@@ -10,6 +10,7 @@ import DocumentsPage from "./pages/DocumentsPage";
 import WorkflowsPage from "./pages/WorkflowsPage";
 import UsersPage from "./pages/UsersPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import InventoryPage from "./pages/InventoryPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFound from "./pages/NotFound";
 
@@ -29,7 +30,7 @@ const App = () => (
           <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/inventory" element={<PlaceholderPage title="Inventory" description="Track stock levels, manage warehouses, and handle transfers across locations." />} />
+          <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/sales" element={<PlaceholderPage title="Sales" description="Monitor sales performance, process transactions, and manage POS operations." />} />
           <Route path="/approvals" element={<PlaceholderPage title="Approvals" description="Review and process pending approval requests across all workflows." />} />
           <Route path="/organization" element={<PlaceholderPage title="Organization" description="Manage stores, warehouses, departments, and organizational structure." />} />
