@@ -11,6 +11,7 @@ import WorkflowsPage from "./pages/WorkflowsPage";
 import UsersPage from "./pages/UsersPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import InventoryPage from "./pages/InventoryPage";
+import SalesPage from "./pages/SalesPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 import NotFound from "./pages/NotFound";
 
@@ -31,7 +32,7 @@ const App = () => (
           <Route path="/users" element={<UsersPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/sales" element={<PlaceholderPage title="Sales" description="Monitor sales performance, process transactions, and manage POS operations." />} />
+          <Route path="/sales" element={<SalesPage />} />
           <Route path="/approvals" element={<PlaceholderPage title="Approvals" description="Review and process pending approval requests across all workflows." />} />
           <Route path="/organization" element={<PlaceholderPage title="Organization" description="Manage stores, warehouses, departments, and organizational structure." />} />
           <Route path="/audit" element={<PlaceholderPage title="Audit Log" description="View tamper-proof logs of all system activities and changes." />} />

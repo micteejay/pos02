@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import {
   Package,
@@ -17,6 +17,10 @@ import {
   ArrowRight,
   Clock,
   Eye,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
 } from "lucide-react";
 import {
   BarChart,
@@ -170,19 +174,141 @@ export default function InventoryPage() {
 // STOCK TAB
 // ═══════════════════════════════════════════════════════════
 function StockTab() {
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterWarehouse, setFilterWarehouse] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
+  const [sortKey, setSortKey] = useState<"name" | "qty" | "price" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const categories = [...new Set(stockItems.map((i) => i.category))];
+  const warehouseNames = [...new Set(stockItems.map((i) => i.warehouse))];
+  const statuses = ["critical", "low", "ok"] as const;
+
+  const activeFilterCount = [filterCategory, filterWarehouse, filterStatus].filter((f) => f !== "all").length;
+
+  const handleSort = (key: "name" | "qty" | "price") => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  const SortIcon = ({ col }: { col: "name" | "qty" | "price" }) => {
+    if (sortKey !== col) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />;
+  };
+
+  const filtered = useMemo(() => {
+    let items = stockItems.filter((item) => {
+      const matchSearch =
+        search === "" ||
+        item.name.toLowerCase().includes(search.toLowerCase()) ||
+        item.sku.toLowerCase().includes(search.toLowerCase()) ||
+        item.category.toLowerCase().includes(search.toLowerCase());
+      const matchCategory = filterCategory === "all" || item.category === filterCategory;
+      const matchWarehouse = filterWarehouse === "all" || item.warehouse === filterWarehouse;
+      const matchStatus = filterStatus === "all" || item.status === filterStatus;
+      return matchSearch && matchCategory && matchWarehouse && matchStatus;
+    });
+
+    if (sortKey) {
+      items = [...items].sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === "name") cmp = a.name.localeCompare(b.name);
+        else if (sortKey === "qty") cmp = a.qty - b.qty;
+        else if (sortKey === "price") cmp = a.price - b.price;
+        return sortDir === "desc" ? -cmp : cmp;
+      });
+    }
+
+    return items;
+  }, [search, filterCategory, filterWarehouse, filterStatus, sortKey, sortDir]);
+
+  const clearFilters = () => {
+    setFilterCategory("all");
+    setFilterWarehouse("all");
+    setFilterStatus("all");
+  };
+
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Search & Filter */}
       <div className="flex items-center gap-3">
         <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted border border-border text-sm">
           <Search className="w-4 h-4 text-muted-foreground" />
-          <input placeholder="Search by SKU, name, or category..." className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground" />
+          <input
+            placeholder="Search by SKU, name, or category..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground"
+          />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm transition-colors ${
+            showFilters || activeFilterCount > 0
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border text-muted-foreground hover:bg-muted"
+          }`}
+        >
           <Filter className="w-4 h-4" />
           Filter
+          {activeFilterCount > 0 && (
+            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+              {activeFilterCount}
+            </span>
+          )}
         </button>
       </div>
+
+      {/* Filter Row */}
+      {showFilters && (
+        <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
+          >
+            <option value="all">All Categories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <select
+            value={filterWarehouse}
+            onChange={(e) => setFilterWarehouse(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
+          >
+            <option value="all">All Warehouses</option>
+            {warehouseNames.map((w) => (
+              <option key={w} value={w}>{w}</option>
+            ))}
+          </select>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
+          >
+            <option value="all">All Statuses</option>
+            {statuses.map((s) => (
+              <option key={s} value={s}>{statusConfig[s].label}</option>
+            ))}
+          </select>
+          {activeFilterCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Stock Table */}
@@ -190,50 +316,73 @@ function StockTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Item</th>
+                <th
+                  className="text-left text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort("name")}
+                >
+                  <div className="flex items-center gap-1">Item <SortIcon col="name" /></div>
+                </th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">SKU</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Warehouse</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Qty</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Price</th>
+                <th
+                  className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort("qty")}
+                >
+                  <div className="flex items-center gap-1 justify-end">Qty <SortIcon col="qty" /></div>
+                </th>
+                <th
+                  className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => handleSort("price")}
+                >
+                  <div className="flex items-center gap-1 justify-end">Price <SortIcon col="price" /></div>
+                </th>
                 <th className="text-center text-xs font-medium text-muted-foreground px-5 py-3">Status</th>
                 <th className="text-right text-xs font-medium text-muted-foreground px-3 py-3"></th>
               </tr>
             </thead>
             <tbody>
-              {stockItems.map((item) => {
-                const sc = statusConfig[item.status];
-                return (
-                  <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                    <td className="px-5 py-3">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">{item.category}</p>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
-                    <td className="px-5 py-3 text-sm text-muted-foreground">{item.warehouse}</td>
-                    <td className="px-5 py-3 text-right">
-                      <span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>
-                        {item.qty}
-                      </span>
-                      <p className="text-[10px] text-muted-foreground">min: {item.reorder}</p>
-                    </td>
-                    <td className="px-5 py-3 text-right text-sm text-foreground">${item.price.toFixed(2)}</td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
-                        {item.status === "critical" && <AlertTriangle className="w-3 h-3" />}
-                        {item.status === "ok" && <CheckCircle2 className="w-3 h-3" />}
-                        {sc.label}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <button className="p-1.5 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
-                        <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
+                    No items match the current filters.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item) => {
+                  const sc = statusConfig[item.status];
+                  return (
+                    <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
+                      <td className="px-5 py-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.category}</p>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
+                      <td className="px-5 py-3 text-sm text-muted-foreground">{item.warehouse}</td>
+                      <td className="px-5 py-3 text-right">
+                        <span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>
+                          {item.qty}
+                        </span>
+                        <p className="text-[10px] text-muted-foreground">min: {item.reorder}</p>
+                      </td>
+                      <td className="px-5 py-3 text-right text-sm text-foreground">${item.price.toFixed(2)}</td>
+                      <td className="px-5 py-3 text-center">
+                        <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
+                          {item.status === "critical" && <AlertTriangle className="w-3 h-3" />}
+                          {item.status === "ok" && <CheckCircle2 className="w-3 h-3" />}
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <button className="p-1.5 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
+                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
