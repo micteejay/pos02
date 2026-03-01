@@ -1,0 +1,357 @@
+import { useState } from "react";
+import AppLayout from "@/components/AppLayout";
+import { Input } from "@/components/ui/input";
+import {
+  Building2,
+  Warehouse,
+  Users,
+  Network,
+  Search,
+  MapPin,
+  Phone,
+  Mail,
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  MoreVertical,
+  Globe,
+  Boxes,
+} from "lucide-react";
+
+// --- Mock Data ---
+const stores = [
+  { id: 1, name: "Downtown Flagship", type: "Retail", address: "123 Main St, Metro City", phone: "+1 555-0100", email: "downtown@enterprise.com", status: "Active", employees: 45, revenue: "$1.2M/mo" },
+  { id: 2, name: "Mall of Nations", type: "Retail", address: "456 Commerce Ave, Metro City", phone: "+1 555-0200", email: "mall@enterprise.com", status: "Active", employees: 32, revenue: "$890K/mo" },
+  { id: 3, name: "Airport Express", type: "Kiosk", address: "Terminal 3, Int'l Airport", phone: "+1 555-0300", email: "airport@enterprise.com", status: "Active", employees: 12, revenue: "$340K/mo" },
+  { id: 4, name: "Suburban Outlet", type: "Outlet", address: "789 Outlet Blvd, Greenfield", phone: "+1 555-0400", email: "outlet@enterprise.com", status: "Maintenance", employees: 18, revenue: "$520K/mo" },
+];
+
+const warehouses = [
+  { id: 1, name: "Central Distribution Hub", location: "Industrial Park, Zone A", capacity: 85, sqft: "120,000", manager: "Robert Chen", zones: 12, activePicks: 234 },
+  { id: 2, name: "West Coast Fulfillment", location: "Port District, Bay Area", capacity: 62, sqft: "85,000", manager: "Maria Santos", zones: 8, activePicks: 156 },
+  { id: 3, name: "Cold Storage Facility", location: "North Industrial, Metro City", capacity: 91, sqft: "45,000", manager: "James Park", zones: 6, activePicks: 89 },
+];
+
+const departments = [
+  { id: 1, name: "Operations", head: "Sarah Mitchell", headcount: 128, budget: "$2.4M", teams: ["Logistics", "Quality Control", "Procurement"] },
+  { id: 2, name: "Sales & Marketing", head: "David Kumar", headcount: 85, budget: "$3.1M", teams: ["Retail Sales", "E-Commerce", "Brand Marketing", "Digital Ads"] },
+  { id: 3, name: "Finance", head: "Lisa Zhang", headcount: 42, budget: "$1.8M", teams: ["Accounting", "Treasury", "Audit"] },
+  { id: 4, name: "Human Resources", head: "Michael Brown", headcount: 28, budget: "$900K", teams: ["Recruitment", "Training", "Payroll"] },
+  { id: 5, name: "Technology", head: "Anna Kowalski", headcount: 64, budget: "$4.2M", teams: ["Infrastructure", "Development", "Support", "Security"] },
+];
+
+interface OrgNode {
+  name: string;
+  role: string;
+  children?: OrgNode[];
+}
+
+const orgTree: OrgNode = {
+  name: "James Wilson",
+  role: "CEO",
+  children: [
+    {
+      name: "Sarah Mitchell",
+      role: "COO",
+      children: [
+        { name: "Robert Chen", role: "VP Logistics" },
+        { name: "Tom Harris", role: "VP Quality" },
+      ],
+    },
+    {
+      name: "David Kumar",
+      role: "CMO",
+      children: [
+        { name: "Emily Rose", role: "Dir. Retail" },
+        { name: "Alex Kim", role: "Dir. E-Commerce" },
+      ],
+    },
+    {
+      name: "Lisa Zhang",
+      role: "CFO",
+      children: [
+        { name: "Mark Davis", role: "Controller" },
+        { name: "Nina Patel", role: "Treasurer" },
+      ],
+    },
+    {
+      name: "Anna Kowalski",
+      role: "CTO",
+      children: [
+        { name: "Chris Lee", role: "VP Engineering" },
+        { name: "Sam Wright", role: "VP Infrastructure" },
+      ],
+    },
+  ],
+};
+
+function OrgTreeNode({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
+  const [expanded, setExpanded] = useState(depth < 2);
+  const hasChildren = node.children && node.children.length > 0;
+
+  return (
+    <div className={depth > 0 ? "ml-6 border-l border-border/50 pl-4" : ""}>
+      <div
+        className="flex items-center gap-3 py-2 group cursor-pointer"
+        onClick={() => hasChildren && setExpanded(!expanded)}
+      >
+        {hasChildren ? (
+          expanded ? (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          )
+        ) : (
+          <div className="w-4" />
+        )}
+        <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-sm font-semibold text-primary">
+          {node.name.split(" ").map((n) => n[0]).join("")}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{node.name}</p>
+          <p className="text-xs text-muted-foreground">{node.role}</p>
+        </div>
+      </div>
+      {hasChildren && expanded && (
+        <div className="animate-fade-in">
+          {node.children!.map((child, i) => (
+            <OrgTreeNode key={i} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type Tab = "stores" | "warehouses" | "departments" | "hierarchy";
+
+export default function OrganizationPage() {
+  const [activeTab, setActiveTab] = useState<Tab>("stores");
+  const [search, setSearch] = useState("");
+
+  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+    { key: "stores", label: "Stores", icon: Building2 },
+    { key: "warehouses", label: "Warehouses", icon: Warehouse },
+    { key: "departments", label: "Departments", icon: Users },
+    { key: "hierarchy", label: "Org Chart", icon: Network },
+  ];
+
+  const stats = [
+    { label: "Total Stores", value: stores.length.toString(), icon: Building2, color: "text-primary" },
+    { label: "Warehouses", value: warehouses.length.toString(), icon: Warehouse, color: "text-info" },
+    { label: "Departments", value: departments.length.toString(), icon: Boxes, color: "text-accent" },
+    { label: "Total Headcount", value: departments.reduce((s, d) => s + d.headcount, 0).toString(), icon: Users, color: "text-success" },
+  ];
+
+  const filteredStores = stores.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredDepts = departments.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <AppLayout>
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Organization</h1>
+            <p className="text-sm text-muted-foreground mt-1">Manage stores, warehouses, departments, and structure</p>
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+            <Plus className="w-4 h-4" />
+            Add New
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="glass-card rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
+                <stat.icon className={`w-4 h-4 ${stat.color}`} />
+              </div>
+              <p className="text-2xl font-bold text-foreground mt-1">{stat.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50 w-fit">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === tab.key
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        {activeTab !== "hierarchy" && (
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search ${activeTab}...`}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
+
+        {/* Stores Tab */}
+        {activeTab === "stores" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredStores.map((store) => (
+              <div key={store.id} className="glass-card rounded-xl p-5 hover:border-primary/30 transition-colors">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{store.name}</h3>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        store.status === "Active"
+                          ? "bg-success/10 text-success"
+                          : "bg-warning/10 text-warning"
+                      }`}>
+                        {store.status}
+                      </span>
+                    </div>
+                  </div>
+                  <button className="p-1 rounded hover:bg-muted transition-colors">
+                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{store.address}</div>
+                  <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{store.phone}</div>
+                  <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5" />{store.email}</div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Employees: </span>
+                    <span className="font-medium text-foreground">{store.employees}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Revenue: </span>
+                    <span className="font-medium text-primary">{store.revenue}</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-muted text-muted-foreground">{store.type}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Warehouses Tab */}
+        {activeTab === "warehouses" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {filteredWarehouses.map((wh) => (
+              <div key={wh.id} className="glass-card rounded-xl p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-info/10 flex items-center justify-center">
+                    <Warehouse className="w-5 h-5 text-info" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">{wh.name}</h3>
+                    <p className="text-xs text-muted-foreground">{wh.location}</p>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Capacity</span>
+                      <span className={`font-medium ${wh.capacity > 85 ? "text-destructive" : "text-foreground"}`}>{wh.capacity}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          wh.capacity > 85 ? "bg-destructive" : wh.capacity > 70 ? "bg-warning" : "bg-primary"
+                        }`}
+                        style={{ width: `${wh.capacity}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-sm font-bold text-foreground">{wh.sqft}</p>
+                      <p className="text-[10px] text-muted-foreground">Sq. Ft.</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-sm font-bold text-foreground">{wh.zones}</p>
+                      <p className="text-[10px] text-muted-foreground">Zones</p>
+                    </div>
+                    <div className="p-2 rounded-lg bg-muted/50">
+                      <p className="text-sm font-bold text-foreground">{wh.activePicks}</p>
+                      <p className="text-[10px] text-muted-foreground">Picks</p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" /> Manager: <span className="text-foreground font-medium">{wh.manager}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Departments Tab */}
+        {activeTab === "departments" && (
+          <div className="space-y-3">
+            {filteredDepts.map((dept) => (
+              <div key={dept.id} className="glass-card rounded-xl p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                      <Boxes className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{dept.name}</h3>
+                      <p className="text-xs text-muted-foreground">Head: {dept.head}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs">
+                    <div className="text-right">
+                      <p className="font-semibold text-foreground">{dept.headcount}</p>
+                      <p className="text-muted-foreground">People</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-primary">{dept.budget}</p>
+                      <p className="text-muted-foreground">Budget</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {dept.teams.map((team) => (
+                    <span key={team} className="text-[10px] px-2 py-1 rounded-full bg-muted text-muted-foreground font-medium">
+                      {team}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Org Chart Tab */}
+        {activeTab === "hierarchy" && (
+          <div className="glass-card rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe className="w-4 h-4 text-primary" />
+              <h3 className="text-sm font-semibold text-foreground">Organization Hierarchy</h3>
+            </div>
+            <OrgTreeNode node={orgTree} />
+          </div>
+        )}
+      </div>
+    </AppLayout>
+  );
+}
