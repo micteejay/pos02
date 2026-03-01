@@ -14,7 +14,8 @@ import InventoryPage from "./pages/InventoryPage";
 import SalesPage from "./pages/SalesPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import AuditLogPage from "./pages/AuditLogPage";
-import PlaceholderPage from "./pages/PlaceholderPage";
+import OrganizationPage from "./pages/OrganizationPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,9 +37,9 @@ const App = () => (
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/sales" element={<SalesPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
-          <Route path="/organization" element={<PlaceholderPage title="Organization" description="Manage stores, warehouses, departments, and organizational structure." />} />
+          <Route path="/organization" element={<OrganizationPage />} />
           <Route path="/audit" element={<AuditLogPage />} />
-          <Route path="/settings" element={<PlaceholderPage title="Settings" description="Configure system preferences, integrations, and security settings." />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
