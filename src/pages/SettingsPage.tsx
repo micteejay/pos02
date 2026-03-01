@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useTheme } from "@/hooks/use-theme";
 import {
   Settings,
   Palette,
@@ -52,7 +53,7 @@ const receiptStyles = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const [selectedReceipt, setSelectedReceipt] = useState("modern");
-  const [theme, setTheme] = useState("dark");
+  const { theme, setTheme } = useTheme();
   const [language, setLanguage] = useState("en");
   const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
   const [twoFactor, setTwoFactor] = useState(false);
@@ -82,7 +83,7 @@ export default function SettingsPage() {
   return (
     <AppLayout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Settings</h1>
             <p className="text-sm text-muted-foreground mt-1">Configure system preferences, integrations, and security</p>
@@ -101,19 +102,19 @@ export default function SettingsPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50 w-fit">
+        <div className="flex items-center gap-1 p-1 rounded-lg bg-muted/50 w-fit overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <tab.icon className="w-4 h-4" />
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
@@ -148,11 +149,11 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">Appearance</h3>
               </div>
               <div className="grid grid-cols-3 gap-3">
-                {[
-                  { key: "light", label: "Light", icon: Sun },
-                  { key: "dark", label: "Dark", icon: Moon },
-                  { key: "system", label: "System", icon: Monitor },
-                ].map((t) => (
+                {([
+                  { key: "light" as const, label: "Light", icon: Sun },
+                  { key: "dark" as const, label: "Dark", icon: Moon },
+                  { key: "system" as const, label: "System", icon: Monitor },
+                ]).map((t) => (
                   <button
                     key={t.key}
                     onClick={() => setTheme(t.key)}
@@ -185,7 +186,7 @@ export default function SettingsPage() {
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
                   >
                     <option value="en">English</option>
                     <option value="es">Spanish</option>
@@ -196,7 +197,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Timezone</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>UTC-05:00 Eastern</option>
                     <option>UTC-06:00 Central</option>
                     <option>UTC-07:00 Mountain</option>
@@ -256,7 +257,6 @@ export default function SettingsPage() {
                       : "hover:border-muted-foreground/30"
                   }`}
                 >
-                  {/* Mini receipt preview */}
                   <div className="w-full aspect-[3/4] rounded-lg bg-card border border-border mb-3 p-3 flex flex-col">
                     {style.preview.accentBar && <div className="h-1 rounded-full bg-primary mb-2" />}
                     {style.preview.showLogo && (
@@ -295,7 +295,6 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            {/* Receipt Customization */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="glass-card rounded-xl p-6">
                 <h3 className="text-sm font-semibold text-foreground mb-4">Receipt Content</h3>
@@ -319,7 +318,7 @@ export default function SettingsPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Paper Width</label>
-                    <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                    <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                       <option>80mm (Standard)</option>
                       <option>58mm (Compact)</option>
                       <option>A4 (Full Page)</option>
@@ -327,7 +326,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">Font Size</label>
-                    <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                    <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                       <option>Small</option>
                       <option>Medium</option>
                       <option>Large</option>
@@ -406,7 +405,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Session Timeout</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>30 minutes</option>
                     <option>1 hour</option>
                     <option>4 hours</option>
@@ -415,7 +414,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Password Policy</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>Strong (12+ chars, mixed case, symbols)</option>
                     <option>Medium (8+ chars, mixed case)</option>
                     <option>Basic (6+ chars)</option>
