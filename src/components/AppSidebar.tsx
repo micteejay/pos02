@@ -60,7 +60,11 @@ const navSections: { title: string; items: NavItem[] }[] = [
   },
 ];
 
-export default function AppSidebar() {
+interface AppSidebarProps {
+  onNavigate?: () => void;
+}
+
+export default function AppSidebar({ onNavigate }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -116,6 +120,7 @@ export default function AppSidebar() {
                   <Link
                     key={item.path}
                     to={item.path}
+                    onClick={onNavigate}
                     className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative ${
                       isActive
                         ? "bg-sidebar-accent text-sidebar-primary font-medium"
@@ -148,8 +153,8 @@ export default function AppSidebar() {
         ))}
       </nav>
 
-      {/* Collapse Toggle */}
-      <div className="border-t border-sidebar-border p-3 shrink-0">
+      {/* Collapse Toggle - hidden on mobile */}
+      <div className="border-t border-sidebar-border p-3 shrink-0 hidden lg:block">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors"

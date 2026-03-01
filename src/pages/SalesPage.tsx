@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
+import { Input } from "@/components/ui/input";
 import {
   DollarSign,
   ShoppingCart,
@@ -10,13 +11,18 @@ import {
   CreditCard,
   Banknote,
   Search,
-  Filter,
   Eye,
-  MoreHorizontal,
   ArrowUpRight,
   Clock,
   Star,
   Target,
+  Plus,
+  X,
+  Check,
+  Trash2,
+  Filter,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   AreaChart,
@@ -32,7 +38,42 @@ import {
   Pie,
 } from "recharts";
 
+// --- Types ---
+interface Transaction {
+  id: string;
+  customer: string;
+  items: number;
+  total: number;
+  method: string;
+  store: string;
+  rep: string;
+  time: string;
+  status: "completed" | "refunded" | "pending";
+  date: string;
+}
+
 type Tab = "transactions" | "analytics" | "reps";
+type SortKey = "time" | "total" | "customer";
+
+// --- Initial Data ---
+const initialTransactions: Transaction[] = [
+  { id: "TXN-9201", customer: "John Rivera", items: 3, total: 247.50, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "2:34 PM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9200", customer: "Sara Mitchell", items: 1, total: 89.00, method: "Cash", store: "West Store", rep: "Bob Tran", time: "2:18 PM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9199", customer: "Mike Thompson", items: 5, total: 512.75, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "1:55 PM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9198", customer: "Emily Watts", items: 2, total: 164.00, method: "Debit Card", store: "East Store", rep: "Diana Lee", time: "1:30 PM", status: "refunded", date: "2026-03-01" },
+  { id: "TXN-9197", customer: "Carlos Diaz", items: 4, total: 328.20, method: "Credit Card", store: "Main HQ", rep: "Frank Kim", time: "12:45 PM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9196", customer: "Linda Park", items: 1, total: 45.99, method: "Mobile Pay", store: "South Hub", rep: "Grace Wu", time: "12:10 PM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9195", customer: "David Brown", items: 6, total: 689.40, method: "Credit Card", store: "West Store", rep: "Bob Tran", time: "11:42 AM", status: "completed", date: "2026-03-01" },
+  { id: "TXN-9194", customer: "Rachel Green", items: 2, total: 175.00, method: "Cash", store: "Main HQ", rep: "Alice Chen", time: "11:05 AM", status: "pending", date: "2026-03-01" },
+];
+
+const salesReps = [
+  { name: "Alice Chen", store: "Main HQ", sales: 142, revenue: 18420, target: 20000, avgTicket: 129.72, rating: 4.8, trend: "up" as const },
+  { name: "Bob Tran", store: "West Store", sales: 118, revenue: 15890, target: 16000, avgTicket: 134.66, rating: 4.6, trend: "up" as const },
+  { name: "Diana Lee", store: "East Store", sales: 95, revenue: 11200, target: 14000, avgTicket: 117.89, rating: 4.4, trend: "down" as const },
+  { name: "Frank Kim", store: "Main HQ", sales: 130, revenue: 16750, target: 18000, avgTicket: 128.85, rating: 4.7, trend: "up" as const },
+  { name: "Grace Wu", store: "South Hub", sales: 88, revenue: 9850, target: 12000, avgTicket: 111.93, rating: 4.3, trend: "down" as const },
+];
 
 const revenueData = [
   { day: "Mon", revenue: 4200, orders: 38 },
@@ -44,44 +85,11 @@ const revenueData = [
   { day: "Sun", revenue: 5600, orders: 47 },
 ];
 
-const transactions = [
-  { id: "TXN-9201", customer: "John Rivera", items: 3, total: 247.50, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "2:34 PM", status: "completed" as const },
-  { id: "TXN-9200", customer: "Sara Mitchell", items: 1, total: 89.00, method: "Cash", store: "West Store", rep: "Bob Tran", time: "2:18 PM", status: "completed" as const },
-  { id: "TXN-9199", customer: "Mike Thompson", items: 5, total: 512.75, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "1:55 PM", status: "completed" as const },
-  { id: "TXN-9198", customer: "Emily Watts", items: 2, total: 164.00, method: "Debit Card", store: "East Store", rep: "Diana Lee", time: "1:30 PM", status: "refunded" as const },
-  { id: "TXN-9197", customer: "Carlos Diaz", items: 4, total: 328.20, method: "Credit Card", store: "Main HQ", rep: "Frank Kim", time: "12:45 PM", status: "completed" as const },
-  { id: "TXN-9196", customer: "Linda Park", items: 1, total: 45.99, method: "Mobile Pay", store: "South Hub", rep: "Grace Wu", time: "12:10 PM", status: "completed" as const },
-  { id: "TXN-9195", customer: "David Brown", items: 6, total: 689.40, method: "Credit Card", store: "West Store", rep: "Bob Tran", time: "11:42 AM", status: "completed" as const },
-  { id: "TXN-9194", customer: "Rachel Green", items: 2, total: 175.00, method: "Cash", store: "Main HQ", rep: "Alice Chen", time: "11:05 AM", status: "pending" as const },
-];
-
-const salesReps = [
-  { name: "Alice Chen", store: "Main HQ", sales: 142, revenue: 18420, target: 20000, avgTicket: 129.72, rating: 4.8, trend: "up" as const },
-  { name: "Bob Tran", store: "West Store", sales: 118, revenue: 15890, target: 16000, avgTicket: 134.66, rating: 4.6, trend: "up" as const },
-  { name: "Diana Lee", store: "East Store", sales: 95, revenue: 11200, target: 14000, avgTicket: 117.89, rating: 4.4, trend: "down" as const },
-  { name: "Frank Kim", store: "Main HQ", sales: 130, revenue: 16750, target: 18000, avgTicket: 128.85, rating: 4.7, trend: "up" as const },
-  { name: "Grace Wu", store: "South Hub", sales: 88, revenue: 9850, target: 12000, avgTicket: 111.93, rating: 4.3, trend: "down" as const },
-];
-
-const paymentBreakdown = [
-  { name: "Credit Card", value: 58, color: "hsl(172,66%,50%)" },
-  { name: "Cash", value: 22, color: "hsl(205,80%,55%)" },
-  { name: "Debit Card", value: 12, color: "hsl(38,92%,50%)" },
-  { name: "Mobile Pay", value: 8, color: "hsl(152,60%,45%)" },
-];
-
 const hourlyData = [
   { hour: "9AM", sales: 12 }, { hour: "10AM", sales: 18 }, { hour: "11AM", sales: 24 },
   { hour: "12PM", sales: 31 }, { hour: "1PM", sales: 28 }, { hour: "2PM", sales: 22 },
   { hour: "3PM", sales: 19 }, { hour: "4PM", sales: 26 }, { hour: "5PM", sales: 34 },
   { hour: "6PM", sales: 29 }, { hour: "7PM", sales: 15 }, { hour: "8PM", sales: 8 },
-];
-
-const stats = [
-  { label: "Today's Revenue", value: "$12,480", change: "+12.4%", trend: "up" as const, icon: DollarSign },
-  { label: "Transactions", value: "94", change: "+8", trend: "up" as const, icon: ShoppingCart },
-  { label: "Avg. Ticket", value: "$132.77", change: "+$4.20", trend: "up" as const, icon: Receipt },
-  { label: "Active Reps", value: "5", change: "0", trend: "up" as const, icon: Users },
 ];
 
 const statusConfig = {
@@ -97,8 +105,59 @@ const methodIcons: Record<string, React.ElementType> = {
   "Mobile Pay": DollarSign,
 };
 
+const stores = ["All Stores", "Main HQ", "West Store", "East Store", "South Hub"];
+const statuses = ["All Status", "completed", "refunded", "pending"];
+const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
+
 export default function SalesPage() {
   const [tab, setTab] = useState<Tab>("transactions");
+  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [showNewSale, setShowNewSale] = useState(false);
+
+  // Computed stats from actual transactions
+  const stats = useMemo(() => {
+    const completed = transactions.filter((t) => t.status === "completed");
+    const totalRevenue = completed.reduce((s, t) => s + t.total, 0);
+    const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
+    return [
+      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: "+12.4%", trend: "up" as const, icon: DollarSign },
+      { label: "Transactions", value: transactions.length.toString(), change: `+${transactions.length - 5}`, trend: "up" as const, icon: ShoppingCart },
+      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "+$4.20", trend: "up" as const, icon: Receipt },
+      { label: "Active Reps", value: "5", change: "0", trend: "up" as const, icon: Users },
+    ];
+  }, [transactions]);
+
+  const paymentBreakdown = useMemo(() => {
+    const counts: Record<string, number> = {};
+    transactions.forEach((t) => { counts[t.method] = (counts[t.method] || 0) + 1; });
+    const total = transactions.length;
+    const colors: Record<string, string> = { "Credit Card": "hsl(172,66%,50%)", Cash: "hsl(205,80%,55%)", "Debit Card": "hsl(38,92%,50%)", "Mobile Pay": "hsl(152,60%,45%)" };
+    return Object.entries(counts).map(([name, count]) => ({
+      name,
+      value: Math.round((count / total) * 100),
+      color: colors[name] || "hsl(220,10%,50%)",
+    }));
+  }, [transactions]);
+
+  const addTransaction = useCallback((data: { customer: string; total: number; method: string; store: string; rep: string; items: number }) => {
+    const newTxn: Transaction = {
+      id: `TXN-${9202 + transactions.length}`,
+      ...data,
+      time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+      status: "completed",
+      date: new Date().toISOString().split("T")[0],
+    };
+    setTransactions((prev) => [newTxn, ...prev]);
+    setShowNewSale(false);
+  }, [transactions.length]);
+
+  const updateStatus = useCallback((id: string, status: Transaction["status"]) => {
+    setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+  }, []);
+
+  const deleteTransaction = useCallback((id: string) => {
+    setTransactions((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "transactions", label: "Transactions", icon: Receipt },
@@ -108,142 +167,312 @@ export default function SalesPage() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Sales</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Monitor transactions, track revenue, and measure rep performance.
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Monitor transactions, track revenue, and measure rep performance.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-            <ShoppingCart className="w-4 h-4" />
+          <button
+            onClick={() => setShowNewSale(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
             New Sale
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <s.icon className="w-5 h-5 text-primary" />
+            <div key={s.label} className="glass-card rounded-xl p-4 sm:p-5 hover:stat-glow transition-all duration-300">
+              <div className="flex items-start justify-between mb-2 sm:mb-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <s.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
+                <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
                   {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   <span>{s.change}</span>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-foreground">{s.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+              <p className="text-lg sm:text-2xl font-bold text-foreground">{s.value}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{s.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit overflow-x-auto">
           {tabs.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
                 tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <t.icon className="w-4 h-4" />
-              {t.label}
+              <span className="hidden sm:inline">{t.label}</span>
             </button>
           ))}
         </div>
 
-        {tab === "transactions" && <TransactionsTab />}
-        {tab === "analytics" && <AnalyticsTab />}
+        {/* New Sale Modal */}
+        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} />}
+
+        {tab === "transactions" && (
+          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
+        )}
+        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} />}
         {tab === "reps" && <RepsTab />}
       </div>
     </AppLayout>
   );
 }
 
-function TransactionsTab() {
-  const [search, setSearch] = useState("");
-  const filtered = transactions.filter(
-    (t) =>
-      t.id.toLowerCase().includes(search.toLowerCase()) ||
-      t.customer.toLowerCase().includes(search.toLowerCase()) ||
-      t.rep.toLowerCase().includes(search.toLowerCase())
-  );
+// --- New Sale Modal ---
+function NewSaleModal({ onAdd, onClose }: { onAdd: (data: any) => void; onClose: () => void }) {
+  const [customer, setCustomer] = useState("");
+  const [total, setTotal] = useState("");
+  const [items, setItems] = useState("1");
+  const [method, setMethod] = useState("Credit Card");
+  const [store, setStore] = useState("Main HQ");
+  const [rep, setRep] = useState("Alice Chen");
+
+  const handleSubmit = () => {
+    if (!customer || !total) return;
+    onAdd({ customer, total: parseFloat(total), items: parseInt(items), method, store, rep });
+  };
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted border border-border text-sm">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            placeholder="Search transactions..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground"
-          />
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-foreground">New Sale</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
         </div>
-      </div>
-
-      <div className="glass-card rounded-xl overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Transaction</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Customer</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Payment</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Store</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Rep</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Total</th>
-              <th className="text-center text-xs font-medium text-muted-foreground px-5 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((txn) => {
-              const sc = statusConfig[txn.status];
-              const MethodIcon = methodIcons[txn.method] || DollarSign;
-              return (
-                <tr key={txn.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                  <td className="px-5 py-3">
-                    <p className="text-xs font-mono text-primary">{txn.id}</p>
-                    <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3" /> {txn.time}
-                    </p>
-                  </td>
-                  <td className="px-5 py-3">
-                    <p className="text-sm font-medium text-foreground">{txn.customer}</p>
-                    <p className="text-xs text-muted-foreground">{txn.items} item{txn.items !== 1 ? "s" : ""}</p>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <MethodIcon className="w-3.5 h-3.5" />
-                      {txn.method}
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">{txn.store}</td>
-                  <td className="px-5 py-3 text-sm text-foreground">{txn.rep}</td>
-                  <td className="px-5 py-3 text-right text-sm font-semibold text-foreground">${txn.total.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-center">
-                    <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
-                      {sc.label}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
+            <Input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Enter customer name" className="mt-1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Total ($)</label>
+              <Input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="0.00" className="mt-1" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Items</label>
+              <Input type="number" value={items} onChange={(e) => setItems(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">Payment Method</label>
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+              <option>Credit Card</option>
+              <option>Cash</option>
+              <option>Debit Card</option>
+              <option>Mobile Pay</option>
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Store</label>
+              <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                <option>Main HQ</option>
+                <option>West Store</option>
+                <option>East Store</option>
+                <option>South Hub</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Sales Rep</label>
+              <select value={rep} onChange={(e) => setRep(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                {salesReps.map((r) => <option key={r.name}>{r.name}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
+          <button onClick={handleSubmit} disabled={!customer || !total} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+            <Check className="w-4 h-4 inline mr-1" /> Create Sale
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function AnalyticsTab() {
+// --- Transactions Tab ---
+function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
+  transactions: Transaction[];
+  onUpdateStatus: (id: string, status: Transaction["status"]) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [storeFilter, setStoreFilter] = useState("All Stores");
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [methodFilter, setMethodFilter] = useState("All Methods");
+  const [sortKey, setSortKey] = useState<SortKey>("time");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [showFilters, setShowFilters] = useState(false);
+  const [expandedTxn, setExpandedTxn] = useState<string | null>(null);
+
+  const filtered = useMemo(() => {
+    let result = transactions.filter((t) => {
+      const matchSearch = !search || t.id.toLowerCase().includes(search.toLowerCase()) || t.customer.toLowerCase().includes(search.toLowerCase()) || t.rep.toLowerCase().includes(search.toLowerCase());
+      const matchStore = storeFilter === "All Stores" || t.store === storeFilter;
+      const matchStatus = statusFilter === "All Status" || t.status === statusFilter;
+      const matchMethod = methodFilter === "All Methods" || t.method === methodFilter;
+      return matchSearch && matchStore && matchStatus && matchMethod;
+    });
+    result.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "total") cmp = a.total - b.total;
+      else if (sortKey === "customer") cmp = a.customer.localeCompare(b.customer);
+      else cmp = a.time.localeCompare(b.time);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return result;
+  }, [transactions, search, storeFilter, statusFilter, methodFilter, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  const activeFilters = [storeFilter, statusFilter, methodFilter].filter((f) => !f.startsWith("All")).length;
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="relative flex-1 w-full sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        </div>
+        <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
+          <Filter className="w-4 h-4" />
+          Filters
+          {activeFilters > 0 && <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">{activeFilters}</span>}
+        </button>
+      </div>
+
+      {showFilters && (
+        <div className="glass-card rounded-xl p-4 flex flex-wrap gap-3 animate-fade-in">
+          <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {stores.map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {statuses.map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <select value={methodFilter} onChange={(e) => setMethodFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {methods.map((m) => <option key={m}>{m}</option>)}
+          </select>
+          {activeFilters > 0 && (
+            <button onClick={() => { setStoreFilter("All Stores"); setStatusFilter("All Status"); setMethodFilter("All Methods"); }} className="text-xs text-primary hover:underline">
+              Clear all
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="glass-card rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 cursor-pointer hover:text-foreground" onClick={() => toggleSort("time")}>
+                  <span className="flex items-center gap-1">Transaction {sortKey === "time" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}</span>
+                </th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 cursor-pointer hover:text-foreground hidden sm:table-cell" onClick={() => toggleSort("customer")}>
+                  <span className="flex items-center gap-1">Customer {sortKey === "customer" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}</span>
+                </th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Payment</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Store</th>
+                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 cursor-pointer hover:text-foreground" onClick={() => toggleSort("total")}>
+                  <span className="flex items-center justify-end gap-1">Total {sortKey === "total" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}</span>
+                </th>
+                <th className="text-center text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((txn) => {
+                const sc = statusConfig[txn.status];
+                const MethodIcon = methodIcons[txn.method] || DollarSign;
+                const isExpanded = expandedTxn === txn.id;
+                return (
+                  <>
+                    <tr
+                      key={txn.id}
+                      className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => setExpandedTxn(isExpanded ? null : txn.id)}
+                    >
+                      <td className="px-4 py-3">
+                        <p className="text-xs font-mono text-primary">{txn.id}</p>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="w-3 h-3" /> {txn.time}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
+                        <p className="text-sm font-medium text-foreground">{txn.customer}</p>
+                        <p className="text-xs text-muted-foreground">{txn.items} item{txn.items !== 1 ? "s" : ""}</p>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                          <MethodIcon className="w-3.5 h-3.5" />
+                          {txn.method}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{txn.store}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">${txn.total.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr key={`${txn.id}-detail`} className="bg-muted/20">
+                        <td colSpan={6} className="px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-3 animate-fade-in">
+                            <span className="text-xs text-muted-foreground">Rep: <span className="text-foreground font-medium">{txn.rep}</span></span>
+                            <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.store}</span></span>
+                            <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
+                            <div className="ml-auto flex gap-2">
+                              {txn.status === "pending" && (
+                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">
+                                  Complete
+                                </button>
+                              )}
+                              {txn.status === "completed" && (
+                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">
+                                  Refund
+                                </button>
+                              )}
+                              <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20">
+                                <Trash2 className="w-3 h-3 inline mr-1" /> Delete
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">No transactions found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Analytics Tab ---
+function AnalyticsTab({ paymentBreakdown }: { paymentBreakdown: { name: string; value: number; color: string }[] }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Chart */}
         <div className="lg:col-span-2 glass-card rounded-xl p-5">
           <h3 className="font-semibold text-foreground mb-1">Weekly Revenue</h3>
           <p className="text-xs text-muted-foreground mb-4">Revenue trend over the past 7 days</p>
@@ -258,49 +487,22 @@ function AnalyticsTab() {
               <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
               <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
               <Tooltip
-                contentStyle={{
-                  background: "hsl(222,22%,11%)",
-                  border: "1px solid hsl(220,18%,18%)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  color: "hsl(210,20%,92%)",
-                }}
+                contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }}
                 formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
               />
               <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGrad)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
-
-        {/* Payment Breakdown */}
         <div className="glass-card rounded-xl p-5">
           <h3 className="font-semibold text-foreground mb-1">Payment Methods</h3>
           <p className="text-xs text-muted-foreground mb-4">Distribution by payment type</p>
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
-              <Pie
-                data={paymentBreakdown}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={75}
-                dataKey="value"
-                stroke="none"
-              >
-                {paymentBreakdown.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
+              <Pie data={paymentBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" stroke="none">
+                {paymentBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
               </Pie>
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(222,22%,11%)",
-                  border: "1px solid hsl(220,18%,18%)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  color: "hsl(210,20%,92%)",
-                }}
-                formatter={(value: number) => [`${value}%`]}
-              />
+              <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} formatter={(value: number) => [`${value}%`]} />
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2 mt-2">
@@ -316,8 +518,6 @@ function AnalyticsTab() {
           </div>
         </div>
       </div>
-
-      {/* Hourly Sales */}
       <div className="glass-card rounded-xl p-5">
         <h3 className="font-semibold text-foreground mb-1">Hourly Sales Volume</h3>
         <p className="text-xs text-muted-foreground mb-4">Number of transactions per hour today</p>
@@ -325,15 +525,7 @@ function AnalyticsTab() {
           <BarChart data={hourlyData} barSize={20}>
             <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
             <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-            <Tooltip
-              contentStyle={{
-                background: "hsl(222,22%,11%)",
-                border: "1px solid hsl(220,18%,18%)",
-                borderRadius: "8px",
-                fontSize: "12px",
-                color: "hsl(210,20%,92%)",
-              }}
-            />
+            <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} />
             <Bar dataKey="sales" fill="hsl(205,80%,55%)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -342,6 +534,7 @@ function AnalyticsTab() {
   );
 }
 
+// --- Reps Tab ---
 function RepsTab() {
   return (
     <div className="space-y-4 animate-fade-in">
@@ -349,7 +542,6 @@ function RepsTab() {
         {salesReps.map((rep) => {
           const progress = Math.round((rep.revenue / rep.target) * 100);
           const progressColor = progress >= 90 ? "bg-success" : progress >= 70 ? "bg-warning" : "bg-destructive";
-
           return (
             <div key={rep.name} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
               <div className="flex items-start justify-between mb-4">
@@ -367,13 +559,9 @@ function RepsTab() {
                   <span className="font-semibold text-foreground">{rep.rating}</span>
                 </div>
               </div>
-
-              {/* Target Progress */}
               <div className="mb-4">
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <Target className="w-3 h-3" /> Target Progress
-                  </span>
+                  <span className="text-muted-foreground flex items-center gap-1"><Target className="w-3 h-3" /> Target Progress</span>
                   <span className="font-semibold text-foreground">{progress}%</span>
                 </div>
                 <div className="h-2 rounded-full bg-muted overflow-hidden">
@@ -384,8 +572,6 @@ function RepsTab() {
                   <span>${rep.target.toLocaleString()}</span>
                 </div>
               </div>
-
-              {/* Stats */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="text-center p-2 rounded-lg bg-muted/50">
                   <p className="text-sm font-bold text-foreground">{rep.sales}</p>
