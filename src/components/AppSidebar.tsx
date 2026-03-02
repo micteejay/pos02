@@ -16,6 +16,9 @@ import {
   Package,
   BarChart3,
   ClipboardCheck,
+  ShoppingCart,
+  PieChart,
+  Truck,
 } from "lucide-react";
 
 interface NavItem {
@@ -36,8 +39,10 @@ const navSections: { title: string; items: NavItem[] }[] = [
   {
     title: "Operations",
     items: [
+      { label: "POS", icon: ShoppingCart, path: "/pos" },
       { label: "Inventory", icon: Package, path: "/inventory" },
       { label: "Sales", icon: BarChart3, path: "/sales" },
+      { label: "Supply Chain", icon: Truck, path: "/supply" },
       { label: "Workflows", icon: GitBranch, path: "/workflows" },
       { label: "Approvals", icon: ClipboardCheck, path: "/approvals" },
     ],
@@ -47,6 +52,12 @@ const navSections: { title: string; items: NavItem[] }[] = [
     items: [
       { label: "Chat", icon: MessageSquare, path: "/chat", badge: 3 },
       { label: "Documents", icon: FileText, path: "/documents" },
+    ],
+  },
+  {
+    title: "Analytics",
+    items: [
+      { label: "Reports", icon: PieChart, path: "/reports" },
     ],
   },
   {

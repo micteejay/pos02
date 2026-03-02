@@ -13,6 +13,9 @@ import UsersPage from "./pages/UsersPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import InventoryPage from "./pages/InventoryPage";
 import SalesPage from "./pages/SalesPage";
+import POSPage from "./pages/POSPage";
+import ReportsPage from "./pages/ReportsPage";
+import SupplyPage from "./pages/SupplyPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import AuditLogPage from "./pages/AuditLogPage";
 import OrganizationPage from "./pages/OrganizationPage";
@@ -38,6 +41,9 @@ const App = () => (
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/sales" element={<SalesPage />} />
+            <Route path="/pos" element={<POSPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/supply" element={<SupplyPage />} />
             <Route path="/approvals" element={<ApprovalsPage />} />
             <Route path="/organization" element={<OrganizationPage />} />
             <Route path="/audit" element={<AuditLogPage />} />
