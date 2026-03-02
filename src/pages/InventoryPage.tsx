@@ -1,82 +1,51 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import {
-  Package,
-  Warehouse,
-  ArrowRightLeft,
-  Search,
-  Filter,
-  Plus,
-  AlertTriangle,
-  CheckCircle2,
-  TrendingDown,
-  TrendingUp,
-  MoreHorizontal,
-  MapPin,
-  Box,
-  ArrowRight,
-  Clock,
-  Eye,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  X,
+  Package, Warehouse, ArrowRightLeft, Search, Filter, Plus, AlertTriangle,
+  CheckCircle2, TrendingDown, TrendingUp, MoreHorizontal, MapPin, Box,
+  ArrowRight, Clock, Eye, ArrowUpDown, ArrowUp, ArrowDown, X, Check, Trash2, Edit2,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+import { Input } from "@/components/ui/input";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 type Tab = "stock" | "warehouses" | "transfers";
 
-// ── Stock Data ──────────────────────────────────────────────
-const stockItems = [
-  { sku: "WDG-A100", name: "Widget Alpha", category: "Components", warehouse: "Main HQ", qty: 12, reorder: 50, price: 24.99, status: "critical" as const },
-  { sku: "WDG-B200", name: "Widget Beta", category: "Components", warehouse: "Main HQ", qty: 340, reorder: 100, price: 18.50, status: "ok" as const },
-  { sku: "SEN-X10", name: "Sensor X10", category: "Electronics", warehouse: "West DC", qty: 45, reorder: 40, price: 89.00, status: "low" as const },
-  { sku: "MTR-500", name: "Motor 500W", category: "Machinery", warehouse: "East DC", qty: 78, reorder: 30, price: 145.00, status: "ok" as const },
-  { sku: "CBL-CAT6", name: "Cat6 Cable (100ft)", category: "Networking", warehouse: "Main HQ", qty: 520, reorder: 200, price: 34.99, status: "ok" as const },
-  { sku: "PCB-R3", name: "PCB Board Rev3", category: "Electronics", warehouse: "West DC", qty: 8, reorder: 25, price: 12.75, status: "critical" as const },
-  { sku: "FAN-120", name: "Cooling Fan 120mm", category: "Components", warehouse: "East DC", qty: 190, reorder: 100, price: 9.99, status: "ok" as const },
-  { sku: "PSU-750", name: "PSU 750W Gold", category: "Electronics", warehouse: "Main HQ", qty: 62, reorder: 50, price: 119.00, status: "low" as const },
+interface StockItem {
+  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; price: number; status: "critical" | "low" | "ok";
+}
+
+interface WarehouseData {
+  id: string; name: string; location: string; capacity: number; items: number; zones: number; manager: string; status: "operational" | "maintenance";
+}
+
+interface Transfer {
+  id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
+}
+
+const initialStock: StockItem[] = [
+  { sku: "WDG-A100", name: "Widget Alpha", category: "Components", warehouse: "Main HQ", qty: 12, reorder: 50, price: 24.99, status: "critical" },
+  { sku: "WDG-B200", name: "Widget Beta", category: "Components", warehouse: "Main HQ", qty: 340, reorder: 100, price: 18.50, status: "ok" },
+  { sku: "SEN-X10", name: "Sensor X10", category: "Electronics", warehouse: "West DC", qty: 45, reorder: 40, price: 89.00, status: "low" },
+  { sku: "MTR-500", name: "Motor 500W", category: "Machinery", warehouse: "East DC", qty: 78, reorder: 30, price: 145.00, status: "ok" },
+  { sku: "CBL-CAT6", name: "Cat6 Cable (100ft)", category: "Networking", warehouse: "Main HQ", qty: 520, reorder: 200, price: 34.99, status: "ok" },
+  { sku: "PCB-R3", name: "PCB Board Rev3", category: "Electronics", warehouse: "West DC", qty: 8, reorder: 25, price: 12.75, status: "critical" },
+  { sku: "FAN-120", name: "Cooling Fan 120mm", category: "Components", warehouse: "East DC", qty: 190, reorder: 100, price: 9.99, status: "ok" },
+  { sku: "PSU-750", name: "PSU 750W Gold", category: "Electronics", warehouse: "Main HQ", qty: 62, reorder: 50, price: 119.00, status: "low" },
 ];
 
-const categoryData = [
-  { name: "Components", count: 542 },
-  { name: "Electronics", count: 115 },
-  { name: "Machinery", count: 78 },
-  { name: "Networking", count: 520 },
+const initialWarehouses: WarehouseData[] = [
+  { id: "WH-001", name: "Main HQ Warehouse", location: "San Francisco, CA", capacity: 85, items: 4280, zones: 12, manager: "Sarah Chen", status: "operational" },
+  { id: "WH-002", name: "West Distribution Center", location: "Portland, OR", capacity: 62, items: 2150, zones: 8, manager: "James Wilson", status: "operational" },
+  { id: "WH-003", name: "East Distribution Center", location: "Atlanta, GA", capacity: 91, items: 5420, zones: 15, manager: "Maria Garcia", status: "maintenance" },
+  { id: "WH-004", name: "South Fulfillment Hub", location: "Houston, TX", capacity: 34, items: 890, zones: 6, manager: "David Kim", status: "operational" },
 ];
 
-// ── Warehouse Data ──────────────────────────────────────────
-const warehouses = [
-  { id: "WH-001", name: "Main HQ Warehouse", location: "San Francisco, CA", capacity: 85, items: 4280, zones: 12, manager: "Sarah Chen", status: "operational" as const },
-  { id: "WH-002", name: "West Distribution Center", location: "Portland, OR", capacity: 62, items: 2150, zones: 8, manager: "James Wilson", status: "operational" as const },
-  { id: "WH-003", name: "East Distribution Center", location: "Atlanta, GA", capacity: 91, items: 5420, zones: 15, manager: "Maria Garcia", status: "maintenance" as const },
-  { id: "WH-004", name: "South Fulfillment Hub", location: "Houston, TX", capacity: 34, items: 890, zones: 6, manager: "David Kim", status: "operational" as const },
-];
-
-// ── Transfer Data ───────────────────────────────────────────
-const transfers = [
-  { id: "TRF-4501", items: "Widget Alpha ×200", from: "West DC", to: "Main HQ", initiated: "Feb 12, 2026", eta: "Feb 14, 2026", status: "in_transit" as const, requester: "Lisa Park" },
-  { id: "TRF-4498", items: "Sensor X10 ×50", from: "Main HQ", to: "East DC", initiated: "Feb 11, 2026", eta: "Feb 13, 2026", status: "in_transit" as const, requester: "Mike Ross" },
-  { id: "TRF-4495", items: "Motor 500W ×30", from: "East DC", to: "South Hub", initiated: "Feb 10, 2026", eta: "Feb 12, 2026", status: "delivered" as const, requester: "Sarah Chen" },
-  { id: "TRF-4490", items: "Cat6 Cable ×100", from: "Main HQ", to: "West DC", initiated: "Feb 9, 2026", eta: "Feb 11, 2026", status: "delivered" as const, requester: "James Wilson" },
-  { id: "TRF-4488", items: "PCB Board Rev3 ×100", from: "South Hub", to: "Main HQ", initiated: "Feb 8, 2026", eta: "Feb 14, 2026", status: "pending" as const, requester: "David Kim" },
-  { id: "TRF-4485", items: "PSU 750W ×25", from: "West DC", to: "East DC", initiated: "Feb 7, 2026", eta: "Feb 10, 2026", status: "delivered" as const, requester: "Maria Garcia" },
-];
-
-// ── Stat cards ──────────────────────────────────────────────
-const stats = [
-  { label: "Total SKUs", value: "12,847", change: "+124", trend: "up" as const, icon: Package },
-  { label: "Warehouses", value: "4", change: "0", trend: "up" as const, icon: Warehouse },
-  { label: "Low Stock Alerts", value: "18", change: "+3", trend: "down" as const, icon: AlertTriangle },
-  { label: "Active Transfers", value: "2", change: "-1", trend: "up" as const, icon: ArrowRightLeft },
+const initialTransfers: Transfer[] = [
+  { id: "TRF-4501", items: "Widget Alpha ×200", from: "West DC", to: "Main HQ", initiated: "Feb 12, 2026", eta: "Feb 14, 2026", status: "in_transit", requester: "Lisa Park" },
+  { id: "TRF-4498", items: "Sensor X10 ×50", from: "Main HQ", to: "East DC", initiated: "Feb 11, 2026", eta: "Feb 13, 2026", status: "in_transit", requester: "Mike Ross" },
+  { id: "TRF-4495", items: "Motor 500W ×30", from: "East DC", to: "South Hub", initiated: "Feb 10, 2026", eta: "Feb 12, 2026", status: "delivered", requester: "Sarah Chen" },
+  { id: "TRF-4490", items: "Cat6 Cable ×100", from: "Main HQ", to: "West DC", initiated: "Feb 9, 2026", eta: "Feb 11, 2026", status: "delivered", requester: "James Wilson" },
+  { id: "TRF-4488", items: "PCB Board Rev3 ×100", from: "South Hub", to: "Main HQ", initiated: "Feb 8, 2026", eta: "Feb 14, 2026", status: "pending", requester: "David Kim" },
 ];
 
 const statusConfig = {
@@ -94,6 +63,22 @@ const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "h
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<Tab>("stock");
+  const [stockItems, setStockItems] = useState(initialStock);
+  const [warehouses, setWarehouses] = useState(initialWarehouses);
+  const [transfers, setTransfers] = useState(initialTransfers);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const stats = useMemo(() => {
+    const totalSkus = stockItems.length;
+    const lowAlerts = stockItems.filter((i) => i.status === "critical" || i.status === "low").length;
+    const activeTransfers = transfers.filter((t) => t.status === "in_transit" || t.status === "pending").length;
+    return [
+      { label: "Total SKUs", value: totalSkus.toLocaleString(), change: `+${totalSkus}`, trend: "up" as const, icon: Package },
+      { label: "Warehouses", value: warehouses.length.toString(), change: "0", trend: "up" as const, icon: Warehouse },
+      { label: "Low Stock Alerts", value: lowAlerts.toString(), change: `+${lowAlerts}`, trend: "down" as const, icon: AlertTriangle },
+      { label: "Active Transfers", value: activeTransfers.toString(), change: "0", trend: "up" as const, icon: ArrowRightLeft },
+    ];
+  }, [stockItems, warehouses, transfers]);
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stock", label: "Stock Levels", icon: Package },
@@ -101,100 +86,183 @@ export default function InventoryPage() {
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
   ];
 
+  const addStockItem = (item: StockItem) => {
+    setStockItems((prev) => [...prev, item]);
+    setShowAddModal(false);
+  };
+
+  const deleteStockItem = (sku: string) => setStockItems((prev) => prev.filter((i) => i.sku !== sku));
+
+  const adjustQty = (sku: string, delta: number) => {
+    setStockItems((prev) =>
+      prev.map((i) => {
+        if (i.sku !== sku) return i;
+        const newQty = Math.max(0, i.qty + delta);
+        const status: StockItem["status"] = newQty <= i.reorder * 0.3 ? "critical" : newQty <= i.reorder ? "low" : "ok";
+        return { ...i, qty: newQty, status };
+      })
+    );
+  };
+
+  const addTransfer = (tr: Transfer) => setTransfers((prev) => [tr, ...prev]);
+
+  const updateTransferStatus = (id: string, status: Transfer["status"]) => {
+    setTransfers((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+  };
+
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
-        {/* Header */}
+      <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track stock levels, manage warehouses, and monitor transfers.
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">Track stock levels, manage warehouses, and monitor transfers.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
             <Plus className="w-4 h-4" />
             {tab === "stock" ? "Add Item" : tab === "warehouses" ? "Add Warehouse" : "New Transfer"}
           </button>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <s.icon className="w-5 h-5 text-primary" />
+            <div key={s.label} className="glass-card rounded-xl p-4 hover:stat-glow transition-all duration-300">
+              <div className="flex items-start justify-between mb-2">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <s.icon className="w-4 h-4 text-primary" />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
-                  {s.label === "Low Stock Alerts" ? (
-                    <TrendingUp className="w-3 h-3 text-destructive" />
-                  ) : s.trend === "up" ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  <span className={s.label === "Low Stock Alerts" ? "text-destructive" : ""}>{s.change}</span>
+                <div className={`flex items-center gap-1 text-xs font-medium ${s.label === "Low Stock Alerts" ? "text-destructive" : s.trend === "up" ? "text-success" : "text-destructive"}`}>
+                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  <span>{s.change}</span>
                 </div>
               </div>
-              <p className="text-2xl font-bold text-foreground">{s.value}</p>
-              <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+              <p className="text-xl font-bold text-foreground">{s.value}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
           {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-                tab === t.key
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <t.icon className="w-4 h-4" />
-              {t.label}
+            <button key={t.key} onClick={() => setTab(t.key)} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+              <t.icon className="w-4 h-4" />{t.label}
             </button>
           ))}
         </div>
 
-        {/* Tab Content */}
-        {tab === "stock" && <StockTab />}
-        {tab === "warehouses" && <WarehouseTab />}
-        {tab === "transfers" && <TransferTab />}
+        {tab === "stock" && <StockTab items={stockItems} onDelete={deleteStockItem} onAdjustQty={adjustQty} />}
+        {tab === "warehouses" && <WarehouseTab warehouses={warehouses} />}
+        {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
       </div>
+
+      {/* Add Item Modal */}
+      {showAddModal && tab === "stock" && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Add Stock Item</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <AddItemForm onAdd={addStockItem} onCancel={() => setShowAddModal(false)} />
+          </div>
+        </div>
+      )}
+
+      {showAddModal && tab === "transfers" && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">New Transfer</h3>
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <NewTransferForm onAdd={(tr) => { addTransfer(tr); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// STOCK TAB
-// ═══════════════════════════════════════════════════════════
-function StockTab() {
-  const [search, setSearch] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterWarehouse, setFilterWarehouse] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [showFilters, setShowFilters] = useState(false);
-  const [sortKey, setSortKey] = useState<"name" | "qty" | "price" | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+function AddItemForm({ onAdd, onCancel }: { onAdd: (item: StockItem) => void; onCancel: () => void }) {
+  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
+  const [warehouse, setWarehouse] = useState("Main HQ"); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
 
-  const categories = [...new Set(stockItems.map((i) => i.category))];
-  const warehouseNames = [...new Set(stockItems.map((i) => i.warehouse))];
-  const statuses = ["critical", "low", "ok"] as const;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={sku} onChange={(e) => setSku(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Category</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option>
+          </select>
+        </div>
+        <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
+          <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Qty</label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Reorder Point</label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Price ($)</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
+        <button
+          disabled={!name || !sku || !qty || !price}
+          onClick={() => {
+            const q = parseInt(qty); const r = parseInt(reorder);
+            const status: StockItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, price: parseFloat(price), status });
+          }}
+          className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >Add Item</button>
+      </div>
+    </div>
+  );
+}
 
+function NewTransferForm({ onAdd, onCancel }: { onAdd: (tr: Transfer) => void; onCancel: () => void }) {
+  const [items, setItems] = useState(""); const [from, setFrom] = useState("Main HQ"); const [to, setTo] = useState("West DC");
+  const wh = ["Main HQ", "West DC", "East DC", "South Hub"];
+
+  return (
+    <div className="space-y-3">
+      <div><label className="text-xs font-medium text-muted-foreground">Items Description</label><Input value={items} onChange={(e) => setItems(e.target.value)} placeholder="e.g. Widget Alpha ×200" className="mt-1" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">From</label>
+          <select value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">{wh.map((w) => <option key={w}>{w}</option>)}</select>
+        </div>
+        <div><label className="text-xs font-medium text-muted-foreground">To</label>
+          <select value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">{wh.filter((w) => w !== from).map((w) => <option key={w}>{w}</option>)}</select>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
+        <button disabled={!items} onClick={() => onAdd({ id: `TRF-${4600 + Math.floor(Math.random() * 100)}`, items, from, to, initiated: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), eta: "TBD", status: "pending", requester: "You" })}
+          className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Create Transfer</button>
+      </div>
+    </div>
+  );
+}
+
+function StockTab({ items, onDelete, onAdjustQty }: { items: StockItem[]; onDelete: (sku: string) => void; onAdjustQty: (sku: string, delta: number) => void }) {
+  const [search, setSearch] = useState(""); const [filterCategory, setFilterCategory] = useState("all"); const [filterWarehouse, setFilterWarehouse] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all"); const [showFilters, setShowFilters] = useState(false);
+  const [sortKey, setSortKey] = useState<"name" | "qty" | "price" | null>(null); const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [expandedSku, setExpandedSku] = useState<string | null>(null);
+
+  const categories = [...new Set(items.map((i) => i.category))];
+  const warehouseNames = [...new Set(items.map((i) => i.warehouse))];
   const activeFilterCount = [filterCategory, filterWarehouse, filterStatus].filter((f) => f !== "all").length;
 
   const handleSort = (key: "name" | "qty" | "price") => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
+    if (sortKey === key) setSortDir((d) => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
   };
 
   const SortIcon = ({ col }: { col: "name" | "qty" | "price" }) => {
@@ -203,228 +271,134 @@ function StockTab() {
   };
 
   const filtered = useMemo(() => {
-    let items = stockItems.filter((item) => {
-      const matchSearch =
-        search === "" ||
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.sku.toLowerCase().includes(search.toLowerCase()) ||
-        item.category.toLowerCase().includes(search.toLowerCase());
-      const matchCategory = filterCategory === "all" || item.category === filterCategory;
-      const matchWarehouse = filterWarehouse === "all" || item.warehouse === filterWarehouse;
-      const matchStatus = filterStatus === "all" || item.status === filterStatus;
-      return matchSearch && matchCategory && matchWarehouse && matchStatus;
+    let result = items.filter((item) => {
+      const matchSearch = search === "" || item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());
+      return matchSearch && (filterCategory === "all" || item.category === filterCategory) && (filterWarehouse === "all" || item.warehouse === filterWarehouse) && (filterStatus === "all" || item.status === filterStatus);
     });
-
     if (sortKey) {
-      items = [...items].sort((a, b) => {
-        let cmp = 0;
-        if (sortKey === "name") cmp = a.name.localeCompare(b.name);
-        else if (sortKey === "qty") cmp = a.qty - b.qty;
-        else if (sortKey === "price") cmp = a.price - b.price;
+      result = [...result].sort((a, b) => {
+        let cmp = sortKey === "name" ? a.name.localeCompare(b.name) : sortKey === "qty" ? a.qty - b.qty : a.price - b.price;
         return sortDir === "desc" ? -cmp : cmp;
       });
     }
+    return result;
+  }, [items, search, filterCategory, filterWarehouse, filterStatus, sortKey, sortDir]);
 
-    return items;
-  }, [search, filterCategory, filterWarehouse, filterStatus, sortKey, sortDir]);
-
-  const clearFilters = () => {
-    setFilterCategory("all");
-    setFilterWarehouse("all");
-    setFilterStatus("all");
-  };
+  const categoryData = useMemo(() => {
+    const map: Record<string, number> = {};
+    items.forEach((i) => { map[i.category] = (map[i.category] || 0) + i.qty; });
+    return Object.entries(map).map(([name, count]) => ({ name, count }));
+  }, [items]);
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Search & Filter */}
       <div className="flex items-center gap-3">
         <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted border border-border text-sm">
           <Search className="w-4 h-4 text-muted-foreground" />
-          <input
-            placeholder="Search by SKU, name, or category..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground"
-          />
+          <input placeholder="Search by SKU, name, or category..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground" />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm transition-colors ${
-            showFilters || activeFilterCount > 0
-              ? "border-primary bg-primary/10 text-primary"
-              : "border-border text-muted-foreground hover:bg-muted"
-          }`}
-        >
-          <Filter className="w-4 h-4" />
-          Filter
-          {activeFilterCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-              {activeFilterCount}
-            </span>
-          )}
+        <button onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm transition-colors ${showFilters || activeFilterCount > 0 ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>
+          <Filter className="w-4 h-4" />Filter
+          {activeFilterCount > 0 && <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">{activeFilterCount}</span>}
         </button>
       </div>
 
-      {/* Filter Row */}
       {showFilters && (
         <div className="flex flex-wrap items-center gap-3 animate-fade-in">
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
+          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none">
+            <option value="all">All Categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select
-            value={filterWarehouse}
-            onChange={(e) => setFilterWarehouse(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
-          >
-            <option value="all">All Warehouses</option>
-            {warehouseNames.map((w) => (
-              <option key={w} value={w}>{w}</option>
-            ))}
+          <select value={filterWarehouse} onChange={(e) => setFilterWarehouse(e.target.value)} className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none">
+            <option value="all">All Warehouses</option>{warehouseNames.map((w) => <option key={w} value={w}>{w}</option>)}
           </select>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none"
-          >
-            <option value="all">All Statuses</option>
-            {statuses.map((s) => (
-              <option key={s} value={s}>{statusConfig[s].label}</option>
-            ))}
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="px-3 py-2 rounded-lg bg-muted border border-border text-sm text-foreground outline-none">
+            <option value="all">All Statuses</option><option value="critical">Critical</option><option value="low">Low Stock</option><option value="ok">In Stock</option>
           </select>
           {activeFilterCount > 0 && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-              Clear filters
+            <button onClick={() => { setFilterCategory("all"); setFilterWarehouse("all"); setFilterStatus("all"); }} className="flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium text-destructive hover:bg-destructive/10">
+              <X className="w-3.5 h-3.5" />Clear
             </button>
           )}
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Stock Table */}
         <div className="lg:col-span-2 glass-card rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th
-                  className="text-left text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
-                  onClick={() => handleSort("name")}
-                >
-                  <div className="flex items-center gap-1">Item <SortIcon col="name" /></div>
-                </th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">SKU</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Warehouse</th>
-                <th
-                  className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
-                  onClick={() => handleSort("qty")}
-                >
-                  <div className="flex items-center gap-1 justify-end">Qty <SortIcon col="qty" /></div>
-                </th>
-                <th
-                  className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground transition-colors select-none"
-                  onClick={() => handleSort("price")}
-                >
-                  <div className="flex items-center gap-1 justify-end">Price <SortIcon col="price" /></div>
-                </th>
-                <th className="text-center text-xs font-medium text-muted-foreground px-5 py-3">Status</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-3 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                    No items match the current filters.
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground" onClick={() => handleSort("name")}>
+                    <div className="flex items-center gap-1">Item <SortIcon col="name" /></div>
+                  </th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">SKU</th>
+                  <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 hidden md:table-cell">Warehouse</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground" onClick={() => handleSort("qty")}>
+                    <div className="flex items-center gap-1 justify-end">Qty <SortIcon col="qty" /></div>
+                  </th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground hidden sm:table-cell" onClick={() => handleSort("price")}>
+                    <div className="flex items-center gap-1 justify-end">Price <SortIcon col="price" /></div>
+                  </th>
+                  <th className="text-center text-xs font-medium text-muted-foreground px-5 py-3">Status</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-3 py-3"></th>
                 </tr>
-              ) : (
-                filtered.map((item) => {
+              </thead>
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No items match filters.</td></tr>
+                ) : filtered.map((item) => {
                   const sc = statusConfig[item.status];
+                  const isExpanded = expandedSku === item.sku;
                   return (
-                    <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors group">
-                      <td className="px-5 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.category}</p>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
-                      <td className="px-5 py-3 text-sm text-muted-foreground">{item.warehouse}</td>
-                      <td className="px-5 py-3 text-right">
-                        <span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>
-                          {item.qty}
-                        </span>
-                        <p className="text-[10px] text-muted-foreground">min: {item.reorder}</p>
-                      </td>
-                      <td className="px-5 py-3 text-right text-sm text-foreground">${item.price.toFixed(2)}</td>
-                      <td className="px-5 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
-                          {item.status === "critical" && <AlertTriangle className="w-3 h-3" />}
-                          {item.status === "ok" && <CheckCircle2 className="w-3 h-3" />}
-                          {sc.label}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        <button className="p-1.5 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => setExpandedSku(isExpanded ? null : item.sku)}>
+                        <td className="px-5 py-3"><p className="text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted-foreground">{item.category}</p></td>
+                        <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
+                        <td className="px-5 py-3 text-right"><span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>{item.qty}</span></td>
+                        <td className="px-5 py-3 text-right text-sm text-foreground hidden sm:table-cell">${item.price.toFixed(2)}</td>
+                        <td className="px-5 py-3 text-center"><span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{item.status === "critical" && <AlertTriangle className="w-3 h-3" />}{sc.label}</span></td>
+                        <td className="px-3 py-3 text-right"><MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" /></td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${item.sku}-actions`} className="bg-muted/20">
+                          <td colSpan={7} className="px-5 py-3">
+                            <div className="flex flex-wrap items-center gap-2 animate-fade-in">
+                              <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
+                              <div className="ml-auto flex gap-2">
+                                <button onClick={(e) => { e.stopPropagation(); onAdjustQty(item.sku, 10); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">+10 Stock</button>
+                                <button onClick={(e) => { e.stopPropagation(); onAdjustQty(item.sku, -10); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">-10 Stock</button>
+                                <button onClick={(e) => { e.stopPropagation(); onDelete(item.sku); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20"><Trash2 className="w-3 h-3 inline mr-1" />Delete</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   );
-                })
-              )}
-            </tbody>
-          </table>
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Category Breakdown */}
         <div className="glass-card rounded-xl p-5">
           <h3 className="font-semibold text-foreground mb-1">By Category</h3>
-          <p className="text-xs text-muted-foreground mb-4">Stock distribution across categories</p>
+          <p className="text-xs text-muted-foreground mb-4">Stock distribution</p>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={categoryData} barSize={24}>
               <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
               <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-              <Tooltip
-                contentStyle={{
-                  background: "hsl(222,22%,11%)",
-                  border: "1px solid hsl(220,18%,18%)",
-                  borderRadius: "8px",
-                  fontSize: "12px",
-                  color: "hsl(210,20%,92%)",
-                }}
-              />
-              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                {categoryData.map((_, i) => (
-                  <Cell key={i} fill={barColors[i % barColors.length]} />
-                ))}
-              </Bar>
+              <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>{categoryData.map((_, i) => <Cell key={i} fill={barColors[i % barColors.length]} />)}</Bar>
             </BarChart>
           </ResponsiveContainer>
-
-          {/* Low stock alerts */}
           <div className="mt-5 pt-4 border-t border-border">
-            <h4 className="text-xs font-semibold text-destructive flex items-center gap-1.5 mb-3">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Critical Stock Alerts
-            </h4>
+            <h4 className="text-xs font-semibold text-destructive flex items-center gap-1.5 mb-3"><AlertTriangle className="w-3.5 h-3.5" />Critical Stock</h4>
             <div className="space-y-2">
-              {stockItems.filter((i) => i.status === "critical").map((item) => (
+              {items.filter((i) => i.status === "critical").map((item) => (
                 <div key={item.sku} className="flex items-center justify-between p-2.5 rounded-lg bg-destructive/5 border border-destructive/10">
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{item.sku} · {item.warehouse}</p>
-                  </div>
+                  <div><p className="text-xs font-medium text-foreground">{item.name}</p><p className="text-[10px] text-muted-foreground">{item.sku} · {item.warehouse}</p></div>
                   <span className="text-sm font-bold text-destructive">{item.qty}</span>
                 </div>
               ))}
@@ -436,123 +410,68 @@ function StockTab() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// WAREHOUSE TAB
-// ═══════════════════════════════════════════════════════════
-function WarehouseTab() {
+function WarehouseTab({ warehouses }: { warehouses: WarehouseData[] }) {
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {warehouses.map((wh) => {
-          const sc = statusConfig[wh.status];
-          const capacityColor =
-            wh.capacity >= 85 ? "bg-destructive" : wh.capacity >= 60 ? "bg-warning" : "bg-success";
-
-          return (
-            <div key={wh.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300 group">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Warehouse className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground text-sm">{wh.name}</h3>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                      <MapPin className="w-3 h-3" />
-                      {wh.location}
-                    </div>
-                  </div>
-                </div>
-                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
-                  {sc.label}
-                </span>
-              </div>
-
-              {/* Capacity Bar */}
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground">Capacity</span>
-                  <span className="font-semibold text-foreground">{wh.capacity}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${capacityColor} transition-all duration-500`}
-                    style={{ width: `${wh.capacity}%` }}
-                  />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+      {warehouses.map((wh) => {
+        const sc = statusConfig[wh.status];
+        const capacityColor = wh.capacity >= 85 ? "bg-destructive" : wh.capacity >= 60 ? "bg-warning" : "bg-success";
+        return (
+          <div key={wh.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Warehouse className="w-5 h-5 text-primary" /></div>
+                <div>
+                  <h3 className="font-semibold text-foreground text-sm">{wh.name}</h3>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5"><MapPin className="w-3 h-3" />{wh.location}</div>
                 </div>
               </div>
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="text-center p-2.5 rounded-lg bg-muted/50">
-                  <Box className="w-4 h-4 text-primary mx-auto mb-1" />
-                  <p className="text-sm font-bold text-foreground">{wh.items.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground">Items</p>
-                </div>
-                <div className="text-center p-2.5 rounded-lg bg-muted/50">
-                  <MapPin className="w-4 h-4 text-info mx-auto mb-1" />
-                  <p className="text-sm font-bold text-foreground">{wh.zones}</p>
-                  <p className="text-[10px] text-muted-foreground">Zones</p>
-                </div>
-                <div className="text-center p-2.5 rounded-lg bg-muted/50">
-                  <Eye className="w-4 h-4 text-warning mx-auto mb-1" />
-                  <p className="text-sm font-bold text-foreground truncate">{wh.manager.split(" ")[0]}</p>
-                  <p className="text-[10px] text-muted-foreground">Manager</p>
-                </div>
-              </div>
+              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
             </div>
-          );
-        })}
-      </div>
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs mb-1.5"><span className="text-muted-foreground">Capacity</span><span className="font-semibold text-foreground">{wh.capacity}%</span></div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${capacityColor} transition-all duration-500`} style={{ width: `${wh.capacity}%` }} /></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Box className="w-4 h-4 text-primary mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.items.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Items</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><MapPin className="w-4 h-4 text-info mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.zones}</p><p className="text-[10px] text-muted-foreground">Zones</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Eye className="w-4 h-4 text-warning mx-auto mb-1" /><p className="text-sm font-bold text-foreground truncate">{wh.manager.split(" ")[0]}</p><p className="text-[10px] text-muted-foreground">Manager</p></div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════
-// TRANSFER TAB
-// ═══════════════════════════════════════════════════════════
-function TransferTab() {
+function TransferTab({ transfers, onUpdateStatus, onAdd }: { transfers: Transfer[]; onUpdateStatus: (id: string, status: Transfer["status"]) => void; onAdd: (tr: Transfer) => void }) {
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => transfers.filter((t) => !search || t.id.toLowerCase().includes(search.toLowerCase()) || t.items.toLowerCase().includes(search.toLowerCase())), [transfers, search]);
+
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Search */}
       <div className="flex items-center gap-3">
         <div className="flex-1 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-muted border border-border text-sm">
           <Search className="w-4 h-4 text-muted-foreground" />
-          <input placeholder="Search transfers..." className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground" />
+          <input placeholder="Search transfers..." value={search} onChange={(e) => setSearch(e.target.value)} className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground" />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
-          <Filter className="w-4 h-4" />
-          Filter
-        </button>
       </div>
-
-      {/* Transfer Cards */}
       <div className="space-y-3">
-        {transfers.map((tr) => {
+        {filtered.map((tr) => {
           const sc = statusConfig[tr.status];
           return (
-            <div key={tr.id} className="glass-card rounded-xl p-5 hover:bg-card/90 transition-all group">
+            <div key={tr.id} className="glass-card rounded-xl p-5 hover:bg-card/90 transition-all">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1 min-w-0">
-                  {/* Transfer Icon */}
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    tr.status === "in_transit" ? "bg-info/10" : tr.status === "pending" ? "bg-warning/10" : "bg-success/10"
-                  }`}>
-                    <ArrowRightLeft className={`w-5 h-5 ${
-                      tr.status === "in_transit" ? "text-info" : tr.status === "pending" ? "text-warning" : "text-success"
-                    }`} />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${tr.status === "in_transit" ? "bg-info/10" : tr.status === "pending" ? "bg-warning/10" : "bg-success/10"}`}>
+                    <ArrowRightLeft className={`w-5 h-5 ${tr.status === "in_transit" ? "text-info" : tr.status === "pending" ? "text-warning" : "text-success"}`} />
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-mono text-primary">{tr.id}</span>
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>
-                        {sc.label}
-                      </span>
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
                     </div>
                     <p className="text-sm font-medium text-foreground">{tr.items}</p>
-
-                    {/* Route */}
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">{tr.from}</span>
                       <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
@@ -560,14 +479,12 @@ function TransferTab() {
                     </div>
                   </div>
                 </div>
-
-                {/* Right side meta */}
                 <div className="text-right shrink-0 ml-4">
-                  <p className="text-xs text-muted-foreground">Requested by</p>
-                  <p className="text-sm font-medium text-foreground">{tr.requester}</p>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 justify-end">
-                    <Clock className="w-3 h-3" />
-                    <span>ETA: {tr.eta}</span>
+                  <p className="text-xs text-muted-foreground">By {tr.requester}</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 justify-end"><Clock className="w-3 h-3" />{tr.eta}</div>
+                  <div className="flex gap-1.5 mt-2 justify-end">
+                    {tr.status === "pending" && <button onClick={() => onUpdateStatus(tr.id, "in_transit")} className="text-[10px] px-2 py-1 rounded bg-info/10 text-info font-medium hover:bg-info/20">Start Transit</button>}
+                    {tr.status === "in_transit" && <button onClick={() => onUpdateStatus(tr.id, "delivered")} className="text-[10px] px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Mark Delivered</button>}
                   </div>
                 </div>
               </div>
