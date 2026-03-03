@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import AppSidebar from "./AppSidebar";
-import { Menu, X } from "lucide-react";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { Menu } from "lucide-react";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -8,6 +9,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { settings } = useAppSettings();
 
   return (
     <div className="min-h-screen bg-background">
@@ -18,9 +20,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </button>
         <div className="flex items-center gap-2 ml-3">
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xs">E</span>
+            <span className="text-primary-foreground font-bold text-xs">{settings.appName.charAt(0)}</span>
           </div>
-          <span className="text-sm font-semibold text-foreground">Enterprise Hub</span>
+          <span className="text-sm font-semibold text-foreground">{settings.appName}</span>
         </div>
       </div>
 
