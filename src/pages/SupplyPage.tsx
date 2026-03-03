@@ -1,41 +1,22 @@
 import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import {
-  Truck, Package, Search, Plus, Filter, Clock, CheckCircle2, XCircle,
-  AlertTriangle, Eye, MoreHorizontal, ArrowRight, X, Check, Building2,
-  DollarSign, Calendar, FileText, Send, Users, TrendingUp, TrendingDown,
-  ChevronRight, MapPin, Phone, Mail, Star, RefreshCw,
+  Truck, Package, Search, Plus, Clock, CheckCircle2, XCircle,
+  FileText, Send, Building2, DollarSign, ChevronRight, MapPin, Phone, Mail, Star,
+  Users, TrendingUp, TrendingDown, X, Edit2, Trash2, RefreshCw,
 } from "lucide-react";
 
 type Tab = "orders" | "suppliers";
 type POStatus = "draft" | "submitted" | "approved" | "shipped" | "received" | "cancelled";
 
 interface PurchaseOrder {
-  id: string;
-  supplier: string;
-  items: { name: string; qty: number; unitPrice: number }[];
-  status: POStatus;
-  created: string;
-  expectedDelivery: string;
-  total: number;
-  warehouse: string;
-  notes: string;
-  approvedBy: string | null;
+  id: string; supplier: string; items: { name: string; qty: number; unitPrice: number }[]; status: POStatus; created: string; expectedDelivery: string; total: number; warehouse: string; notes: string; approvedBy: string | null;
 }
 
 interface Supplier {
-  id: string;
-  name: string;
-  contact: string;
-  email: string;
-  phone: string;
-  address: string;
-  rating: number;
-  totalOrders: number;
-  onTimeRate: number;
-  categories: string[];
-  status: "active" | "inactive";
+  id: string; name: string; contact: string; email: string; phone: string; address: string; rating: number; totalOrders: number; onTimeRate: number; categories: string[]; status: "active" | "inactive";
 }
 
 const initialOrders: PurchaseOrder[] = [
@@ -47,7 +28,7 @@ const initialOrders: PurchaseOrder[] = [
   { id: "PO-5006", supplier: "TechParts Inc", items: [{ name: "Widget Beta", qty: 1000, unitPrice: 14.00 }], status: "cancelled", created: "Feb 3, 2026", expectedDelivery: "—", total: 14000, warehouse: "Main HQ", notes: "Cancelled — supplier couldn't meet deadline", approvedBy: null },
 ];
 
-const suppliers: Supplier[] = [
+const initialSuppliers: Supplier[] = [
   { id: "SUP-01", name: "TechParts Inc", contact: "John Rivera", email: "john@techparts.com", phone: "+1 555-1001", address: "Silicon Valley, CA", rating: 4.8, totalOrders: 142, onTimeRate: 96, categories: ["Components", "Electronics"], status: "active" },
   { id: "SUP-02", name: "Global Sensors", contact: "Mei Zhang", email: "mei@globalsensors.com", phone: "+1 555-1002", address: "Portland, OR", rating: 4.6, totalOrders: 89, onTimeRate: 92, categories: ["Electronics"], status: "active" },
   { id: "SUP-03", name: "PowerMax Supply", contact: "Carlos Diaz", email: "carlos@powermax.com", phone: "+1 555-1003", address: "Houston, TX", rating: 4.4, totalOrders: 67, onTimeRate: 88, categories: ["Electronics", "Machinery"], status: "active" },
@@ -65,35 +46,52 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
   cancelled: { label: "Cancelled", className: "bg-destructive/10 text-destructive", icon: XCircle },
 };
 
-const stats = [
-  { label: "Active POs", value: "4", change: "+1", trend: "up" as const, icon: FileText },
-  { label: "In Transit", value: "1", change: "0", trend: "up" as const, icon: Truck },
-  { label: "Total Spend (MTD)", value: "$35.7K", change: "+8.2%", trend: "up" as const, icon: DollarSign },
-  { label: "Suppliers", value: "5", change: "+1", trend: "up" as const, icon: Building2 },
-];
-
 export default function SupplyPage() {
+  const { formatCurrency } = useAppSettings();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
+  const [suppliers, setSuppliers] = useState(initialSuppliers);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewPO, setShowNewPO] = useState(false);
+  const [showNewSupplier, setShowNewSupplier] = useState(false);
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
-      const matchSearch = !search || o.id.toLowerCase().includes(search.toLowerCase()) || o.supplier.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === "all" || o.status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [orders, search, statusFilter]);
+  const stats = useMemo(() => {
+    const active = orders.filter(o => !["received", "cancelled"].includes(o.status)).length;
+    const inTransit = orders.filter(o => o.status === "shipped").length;
+    const totalSpend = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+    return [
+      { label: "Active POs", value: active.toString(), change: `+${active}`, trend: "up" as const, icon: FileText },
+      { label: "In Transit", value: inTransit.toString(), change: "0", trend: "up" as const, icon: Truck },
+      { label: "Total Spend", value: formatCurrency(totalSpend), change: "+8.2%", trend: "up" as const, icon: DollarSign },
+      { label: "Suppliers", value: suppliers.filter(s => s.status === "active").length.toString(), change: "+1", trend: "up" as const, icon: Building2 },
+    ];
+  }, [orders, suppliers, formatCurrency]);
 
-  const filteredSuppliers = useMemo(() => {
-    return suppliers.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.contact.toLowerCase().includes(search.toLowerCase()));
-  }, [search]);
+  const filteredOrders = useMemo(() => orders.filter((o) => {
+    const matchSearch = !search || o.id.toLowerCase().includes(search.toLowerCase()) || o.supplier.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || o.status === statusFilter;
+    return matchSearch && matchStatus;
+  }), [orders, search, statusFilter]);
+
+  const filteredSuppliers = useMemo(() => suppliers.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase())), [suppliers, search]);
 
   const updateOrderStatus = useCallback((id: string, newStatus: POStatus) => {
-    setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy } : o));
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy } : o));
+  }, []);
+
+  const deleteOrder = useCallback((id: string) => {
+    setOrders(prev => prev.filter(o => o.id !== id));
+  }, []);
+
+  const deleteSupplier = useCallback((id: string) => {
+    setSuppliers(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  const toggleSupplierStatus = useCallback((id: string) => {
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: s.status === "active" ? "inactive" : "active" } : s));
   }, []);
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
@@ -109,23 +107,27 @@ export default function SupplyPage() {
             <h1 className="text-2xl font-bold text-foreground">Supply Chain</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage purchase orders, suppliers, and procurement.</p>
           </div>
-          <button onClick={() => setShowNewPO(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-            <Plus className="w-4 h-4" />
-            New Purchase Order
-          </button>
+          <div className="flex gap-2">
+            {tab === "orders" && (
+              <button onClick={() => setShowNewPO(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
+                <Plus className="w-4 h-4" />New PO
+              </button>
+            )}
+            {tab === "suppliers" && (
+              <button onClick={() => setShowNewSupplier(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90">
+                <Plus className="w-4 h-4" />Add Supplier
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
             <div key={s.label} className="glass-card rounded-xl p-4 hover:stat-glow transition-all duration-300">
               <div className="flex items-start justify-between mb-2">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <s.icon className="w-4 h-4 text-primary" />
-                </div>
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center"><s.icon className="w-4 h-4 text-primary" /></div>
                 <div className={`flex items-center gap-1 text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
-                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {s.change}
+                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{s.change}
                 </div>
               </div>
               <p className="text-xl font-bold text-foreground">{s.value}</p>
@@ -134,7 +136,6 @@ export default function SupplyPage() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
           {tabs.map((t) => (
             <button key={t.key} onClick={() => { setTab(t.key); setSearch(""); }} className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
@@ -143,7 +144,6 @@ export default function SupplyPage() {
           ))}
         </div>
 
-        {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="relative flex-1 w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -162,99 +162,69 @@ export default function SupplyPage() {
           <div className="space-y-3 animate-fade-in">
             {filteredOrders.length === 0 ? (
               <div className="text-center py-12 text-sm text-muted-foreground">No purchase orders match filters.</div>
-            ) : (
-              filteredOrders.map((po) => {
-                const sc = statusConfig[po.status];
-                const StatusIcon = sc.icon;
-                const isExpanded = expandedId === po.id;
-                return (
-                  <div key={po.id} className="glass-card rounded-xl overflow-hidden transition-all">
-                    <button onClick={() => setExpandedId(isExpanded ? null : po.id)} className="w-full flex items-start gap-4 p-5 text-left hover:bg-muted/20 transition-colors">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${sc.className}`}>
-                        <StatusIcon className="w-5 h-5" />
+            ) : filteredOrders.map((po) => {
+              const sc = statusConfig[po.status];
+              const StatusIcon = sc.icon;
+              const isExpanded = expandedId === po.id;
+              return (
+                <div key={po.id} className="glass-card rounded-xl overflow-hidden transition-all">
+                  <button onClick={() => setExpandedId(isExpanded ? null : po.id)} className="w-full flex items-start gap-4 p-5 text-left hover:bg-muted/20 transition-colors">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${sc.className}`}><StatusIcon className="w-5 h-5" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="text-xs font-mono text-primary">{po.id}</span>
+                        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <span className="text-xs font-mono text-primary">{po.id}</span>
-                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground">{po.supplier}</p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                          <span>{po.items.length} item{po.items.length > 1 ? "s" : ""}</span>
-                          <span className="font-semibold text-foreground">${po.total.toLocaleString()}</span>
-                          <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{po.warehouse}</span>
-                        </div>
+                      <p className="text-sm font-semibold text-foreground">{po.supplier}</p>
+                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                        <span>{po.items.length} item{po.items.length > 1 ? "s" : ""}</span>
+                        <span className="font-semibold text-foreground">{formatCurrency(po.total)}</span>
+                        <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{po.warehouse}</span>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs text-muted-foreground">{po.created}</p>
-                        {po.expectedDelivery !== "—" && (
-                          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 justify-end">
-                            <Truck className="w-3 h-3" />ETA: {po.expectedDelivery}
-                          </p>
-                        )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-muted-foreground">{po.created}</p>
+                      {po.expectedDelivery !== "—" && <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1 justify-end"><Truck className="w-3 h-3" />ETA: {po.expectedDelivery}</p>}
+                    </div>
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                  </button>
+                  {isExpanded && (
+                    <div className="px-5 pb-5 animate-fade-in">
+                      <p className="text-xs text-muted-foreground mb-3">{po.notes}</p>
+                      <div className="glass-card rounded-lg overflow-hidden mb-3">
+                        <table className="w-full text-sm">
+                          <thead><tr className="border-b border-border">
+                            <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Item</th>
+                            <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Qty</th>
+                            <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Unit Price</th>
+                            <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Total</th>
+                          </tr></thead>
+                          <tbody>{po.items.map((item, i) => (
+                            <tr key={i} className="border-b border-border/50">
+                              <td className="px-4 py-2 text-foreground">{item.name}</td>
+                              <td className="px-4 py-2 text-right text-muted-foreground">{item.qty}</td>
+                              <td className="px-4 py-2 text-right text-muted-foreground">{formatCurrency(item.unitPrice)}</td>
+                              <td className="px-4 py-2 text-right font-medium text-foreground">{formatCurrency(item.qty * item.unitPrice)}</td>
+                            </tr>
+                          ))}</tbody>
+                        </table>
                       </div>
-                      <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                    </button>
-
-                    {isExpanded && (
-                      <div className="px-5 pb-5 animate-fade-in">
-                        <p className="text-xs text-muted-foreground mb-3">{po.notes}</p>
-                        <div className="glass-card rounded-lg overflow-hidden mb-3">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b border-border">
-                                <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Item</th>
-                                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Qty</th>
-                                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Unit Price</th>
-                                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-2">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {po.items.map((item, i) => (
-                                <tr key={i} className="border-b border-border/50">
-                                  <td className="px-4 py-2 text-foreground">{item.name}</td>
-                                  <td className="px-4 py-2 text-right text-muted-foreground">{item.qty}</td>
-                                  <td className="px-4 py-2 text-right text-muted-foreground">${item.unitPrice.toFixed(2)}</td>
-                                  <td className="px-4 py-2 text-right font-medium text-foreground">${(item.qty * item.unitPrice).toLocaleString()}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        {po.approvedBy && <p className="text-xs text-muted-foreground mb-3">Approved by: <span className="text-foreground font-medium">{po.approvedBy}</span></p>}
-                        <div className="flex flex-wrap gap-2">
-                          {po.status === "draft" && (
-                            <button onClick={() => updateOrderStatus(po.id, "submitted")} className="flex items-center gap-1.5 px-3 py-1.5 bg-info/10 text-info rounded-lg text-xs font-medium hover:bg-info/20">
-                              <Send className="w-3.5 h-3.5" />Submit for Approval
-                            </button>
-                          )}
-                          {po.status === "submitted" && (
-                            <>
-                              <button onClick={() => updateOrderStatus(po.id, "approved")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20">
-                                <CheckCircle2 className="w-3.5 h-3.5" />Approve
-                              </button>
-                              <button onClick={() => updateOrderStatus(po.id, "cancelled")} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20">
-                                <XCircle className="w-3.5 h-3.5" />Reject
-                              </button>
-                            </>
-                          )}
-                          {po.status === "approved" && (
-                            <button onClick={() => updateOrderStatus(po.id, "shipped")} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20">
-                              <Truck className="w-3.5 h-3.5" />Mark Shipped
-                            </button>
-                          )}
-                          {po.status === "shipped" && (
-                            <button onClick={() => updateOrderStatus(po.id, "received")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20">
-                              <Package className="w-3.5 h-3.5" />Mark Received
-                            </button>
-                          )}
-                        </div>
+                      {po.approvedBy && <p className="text-xs text-muted-foreground mb-3">Approved by: <span className="text-foreground font-medium">{po.approvedBy}</span></p>}
+                      <div className="flex flex-wrap gap-2">
+                        {po.status === "draft" && <button onClick={() => updateOrderStatus(po.id, "submitted")} className="flex items-center gap-1.5 px-3 py-1.5 bg-info/10 text-info rounded-lg text-xs font-medium hover:bg-info/20"><Send className="w-3.5 h-3.5" />Submit</button>}
+                        {po.status === "submitted" && <>
+                          <button onClick={() => updateOrderStatus(po.id, "approved")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve</button>
+                          <button onClick={() => updateOrderStatus(po.id, "cancelled")} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
+                        </>}
+                        {po.status === "approved" && <button onClick={() => updateOrderStatus(po.id, "shipped")} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20"><Truck className="w-3.5 h-3.5" />Mark Shipped</button>}
+                        {po.status === "shipped" && <button onClick={() => updateOrderStatus(po.id, "received")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><Package className="w-3.5 h-3.5" />Mark Received</button>}
+                        {["draft", "cancelled"].includes(po.status) && <button onClick={() => deleteOrder(po.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>}
                       </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -265,17 +235,17 @@ export default function SupplyPage() {
               <div key={sup.id} className={`glass-card rounded-xl p-5 transition-all ${sup.status === "inactive" ? "opacity-60" : "hover:border-primary/30"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Building2 className="w-5 h-5 text-primary" />
-                    </div>
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"><Building2 className="w-5 h-5 text-primary" /></div>
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">{sup.name}</h3>
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${sup.status === "active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{sup.status}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 text-warning fill-warning" />
-                    <span className="text-sm font-semibold text-foreground">{sup.rating}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1"><Star className="w-3.5 h-3.5 text-warning fill-warning" /><span className="text-sm font-semibold text-foreground">{sup.rating}</span></div>
+                    <button onClick={() => setEditingSupplier(sup)} className="p-1 rounded hover:bg-muted"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                    <button onClick={() => toggleSupplierStatus(sup.id)} className="p-1 rounded hover:bg-muted"><RefreshCw className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                    <button onClick={() => deleteSupplier(sup.id)} className="p-1 rounded hover:bg-destructive/10"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                   </div>
                 </div>
                 <div className="space-y-1.5 text-xs text-muted-foreground">
@@ -285,11 +255,7 @@ export default function SupplyPage() {
                   <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{sup.address}</div>
                 </div>
                 <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
-                  <div className="flex gap-1.5">
-                    {sup.categories.map((c) => (
-                      <span key={c} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{c}</span>
-                    ))}
-                  </div>
+                  <div className="flex gap-1.5">{sup.categories.map((c) => <span key={c} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{c}</span>)}</div>
                   <div className="flex items-center gap-3 text-xs">
                     <span className="text-muted-foreground">{sup.totalOrders} orders</span>
                     <span className={`font-semibold ${sup.onTimeRate >= 90 ? "text-success" : sup.onTimeRate >= 80 ? "text-warning" : "text-destructive"}`}>{sup.onTimeRate}% on-time</span>
@@ -309,21 +275,37 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">New Purchase Order</h3>
               <button onClick={() => setShowNewPO(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <NewPOForm
+            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency}
               onSubmit={(data) => {
-                const newPO: PurchaseOrder = {
-                  id: `PO-${5007 + orders.length}`,
-                  ...data,
-                  status: "draft",
-                  created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-                  expectedDelivery: "—",
-                  approvedBy: null,
-                };
-                setOrders((prev) => [newPO, ...prev]);
+                setOrders(prev => [{ id: `PO-${5007 + prev.length}`, ...data, status: "draft" as POStatus, created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), expectedDelivery: "—", approvedBy: null }, ...prev]);
                 setShowNewPO(false);
-              }}
-              onCancel={() => setShowNewPO(false)}
-            />
+              }} onCancel={() => setShowNewPO(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* New Supplier Modal */}
+      {showNewSupplier && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNewSupplier(false)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Add Supplier</h3>
+              <button onClick={() => setShowNewSupplier(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <SupplierForm onSave={(data) => { setSuppliers(prev => [...prev, { id: `SUP-${prev.length + 1}`, ...data, rating: 0, totalOrders: 0, onTimeRate: 0 }]); setShowNewSupplier(false); }} onCancel={() => setShowNewSupplier(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Edit Supplier Modal */}
+      {editingSupplier && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingSupplier(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Edit Supplier</h3>
+              <button onClick={() => setEditingSupplier(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <SupplierForm supplier={editingSupplier} onSave={(data) => { setSuppliers(prev => prev.map(s => s.id === editingSupplier.id ? { ...s, ...data } : s)); setEditingSupplier(null); }} onCancel={() => setEditingSupplier(null)} />
           </div>
         </div>
       )}
@@ -331,58 +313,80 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ onSubmit, onCancel }: { onSubmit: (data: any) => void; onCancel: () => void }) {
-  const [supplier, setSupplier] = useState(suppliers[0].name);
+function NewPOForm({ suppliers, formatCurrency, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; onSubmit: (data: any) => void; onCancel: () => void }) {
+  const [supplier, setSupplier] = useState(suppliers[0]?.name || "");
   const [warehouse, setWarehouse] = useState("Main HQ");
-  const [itemName, setItemName] = useState("");
-  const [itemQty, setItemQty] = useState("1");
-  const [itemPrice, setItemPrice] = useState("");
+  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "" }]);
   const [notes, setNotes] = useState("");
 
-  const total = itemPrice && itemQty ? parseFloat(itemPrice) * parseInt(itemQty) : 0;
+  const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "" }]);
+  const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
+  const updateItem = (i: number, field: string, value: string) => setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+
+  const total = items.reduce((s, i) => s + (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0), 0);
 
   return (
     <div className="space-y-3">
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Supplier</label>
+      <div><label className="text-xs font-medium text-muted-foreground">Supplier</label>
         <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-          {suppliers.filter((s) => s.status === "active").map((s) => <option key={s.id}>{s.name}</option>)}
+          {suppliers.map((s) => <option key={s.id}>{s.name}</option>)}
         </select>
       </div>
-      <div>
-        <label className="text-xs font-medium text-muted-foreground">Destination Warehouse</label>
+      <div><label className="text-xs font-medium text-muted-foreground">Destination</label>
         <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
           <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
         </select>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div className="col-span-1">
-          <label className="text-xs font-medium text-muted-foreground">Item</label>
-          <Input value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Item name" className="mt-1" />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Qty</label>
-          <Input type="number" value={itemQty} onChange={(e) => setItemQty(e.target.value)} className="mt-1" />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-muted-foreground">Price ($)</label>
-          <Input type="number" value={itemPrice} onChange={(e) => setItemPrice(e.target.value)} placeholder="0.00" className="mt-1" />
-        </div>
-      </div>
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Notes</label>
-        <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className="mt-1" />
+        <label className="text-xs font-medium text-muted-foreground">Items</label>
+        {items.map((item, i) => (
+          <div key={i} className="grid grid-cols-7 gap-2 mt-1">
+            <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item" className="col-span-3" />
+            <Input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder="Qty" className="col-span-1" />
+            <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value)} placeholder="Price" className="col-span-2" />
+            {items.length > 1 && <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-destructive/10"><X className="w-4 h-4 text-destructive" /></button>}
+          </div>
+        ))}
+        <button onClick={addItem} className="text-xs text-primary mt-2 hover:underline">+ Add item</button>
       </div>
-      {total > 0 && <p className="text-sm font-semibold text-foreground">Total: ${total.toLocaleString()}</p>}
+      <div><label className="text-xs font-medium text-muted-foreground">Notes</label><Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" className="mt-1" /></div>
+      {total > 0 && <p className="text-sm font-semibold text-foreground">Total: {formatCurrency(total)}</p>}
       <div className="flex gap-2 mt-4">
-        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button
-          onClick={() => onSubmit({ supplier, warehouse, items: [{ name: itemName, qty: parseInt(itemQty), unitPrice: parseFloat(itemPrice) }], total, notes })}
-          disabled={!itemName || !itemPrice}
-          className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
-          Create PO
-        </button>
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
+        <button onClick={() => onSubmit({ supplier, warehouse, items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice) })), total, notes })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
+      </div>
+    </div>
+  );
+}
+
+function SupplierForm({ supplier, onSave, onCancel }: { supplier?: Supplier; onSave: (data: any) => void; onCancel: () => void }) {
+  const [name, setName] = useState(supplier?.name || ""); const [contact, setContact] = useState(supplier?.contact || "");
+  const [email, setEmail] = useState(supplier?.email || ""); const [phone, setPhone] = useState(supplier?.phone || "");
+  const [address, setAddress] = useState(supplier?.address || ""); const [categories, setCategories] = useState(supplier?.categories.join(", ") || "");
+  const [status, setStatus] = useState<"active" | "inactive">(supplier?.status || "active");
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Company Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Contact Person</label><Input value={contact} onChange={(e) => setContact(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Email</label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Phone</label><Input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div><label className="text-xs font-medium text-muted-foreground">Address</label><Input value={address} onChange={(e) => setAddress(e.target.value)} className="mt-1" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Categories (comma-separated)</label><Input value={categories} onChange={(e) => setCategories(e.target.value)} placeholder="e.g. Electronics, Components" className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Status</label>
+          <select value={status} onChange={(e) => setStatus(e.target.value as "active" | "inactive")} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option value="active">Active</option><option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
+        <button disabled={!name} onClick={() => onSave({ name, contact, email, phone, address, categories: categories.split(",").map(c => c.trim()).filter(Boolean), status })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">{supplier ? "Update" : "Add"} Supplier</button>
       </div>
     </div>
   );
