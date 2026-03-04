@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAppEvents } from "@/hooks/use-app-events";
 import {
   Truck, Package, Search, Plus, Clock, CheckCircle2, XCircle,
   FileText, Send, Building2, DollarSign, ChevronRight, MapPin, Phone, Mail, Star,
@@ -48,6 +49,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 
 export default function SupplyPage() {
   const { formatCurrency } = useAppSettings();
+  const { addApprovalItem, addNotification } = useAppEvents();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
@@ -79,7 +81,18 @@ export default function SupplyPage() {
   const filteredSuppliers = useMemo(() => suppliers.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase())), [suppliers, search]);
 
   const updateOrderStatus = useCallback((id: string, newStatus: POStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy } : o));
+    setOrders(prev => prev.map(o => {
+      if (o.id !== id) return o;
+      const updated = { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy };
+      if (newStatus === "submitted") {
+        addApprovalItem({ title: `${o.id}: ${o.supplier}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")} — ${o.warehouse}`, priority: "medium" });
+        addNotification({ type: "supply", title: `PO ${o.id} submitted for approval`, message: `${o.supplier} order for ${formatCurrency(o.total)}`, link: "/approvals" });
+      }
+      if (newStatus === "received") {
+        addNotification({ type: "inventory", title: `PO ${o.id} received at ${o.warehouse}`, message: `${o.items.length} item(s) from ${o.supplier} added to inventory`, link: "/inventory" });
+      }
+      return updated;
+    }));
   }, []);
 
   const deleteOrder = useCallback((id: string) => {
