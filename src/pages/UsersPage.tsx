@@ -284,7 +284,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 }
 
 function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
-  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState("Operations"); const [store, setStore] = useState("Main HQ");
+  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState("Operations"); const [store, setStore] = useState("Main HQ");
+  const passwordError = confirmPassword && password !== confirmPassword ? "Passwords do not match" : password && password.length < 8 ? "Min 8 characters" : "";
+  const canSubmit = name && email && password && password.length >= 8 && password === confirmPassword;
 
   return (
     <div className="space-y-3">
@@ -292,6 +295,22 @@ function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (dat
         <div><label className="text-xs font-medium text-muted-foreground">Full Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Email</label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1" /></div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Password</label>
+          <div className="relative mt-1">
+            <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="pr-9" placeholder="Min 8 characters" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1">
+              {showPassword ? <EyeOff className="w-3.5 h-3.5 text-muted-foreground" /> : <Eye className="w-3.5 h-3.5 text-muted-foreground" />}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Confirm Password</label>
+          <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1" placeholder="Confirm password" />
+        </div>
+      </div>
+      {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
       <div><label className="text-xs font-medium text-muted-foreground">Role</label>
         <select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
           {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -311,8 +330,9 @@ function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (dat
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-        <button disabled={!name || !email} onClick={() => onAdd({ name, email, avatar: name.split(" ").map(n => n[0]).join("").slice(0, 2), role, status: "active", lastActive: "Just now", department, store })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Add User</button>
+        <button disabled={!canSubmit} onClick={() => onAdd({ name, email, avatar: name.split(" ").map(n => n[0]).join("").slice(0, 2), role, status: "active", lastActive: "Just now", department, store })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Add User</button>
       </div>
+      <p className="text-[10px] text-muted-foreground text-center">User will receive login credentials via email</p>
     </div>
   );
 }

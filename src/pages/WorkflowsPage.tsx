@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useAppEvents } from "@/hooks/use-app-events";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
   X, Trash2, ArrowRight, Edit2, AlertTriangle,
@@ -40,6 +41,7 @@ const statusConfig = {
 };
 
 export default function WorkflowsPage() {
+  const { addNotification, addApprovalItem } = useAppEvents();
   const [workflows, setWorkflows] = useState(initialWorkflows);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -60,10 +62,13 @@ export default function WorkflowsPage() {
         newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed" };
         const nextStep = wf.currentStep + 1;
         const isComplete = nextStep >= newSteps.length;
+        if (isComplete) {
+          addNotification({ type: "workflow", title: `Workflow ${wf.id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
+        }
         return { ...wf, steps: newSteps, currentStep: nextStep, status: isComplete ? "approved" : "pending" };
       })
     );
-  }, []);
+  }, [addNotification]);
 
   const rejectWorkflow = useCallback((id: string) => {
     setWorkflows((prev) =>
@@ -71,10 +76,11 @@ export default function WorkflowsPage() {
         if (wf.id !== id) return wf;
         const newSteps = [...wf.steps];
         newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
+        addNotification({ type: "workflow", title: `Workflow ${wf.id} rejected`, message: `${wf.title} was rejected at step: ${wf.steps[wf.currentStep].name}`, link: "/workflows" });
         return { ...wf, steps: newSteps, status: "rejected" };
       })
     );
-  }, []);
+  }, [addNotification]);
 
   const deleteWorkflow = useCallback((id: string) => {
     setWorkflows((prev) => prev.filter((wf) => wf.id !== id));
@@ -95,6 +101,8 @@ export default function WorkflowsPage() {
     };
     setWorkflows((prev) => [newWf, ...prev]);
     setShowNewWF(false);
+    addApprovalItem({ title: newWf.title, type: "workflow", sourceId: newWf.id, requester: "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
+    addNotification({ type: "workflow", title: `Workflow ${newWf.id} created`, message: `${data.title} submitted for approval`, link: "/approvals" });
   };
 
   const counts = { pending: workflows.filter((w) => w.status === "pending").length, approved: workflows.filter((w) => w.status === "approved").length, rejected: workflows.filter((w) => w.status === "rejected").length };

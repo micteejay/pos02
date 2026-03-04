@@ -43,6 +43,27 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
   const isBranded = style === "branded";
   const isCompact = style === "compact";
   const isThermal = style === "thermal";
+  const isInvoice = style === "invoice";
+
+  if (isInvoice) {
+    return (
+      <div className="bg-card border border-border rounded-lg p-5 text-[10px] leading-relaxed max-w-[320px] mx-auto font-sans">
+        <div className="flex justify-between items-start mb-4">
+          <div><p className="font-bold text-foreground text-sm">{settings.receiptHeader || settings.appName}</p><p className="text-muted-foreground">123 Main St, Metro City</p></div>
+          <div className="text-right"><p className="text-lg font-bold text-primary">INVOICE</p><p className="text-muted-foreground">INV-2026-0301</p><p className="text-muted-foreground">Mar 03, 2026</p></div>
+        </div>
+        <div className="border-t border-border pt-2 mb-3"><p className="font-semibold text-foreground mb-1">Bill To:</p><p className="text-muted-foreground">Walk-in Customer</p></div>
+        <table className="w-full mb-3"><thead><tr className="border-b border-border"><th className="text-left py-1 text-muted-foreground font-medium">Item</th><th className="text-center py-1 text-muted-foreground font-medium">Qty</th><th className="text-right py-1 text-muted-foreground font-medium">Price</th><th className="text-right py-1 text-muted-foreground font-medium">Total</th></tr></thead>
+        <tbody>{items.map((item, i) => (<tr key={i} className="border-b border-border/50"><td className="py-1 text-foreground">{item.name}</td><td className="py-1 text-center text-muted-foreground">{item.qty}</td><td className="py-1 text-right text-muted-foreground">{formatCurrency(item.price)}</td><td className="py-1 text-right text-foreground">{formatCurrency(item.qty * item.price)}</td></tr>))}</tbody></table>
+        <div className="border-t border-border pt-2 space-y-0.5">
+          <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+          <div className="flex justify-between text-muted-foreground"><span>Tax ({settings.taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
+          <div className="flex justify-between font-bold text-foreground text-xs mt-1 pt-1 border-t border-border"><span>Total Due</span><span>{formatCurrency(total)}</span></div>
+        </div>
+        <div className="mt-3 pt-2 border-t border-border text-center text-muted-foreground"><p>{settings.receiptFooter}</p></div>
+      </div>
+    );
+  }
 
   return (
     <div className={`bg-card border border-border rounded-lg p-4 font-mono text-[10px] leading-relaxed max-w-[280px] mx-auto ${isThermal ? "bg-amber-50 dark:bg-amber-950/20 border-dashed" : ""}`}>
@@ -126,6 +147,7 @@ export default function SettingsPage() {
     { id: "branded", name: "Branded", description: "Bold branding with accent colors" },
     { id: "compact", name: "Compact", description: "Space-saving for narrow paper" },
     { id: "thermal", name: "Thermal", description: "Classic thermal printer style" },
+    { id: "invoice", name: "Invoice", description: "Full invoice format with billing details" },
   ];
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [

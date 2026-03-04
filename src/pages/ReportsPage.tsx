@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
-  Download, Filter, Calendar, FileText, PieChart as PieIcon, ArrowUp, ArrowDown,
+  Download, Calendar, FileText, PieChart as PieIcon, Printer,
   Building2, Warehouse, ClipboardCheck, Activity,
 } from "lucide-react";
 import {
@@ -75,8 +76,10 @@ const tooltipStyle = {
 };
 
 export default function ReportsPage() {
+  const { settings, formatCurrency } = useAppSettings();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
+  const printRef = useRef<HTMLDivElement>(null);
 
   const tabs: { key: ReportType; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: BarChart3 },
@@ -86,20 +89,88 @@ export default function ReportsPage() {
   ];
 
   const exportCSV = () => {
-    const data = monthlyRevenue.map((r) => `${r.month},${r.revenue},${r.expenses},${r.profit}`).join("\n");
-    const csv = `Month,Revenue,Expenses,Profit\n${data}`;
+    let csv = "";
+    if (reportType === "overview" || reportType === "sales") {
+      csv = "Month,Revenue,Expenses,Profit\n" + monthlyRevenue.map(r => `${r.month},${r.revenue},${r.expenses},${r.profit}`).join("\n");
+    } else if (reportType === "inventory") {
+      csv = "Week,Inbound,Outbound,StockLevel\n" + inventoryTrend.map(r => `${r.week},${r.inbound},${r.outbound},${r.stockLevel}`).join("\n");
+    } else {
+      csv = "Month,Approved,Rejected,Pending\n" + approvalMetrics.map(r => `${r.month},${r.approved},${r.rejected},${r.pending}`).join("\n");
+    }
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
+    const a = document.createElement("a"); a.href = url;
     a.download = `report-${reportType}-${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  const printReport = () => {
+    const printContent = printRef.current;
+    if (!printContent) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`
+      <html><head><title>${settings.appName} - ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; color: #1a1a2e; }
+        h1 { font-size: 24px; margin-bottom: 4px; }
+        h2 { font-size: 18px; margin: 24px 0 12px; color: #333; }
+        .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
+        th { background: #f5f5f5; font-weight: 600; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin: 16px 0; }
+        .stat-card { border: 1px solid #eee; border-radius: 8px; padding: 16px; }
+        .stat-value { font-size: 22px; font-weight: 700; }
+        .stat-label { font-size: 12px; color: #666; }
+        .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
+        @media print { body { padding: 20px; } }
+      </style></head><body>
+      <h1>${settings.appName}</h1>
+      <p class="subtitle">${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report — Generated ${new Date().toLocaleDateString()}</p>
+      <div class="stat-grid">
+        ${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label} (${s.change})</div></div>`).join("")}
+      </div>
+      ${reportType === "overview" || reportType === "sales" ? `
+        <h2>Revenue & Expenses</h2>
+        <table><tr><th>Month</th><th>Revenue</th><th>Expenses</th><th>Profit</th></tr>
+        ${monthlyRevenue.map(r => `<tr><td>${r.month}</td><td>${formatCurrency(r.revenue)}</td><td>${formatCurrency(r.expenses)}</td><td>${formatCurrency(r.profit)}</td></tr>`).join("")}
+        </table>
+        <h2>Sales by Store</h2>
+        <table><tr><th>Store</th><th>Share</th></tr>
+        ${salesByStore.map(s => `<tr><td>${s.name}</td><td>${s.value}%</td></tr>`).join("")}
+        </table>
+        <h2>Top Products</h2>
+        <table><tr><th>#</th><th>Product</th><th>Units</th><th>Revenue</th></tr>
+        ${topProducts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.name}</td><td>${p.units}</td><td>${formatCurrency(p.revenue)}</td></tr>`).join("")}
+        </table>
+      ` : ""}
+      ${reportType === "inventory" ? `
+        <h2>Stock Movement</h2>
+        <table><tr><th>Week</th><th>Inbound</th><th>Outbound</th><th>Stock Level</th></tr>
+        ${inventoryTrend.map(r => `<tr><td>${r.week}</td><td>${r.inbound}</td><td>${r.outbound}</td><td>${r.stockLevel}</td></tr>`).join("")}
+        </table>
+        <h2>Warehouse Utilization</h2>
+        <table><tr><th>Warehouse</th><th>Items</th><th>Capacity</th></tr>
+        ${warehouseUtil.map(w => `<tr><td>${w.name}</td><td>${w.items.toLocaleString()}</td><td>${w.capacity}%</td></tr>`).join("")}
+        </table>
+      ` : ""}
+      ${reportType === "operations" ? `
+        <h2>Approval Metrics</h2>
+        <table><tr><th>Month</th><th>Approved</th><th>Rejected</th><th>Pending</th></tr>
+        ${approvalMetrics.map(r => `<tr><td>${r.month}</td><td>${r.approved}</td><td>${r.rejected}</td><td>${r.pending}</td></tr>`).join("")}
+        </table>
+      ` : ""}
+      <div class="footer">Generated by ${settings.appName} · ${new Date().toLocaleString()}</div>
+      </body></html>
+    `);
+    win.document.close();
+    win.print();
   };
 
   return (
     <AppLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div className="space-y-6 animate-fade-in" ref={printRef}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Reports</h1>
@@ -112,9 +183,11 @@ export default function ReportsPage() {
               <option value="6months">Last 6 Months</option>
               <option value="1year">Last Year</option>
             </select>
+            <button onClick={printReport} className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
+              <Printer className="w-4 h-4" />Print
+            </button>
             <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
-              <Download className="w-4 h-4" />
-              Export
+              <Download className="w-4 h-4" />Export
             </button>
           </div>
         </div>
@@ -141,13 +214,9 @@ export default function ReportsPage() {
         {/* Tabs */}
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit overflow-x-auto">
           {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setReportType(t.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${reportType === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              <t.icon className="w-4 h-4" />
-              {t.label}
+            <button key={t.key} onClick={() => setReportType(t.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${reportType === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
+              <t.icon className="w-4 h-4" />{t.label}
             </button>
           ))}
         </div>
@@ -205,8 +274,6 @@ export default function ReportsPage() {
                 </div>
               </div>
             </div>
-
-            {/* Top Products */}
             <div className="glass-card rounded-xl p-5">
               <h3 className="font-semibold text-foreground mb-4">Top Products by Revenue</h3>
               <div className="space-y-3">
