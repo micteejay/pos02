@@ -51,6 +51,8 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { formatCurrency } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
+  const { inventory, addStockFromPO } = useSharedData();
+  const { addApprovalItem, addNotification } = useAppEvents();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
@@ -90,6 +92,7 @@ export default function SupplyPage() {
         addNotification({ type: "supply", title: `PO ${o.id} submitted for approval`, message: `${o.supplier} order for ${formatCurrency(o.total)}`, link: "/approvals" });
       }
       if (newStatus === "received") {
+        addStockFromPO(o.items, o.warehouse);
         addNotification({ type: "inventory", title: `PO ${o.id} received at ${o.warehouse}`, message: `${o.items.length} item(s) from ${o.supplier} added to inventory`, link: "/inventory" });
       }
       return updated;
@@ -289,7 +292,7 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">New Purchase Order</h3>
               <button onClick={() => setShowNewPO(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency}
+            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory}
               onSubmit={(data) => {
                 setOrders(prev => [{ id: `PO-${5007 + prev.length}`, ...data, status: "draft" as POStatus, created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), expectedDelivery: "—", approvedBy: null }, ...prev]);
                 setShowNewPO(false);
@@ -327,7 +330,7 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ suppliers, formatCurrency, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; onSubmit: (data: any) => void; onCancel: () => void }) {
+function NewPOForm({ suppliers, formatCurrency, inventoryItems, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; onSubmit: (data: any) => void; onCancel: () => void }) {
   const [supplier, setSupplier] = useState(suppliers[0]?.name || "");
   const [warehouse, setWarehouse] = useState("Main HQ");
   const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "" }]);
@@ -336,6 +339,13 @@ function NewPOForm({ suppliers, formatCurrency, onSubmit, onCancel }: { supplier
   const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "" }]);
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
   const updateItem = (i: number, field: string, value: string) => setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+
+  const selectInventoryItem = (i: number, sku: string) => {
+    const inv = inventoryItems.find(item => item.sku === sku);
+    if (inv) {
+      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString() } : item));
+    }
+  };
 
   const total = items.reduce((s, i) => s + (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0), 0);
 
@@ -354,11 +364,19 @@ function NewPOForm({ suppliers, formatCurrency, onSubmit, onCancel }: { supplier
       <div>
         <label className="text-xs font-medium text-muted-foreground">Items</label>
         {items.map((item, i) => (
-          <div key={i} className="grid grid-cols-7 gap-2 mt-1">
-            <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item" className="col-span-3" />
-            <Input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder="Qty" className="col-span-1" />
-            <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value)} placeholder="Price" className="col-span-2" />
-            {items.length > 1 && <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-destructive/10"><X className="w-4 h-4 text-destructive" /></button>}
+          <div key={i} className="space-y-1 mt-2 p-2 rounded-lg bg-muted/30 border border-border/50">
+            <div className="flex items-center gap-2">
+              <select onChange={(e) => selectInventoryItem(i, e.target.value)} className="flex-1 h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground" defaultValue="">
+                <option value="" disabled>Select from inventory...</option>
+                {inventoryItems.map(inv => <option key={inv.sku} value={inv.sku}>{inv.name} ({inv.sku})</option>)}
+              </select>
+              {items.length > 1 && <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-destructive/10"><X className="w-3.5 h-3.5 text-destructive" /></button>}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Or type item name" className="col-span-3 h-8 text-xs" />
+              <Input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder="Qty" className="col-span-1 h-8 text-xs" />
+              <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value)} placeholder="Price" className="col-span-3 h-8 text-xs" />
+            </div>
           </div>
         ))}
         <button onClick={addItem} className="text-xs text-primary mt-2 hover:underline">+ Add item</button>
