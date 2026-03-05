@@ -30,7 +30,13 @@ export type Permission =
   | "documents.view" | "documents.create" | "documents.edit" | "documents.delete"
   | "settings.view" | "settings.edit"
   | "audit.view"
-  | "chat.view" | "chat.create";
+  | "chat.view" | "chat.create"
+  | "notifications.view"
+  | "dashboard.view"
+  | "pages.dashboard" | "pages.inventory" | "pages.sales" | "pages.pos" | "pages.supply"
+  | "pages.workflows" | "pages.approvals" | "pages.reports" | "pages.organization"
+  | "pages.documents" | "pages.chat" | "pages.users" | "pages.settings" | "pages.audit"
+  | "pages.notifications";
 
 export interface AppRole {
   id: string;
@@ -68,6 +74,11 @@ const allPermissions: Permission[] = [
   "settings.view","settings.edit",
   "audit.view",
   "chat.view","chat.create",
+  "notifications.view","dashboard.view",
+  "pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply",
+  "pages.workflows","pages.approvals","pages.reports","pages.organization",
+  "pages.documents","pages.chat","pages.users","pages.settings","pages.audit",
+  "pages.notifications",
 ];
 
 const defaultRoles: AppRole[] = [
