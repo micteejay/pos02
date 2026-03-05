@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "./hooks/use-theme";
 import { AppSettingsProvider } from "./hooks/use-app-settings";
 import { AppEventsProvider } from "./hooks/use-app-events";
+import { SharedDataProvider } from "./hooks/use-shared-data";
 import CommandPalette from "./components/CommandPalette";
 import Index from "./pages/Index";
 import ChatPage from "./pages/ChatPage";
@@ -31,6 +32,7 @@ const App = () => (
     <ThemeProvider>
       <AppSettingsProvider>
         <AppEventsProvider>
+          <SharedDataProvider>
           <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -56,6 +58,7 @@ const App = () => (
               </Routes>
             </BrowserRouter>
           </TooltipProvider>
+          </SharedDataProvider>
         </AppEventsProvider>
       </AppSettingsProvider>
     </ThemeProvider>
