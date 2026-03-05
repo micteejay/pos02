@@ -52,7 +52,6 @@ export default function SupplyPage() {
   const { formatCurrency } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, addStockFromPO } = useSharedData();
-  const { addApprovalItem, addNotification } = useAppEvents();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
