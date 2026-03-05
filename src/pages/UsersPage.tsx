@@ -10,6 +10,7 @@ import {
 type Tab = "users" | "roles" | "permissions";
 
 const permissionGroups: { module: string; perms: Permission[] }[] = [
+  { module: "Page Access", perms: ["pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply","pages.workflows","pages.approvals","pages.reports","pages.organization","pages.documents","pages.chat","pages.users","pages.settings","pages.audit","pages.notifications"] },
   { module: "Users", perms: ["users.view","users.create","users.edit","users.delete"] },
   { module: "Roles", perms: ["roles.view","roles.create","roles.edit","roles.delete"] },
   { module: "Inventory", perms: ["inventory.view","inventory.create","inventory.edit","inventory.delete"] },
@@ -24,6 +25,8 @@ const permissionGroups: { module: string; perms: Permission[] }[] = [
   { module: "Settings", perms: ["settings.view","settings.edit"] },
   { module: "Audit", perms: ["audit.view"] },
   { module: "Chat", perms: ["chat.view","chat.create"] },
+  { module: "Notifications", perms: ["notifications.view"] },
+  { module: "Dashboard", perms: ["dashboard.view"] },
 ];
 
 export default function UsersPage() {

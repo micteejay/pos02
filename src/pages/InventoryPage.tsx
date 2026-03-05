@@ -7,12 +7,11 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { useSharedData, InventoryItem } from "@/hooks/use-shared-data";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { useAppSettings } from "@/hooks/use-app-settings";
 
 type Tab = "stock" | "warehouses" | "transfers";
-
-interface StockItem {
-  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; price: number; status: "critical" | "low" | "ok";
-}
 
 interface WarehouseData {
   id: string; name: string; location: string; capacity: number; items: number; zones: number; manager: string; status: "operational" | "maintenance";
@@ -21,17 +20,6 @@ interface WarehouseData {
 interface Transfer {
   id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
-
-const initialStock: StockItem[] = [
-  { sku: "WDG-A100", name: "Widget Alpha", category: "Components", warehouse: "Main HQ", qty: 12, reorder: 50, price: 24.99, status: "critical" },
-  { sku: "WDG-B200", name: "Widget Beta", category: "Components", warehouse: "Main HQ", qty: 340, reorder: 100, price: 18.50, status: "ok" },
-  { sku: "SEN-X10", name: "Sensor X10", category: "Electronics", warehouse: "West DC", qty: 45, reorder: 40, price: 89.00, status: "low" },
-  { sku: "MTR-500", name: "Motor 500W", category: "Machinery", warehouse: "East DC", qty: 78, reorder: 30, price: 145.00, status: "ok" },
-  { sku: "CBL-CAT6", name: "Cat6 Cable (100ft)", category: "Networking", warehouse: "Main HQ", qty: 520, reorder: 200, price: 34.99, status: "ok" },
-  { sku: "PCB-R3", name: "PCB Board Rev3", category: "Electronics", warehouse: "West DC", qty: 8, reorder: 25, price: 12.75, status: "critical" },
-  { sku: "FAN-120", name: "Cooling Fan 120mm", category: "Components", warehouse: "East DC", qty: 190, reorder: 100, price: 9.99, status: "ok" },
-  { sku: "PSU-750", name: "PSU 750W Gold", category: "Electronics", warehouse: "Main HQ", qty: 62, reorder: 50, price: 119.00, status: "low" },
-];
 
 const initialWarehouses: WarehouseData[] = [
   { id: "WH-001", name: "Main HQ Warehouse", location: "San Francisco, CA", capacity: 85, items: 4280, zones: 12, manager: "Sarah Chen", status: "operational" },
@@ -62,23 +50,27 @@ const statusConfig = {
 const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
 
 export default function InventoryPage() {
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty } = useSharedData();
+  const { addNotification, addApprovalItem } = useAppEvents();
+  const { formatCurrency } = useAppSettings();
   const [tab, setTab] = useState<Tab>("stock");
-  const [stockItems, setStockItems] = useState(initialStock);
   const [warehouses, setWarehouses] = useState(initialWarehouses);
   const [transfers, setTransfers] = useState(initialTransfers);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const stats = useMemo(() => {
-    const totalSkus = stockItems.length;
-    const lowAlerts = stockItems.filter((i) => i.status === "critical" || i.status === "low").length;
+    const totalSkus = inventory.length;
+    const lowAlerts = inventory.filter((i) => i.status === "critical" || i.status === "low").length;
     const activeTransfers = transfers.filter((t) => t.status === "in_transit" || t.status === "pending").length;
+    const totalValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
     return [
       { label: "Total SKUs", value: totalSkus.toLocaleString(), change: `+${totalSkus}`, trend: "up" as const, icon: Package },
-      { label: "Warehouses", value: warehouses.length.toString(), change: "0", trend: "up" as const, icon: Warehouse },
+      { label: "Inventory Value", value: formatCurrency(totalValue), change: "+4.2%", trend: "up" as const, icon: Warehouse },
       { label: "Low Stock Alerts", value: lowAlerts.toString(), change: `+${lowAlerts}`, trend: "down" as const, icon: AlertTriangle },
       { label: "Active Transfers", value: activeTransfers.toString(), change: "0", trend: "up" as const, icon: ArrowRightLeft },
     ];
-  }, [stockItems, warehouses, transfers]);
+  }, [inventory, transfers, formatCurrency]);
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stock", label: "Stock Levels", icon: Package },
@@ -86,28 +78,26 @@ export default function InventoryPage() {
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
   ];
 
-  const addStockItem = (item: StockItem) => {
-    setStockItems((prev) => [...prev, item]);
-    setShowAddModal(false);
+  const addTransfer = (tr: Transfer) => {
+    setTransfers((prev) => [tr, ...prev]);
+    addApprovalItem({
+      title: `Transfer: ${tr.items}`,
+      type: "stock_transfer",
+      sourceId: tr.id,
+      requester: "You",
+      department: "Inventory",
+      amount: null,
+      description: `${tr.items} from ${tr.from} to ${tr.to}`,
+      priority: "medium",
+    });
+    addNotification({ type: "inventory", title: `Transfer ${tr.id} created`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
   };
-
-  const deleteStockItem = (sku: string) => setStockItems((prev) => prev.filter((i) => i.sku !== sku));
-
-  const adjustQty = (sku: string, delta: number) => {
-    setStockItems((prev) =>
-      prev.map((i) => {
-        if (i.sku !== sku) return i;
-        const newQty = Math.max(0, i.qty + delta);
-        const status: StockItem["status"] = newQty <= i.reorder * 0.3 ? "critical" : newQty <= i.reorder ? "low" : "ok";
-        return { ...i, qty: newQty, status };
-      })
-    );
-  };
-
-  const addTransfer = (tr: Transfer) => setTransfers((prev) => [tr, ...prev]);
 
   const updateTransferStatus = (id: string, status: Transfer["status"]) => {
     setTransfers((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+    if (status === "delivered") {
+      addNotification({ type: "inventory", title: `Transfer ${id} delivered`, message: "Stock has been received at destination", link: "/inventory" });
+    }
   };
 
   return (
@@ -128,12 +118,9 @@ export default function InventoryPage() {
           {stats.map((s) => (
             <div key={s.label} className="glass-card rounded-xl p-4 hover:stat-glow transition-all duration-300">
               <div className="flex items-start justify-between mb-2">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <s.icon className="w-4 h-4 text-primary" />
-                </div>
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center"><s.icon className="w-4 h-4 text-primary" /></div>
                 <div className={`flex items-center gap-1 text-xs font-medium ${s.label === "Low Stock Alerts" ? "text-destructive" : s.trend === "up" ? "text-success" : "text-destructive"}`}>
-                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  <span>{s.change}</span>
+                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}<span>{s.change}</span>
                 </div>
               </div>
               <p className="text-xl font-bold text-foreground">{s.value}</p>
@@ -150,12 +137,11 @@ export default function InventoryPage() {
           ))}
         </div>
 
-        {tab === "stock" && <StockTab items={stockItems} onDelete={deleteStockItem} onAdjustQty={adjustQty} />}
+        {tab === "stock" && <StockTab items={inventory} onDelete={deleteInventoryItem} onAdjustQty={adjustInventoryQty} onEdit={setEditingItem} formatCurrency={formatCurrency} />}
         {tab === "warehouses" && <WarehouseTab warehouses={warehouses} />}
         {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
       </div>
 
-      {/* Add Item Modal */}
       {showAddModal && tab === "stock" && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
           <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
@@ -163,7 +149,7 @@ export default function InventoryPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Stock Item</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <AddItemForm onAdd={addStockItem} onCancel={() => setShowAddModal(false)} />
+            <AddItemForm onAdd={(item) => { addInventoryItem(item); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
@@ -175,7 +161,19 @@ export default function InventoryPage() {
               <h3 className="text-lg font-semibold text-foreground">New Transfer</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <NewTransferForm onAdd={(tr) => { addTransfer(tr); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <NewTransferForm inventoryItems={inventory} onAdd={(tr) => { addTransfer(tr); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+          </div>
+        </div>
+      )}
+
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingItem(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Edit Item: {editingItem.name}</h3>
+              <button onClick={() => setEditingItem(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <EditItemForm item={editingItem} onSave={(updates) => { updateInventoryItem(editingItem.sku, updates); setEditingItem(null); }} onCancel={() => setEditingItem(null)} />
           </div>
         </div>
       )}
@@ -183,20 +181,24 @@ export default function InventoryPage() {
   );
 }
 
-function AddItemForm({ onAdd, onCancel }: { onAdd: (item: StockItem) => void; onCancel: () => void }) {
-  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
-  const [warehouse, setWarehouse] = useState("Main HQ"); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
+function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave: (updates: Partial<InventoryItem>) => void; onCancel: () => void }) {
+  const [name, setName] = useState(item.name);
+  const [category, setCategory] = useState(item.category);
+  const [warehouse, setWarehouse] = useState(item.warehouse);
+  const [qty, setQty] = useState(item.qty.toString());
+  const [reorder, setReorder] = useState(item.reorder.toString());
+  const [price, setPrice] = useState(item.price.toString());
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
-        <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={sku} onChange={(e) => setSku(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={item.sku} disabled className="mt-1 opacity-60" /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option>
+            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option><option>Accessories</option><option>Uncategorized</option>
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
@@ -212,27 +214,72 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: StockItem) => void; on
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button
-          disabled={!name || !sku || !qty || !price}
-          onClick={() => {
-            const q = parseInt(qty); const r = parseInt(reorder);
-            const status: StockItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, price: parseFloat(price), status });
-          }}
-          className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >Add Item</button>
+        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), price: parseFloat(price) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
 }
 
-function NewTransferForm({ onAdd, onCancel }: { onAdd: (tr: Transfer) => void; onCancel: () => void }) {
-  const [items, setItems] = useState(""); const [from, setFrom] = useState("Main HQ"); const [to, setTo] = useState("West DC");
-  const wh = ["Main HQ", "West DC", "East DC", "South Hub"];
+function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void; onCancel: () => void }) {
+  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
+  const [warehouse, setWarehouse] = useState("Main HQ"); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
 
   return (
     <div className="space-y-3">
-      <div><label className="text-xs font-medium text-muted-foreground">Items Description</label><Input value={items} onChange={(e) => setItems(e.target.value)} placeholder="e.g. Widget Alpha ×200" className="mt-1" /></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={sku} onChange={(e) => setSku(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Category</label>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option><option>Accessories</option>
+          </select>
+        </div>
+        <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
+          <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Qty</label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Reorder Point</label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Price ($)</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
+        <button disabled={!name || !sku || !qty || !price}
+          onClick={() => {
+            const q = parseInt(qty); const r = parseInt(reorder);
+            const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, price: parseFloat(price), status });
+          }}
+          className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
+      </div>
+    </div>
+  );
+}
+
+function NewTransferForm({ inventoryItems, onAdd, onCancel }: { inventoryItems: InventoryItem[]; onAdd: (tr: Transfer) => void; onCancel: () => void }) {
+  const [selectedItem, setSelectedItem] = useState(inventoryItems[0]?.sku || "");
+  const [transferQty, setTransferQty] = useState("10");
+  const [from, setFrom] = useState("Main HQ"); const [to, setTo] = useState("West DC");
+  const wh = ["Main HQ", "West DC", "East DC", "South Hub"];
+  const item = inventoryItems.find(i => i.sku === selectedItem);
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Select Item</label>
+        <select value={selectedItem} onChange={(e) => setSelectedItem(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          {inventoryItems.map(i => <option key={i.sku} value={i.sku}>{i.name} ({i.sku}) — {i.qty} in stock</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+        <Input type="number" value={transferQty} onChange={(e) => setTransferQty(e.target.value)} className="mt-1" max={item?.qty} />
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">From</label>
           <select value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">{wh.map((w) => <option key={w}>{w}</option>)}</select>
@@ -243,18 +290,27 @@ function NewTransferForm({ onAdd, onCancel }: { onAdd: (tr: Transfer) => void; o
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button disabled={!items} onClick={() => onAdd({ id: `TRF-${4600 + Math.floor(Math.random() * 100)}`, items, from, to, initiated: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), eta: "TBD", status: "pending", requester: "You" })}
+        <button disabled={!selectedItem || !transferQty} onClick={() => onAdd({
+          id: `TRF-${4600 + Math.floor(Math.random() * 100)}`,
+          items: `${item?.name || "Item"} ×${transferQty}`, from, to,
+          initiated: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          eta: "TBD", status: "pending", requester: "You"
+        })}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Create Transfer</button>
       </div>
     </div>
   );
 }
 
-function StockTab({ items, onDelete, onAdjustQty }: { items: StockItem[]; onDelete: (sku: string) => void; onAdjustQty: (sku: string, delta: number) => void }) {
+function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
+  items: InventoryItem[]; onDelete: (sku: string) => void; onAdjustQty: (sku: string, delta: number) => void;
+  onEdit: (item: InventoryItem) => void; formatCurrency: (n: number) => string;
+}) {
   const [search, setSearch] = useState(""); const [filterCategory, setFilterCategory] = useState("all"); const [filterWarehouse, setFilterWarehouse] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all"); const [showFilters, setShowFilters] = useState(false);
   const [sortKey, setSortKey] = useState<"name" | "qty" | "price" | null>(null); const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [expandedSku, setExpandedSku] = useState<string | null>(null);
+  const [customQty, setCustomQty] = useState<Record<string, string>>({});
 
   const categories = [...new Set(items.map((i) => i.category))];
   const warehouseNames = [...new Set(items.map((i) => i.warehouse))];
@@ -356,7 +412,7 @@ function StockTab({ items, onDelete, onAdjustQty }: { items: StockItem[]; onDele
                         <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
                         <td className="px-5 py-3 text-right"><span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>{item.qty}</span></td>
-                        <td className="px-5 py-3 text-right text-sm text-foreground hidden sm:table-cell">${item.price.toFixed(2)}</td>
+                        <td className="px-5 py-3 text-right text-sm text-foreground hidden sm:table-cell">{formatCurrency(item.price)}</td>
                         <td className="px-5 py-3 text-center"><span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{item.status === "critical" && <AlertTriangle className="w-3 h-3" />}{sc.label}</span></td>
                         <td className="px-3 py-3 text-right"><MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" /></td>
                       </tr>
@@ -365,9 +421,13 @@ function StockTab({ items, onDelete, onAdjustQty }: { items: StockItem[]; onDele
                           <td colSpan={7} className="px-5 py-3">
                             <div className="flex flex-wrap items-center gap-2 animate-fade-in">
                               <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
+                              <div className="flex items-center gap-1 ml-2">
+                                <Input type="number" placeholder="Qty" value={customQty[item.sku] || ""} onChange={(e) => setCustomQty(prev => ({ ...prev, [item.sku]: e.target.value }))} className="w-20 h-7 text-xs" />
+                                <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, q); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">+ Add</button>
+                                <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, -q); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">- Remove</button>
+                              </div>
                               <div className="ml-auto flex gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); onAdjustQty(item.sku, 10); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">+10 Stock</button>
-                                <button onClick={(e) => { e.stopPropagation(); onAdjustQty(item.sku, -10); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">-10 Stock</button>
+                                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="text-xs px-2 py-1 rounded bg-info/10 text-info font-medium hover:bg-info/20"><Edit2 className="w-3 h-3 inline mr-1" />Edit</button>
                                 <button onClick={(e) => { e.stopPropagation(); onDelete(item.sku); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20"><Trash2 className="w-3 h-3 inline mr-1" />Delete</button>
                               </div>
                             </div>

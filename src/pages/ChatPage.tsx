@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Phone, Video, Pin, X, Trash2, Edit2, Bell, BellOff } from "lucide-react";
+import { useSharedData } from "@/hooks/use-shared-data";
+import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Phone, Video, Pin, X, Trash2, Edit2, Bell, BellOff, FileText } from "lucide-react";
 
 interface Message {
   id: string; sender: string; avatar: string; time: string; text: string; channel: string;
   reactions?: { emoji: string; count: number; reacted: boolean }[];
   pinned?: boolean; edited?: boolean; replyTo?: string;
+  attachment?: { name: string; size: string; type: string };
 }
 
 interface Channel {
@@ -50,6 +52,7 @@ const emojiList = ["👍", "❤️", "😂", "🎉", "🔥", "✅", "👀", "�
 export default function ChatPage() {
   const { addNotification } = useAppEvents();
   const { currentUser } = useAppSettings();
+  const { addDocument } = useSharedData();
   const [channels, setChannels] = useState(initialChannels);
   const [dms, setDms] = useState(initialDMs);
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -65,6 +68,7 @@ export default function ChatPage() {
   const [editText, setEditText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeChannelData = [...channels, ...dms].find((c) => c.id === activeChannel);
   const channelMessages = useMemo(() => {
@@ -76,12 +80,37 @@ export default function ChatPage() {
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [channelMessages]);
 
   const switchChannel = useCallback((id: string) => {
-    setActiveChannel(id);
-    setShowMobileSidebar(false);
-    // Mark channel as read
+    setActiveChannel(id); setShowMobileSidebar(false);
     setChannels(prev => prev.map(c => c.id === id ? { ...c, unread: 0 } : c));
     setDms(prev => prev.map(c => c.id === id ? { ...c, unread: 0 } : c));
   }, []);
+
+  const handleFileAttach = useCallback((files: FileList | null) => {
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      const sizeStr = file.size >= 1024 * 1024
+        ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${(file.size / 1024).toFixed(0)} KB`;
+      const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
+      const docType = (["pdf"].includes(ext) ? "pdf" : ["xlsx","xls"].includes(ext) ? "xlsx" : ["docx","doc"].includes(ext) ? "docx" : ["png"].includes(ext) ? "png" : ["jpg","jpeg"].includes(ext) ? "jpg" : "txt") as any;
+
+      // Add message with attachment
+      const newMsg: Message = {
+        id: `m-${Date.now()}-${file.name}`, sender: "You", avatar: "YO",
+        time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+        text: `📎 Shared a file: ${file.name}`, channel: activeChannel,
+        attachment: { name: file.name, size: sizeStr, type: ext },
+      };
+      setMessages(prev => [...prev, newMsg]);
+
+      // Also add to shared documents under /Chat Attachments
+      addDocument({
+        name: file.name, type: docType, size: sizeStr,
+        modified: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        author: "You", folder: "/Chat Attachments", source: `Chat: #${activeChannelData?.name || activeChannel}`,
+      });
+    });
+  }, [activeChannel, activeChannelData, addDocument]);
 
   const sendMessage = useCallback(() => {
     if (!inputText.trim()) return;
@@ -93,16 +122,10 @@ export default function ChatPage() {
     setMessages(prev => [...prev, newMsg]);
     setInputText(""); setReplyTo(null);
 
-    // Simulate response after 2s
     if (activeChannel.startsWith("dm-")) {
       const dmName = activeChannelData?.name || "Someone";
       setTimeout(() => {
-        const responses = [
-          `Got it, I'll look into that right away.`,
-          `Thanks for the update! Let me get back to you.`,
-          `Sounds good. I'll send the details shortly.`,
-          `Understood. I'll coordinate with the team on this.`,
-        ];
+        const responses = ["Got it, I'll look into that right away.", "Thanks for the update! Let me get back to you.", "Sounds good. I'll send the details shortly.", "Understood. I'll coordinate with the team on this."];
         const resp: Message = {
           id: `m-${Date.now() + 1}`, sender: dmName,
           avatar: dmName.split(" ").map(n => n[0]).join(""),
@@ -146,8 +169,7 @@ export default function ChatPage() {
   }, [newChannelName, addNotification]);
 
   const toggleMute = useCallback(() => {
-    const allChannels = [...channels, ...dms];
-    const ch = allChannels.find(c => c.id === activeChannel);
+    const ch = [...channels, ...dms].find(c => c.id === activeChannel);
     if (!ch) return;
     if (ch.type === "channel") setChannels(prev => prev.map(c => c.id === activeChannel ? { ...c, muted: !c.muted } : c));
     else setDms(prev => prev.map(c => c.id === activeChannel ? { ...c, muted: !c.muted } : c));
@@ -159,7 +181,6 @@ export default function ChatPage() {
   return (
     <AppLayout>
       <div className="flex h-[calc(100vh-3.5rem)] lg:h-screen -m-4 sm:-m-6 lg:-m-8">
-        {/* Channel Sidebar */}
         <div className={`${showMobileSidebar ? "fixed inset-0 z-50 bg-background/80 lg:relative lg:bg-transparent" : "hidden lg:flex"} lg:flex`}>
           <div className="w-64 h-full border-r border-border bg-muted/30 flex flex-col shrink-0">
             <div className="p-3 border-b border-border flex items-center justify-between">
@@ -175,8 +196,7 @@ export default function ChatPage() {
                 {channels.map(ch => (
                   <button key={ch.id} onClick={() => switchChannel(ch.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeChannel === ch.id ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:bg-muted/50"}`}>
-                    <Hash className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{ch.name}</span>
+                    <Hash className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{ch.name}</span>
                     {ch.muted && <BellOff className="w-3 h-3 text-muted-foreground/40 ml-auto" />}
                     {ch.unread > 0 && !ch.muted && <span className="ml-auto bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">{ch.unread}</span>}
                   </button>
@@ -188,9 +208,7 @@ export default function ChatPage() {
                   <button key={dm.id} onClick={() => switchChannel(dm.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeChannel === dm.id ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:bg-muted/50"}`}>
                     <div className="relative shrink-0">
-                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">
-                        {dm.name.split(" ").map(n => n[0]).join("")}
-                      </div>
+                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">{dm.name.split(" ").map(n => n[0]).join("")}</div>
                       <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-muted/30 ${dm.status === "online" ? "bg-success" : dm.status === "away" ? "bg-warning" : "bg-muted-foreground/30"}`} />
                     </div>
                     <span className="truncate">{dm.name}</span>
@@ -202,7 +220,6 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Chat Area */}
         <div className="flex-1 flex flex-col min-w-0">
           <div className="h-14 border-b border-border px-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
@@ -276,9 +293,18 @@ export default function ChatPage() {
                           <button onClick={() => setEditingMsg(null)} className="p-1.5 rounded bg-muted text-xs">Cancel</button>
                         </div>
                       ) : (
-                        <p className={`text-sm mt-1 p-3 rounded-xl ${msg.sender === "You" ? "bg-primary/10 text-foreground rounded-tr-sm" : msg.sender === "System" ? "bg-warning/10 text-foreground border border-warning/20 rounded-tl-sm" : "bg-muted text-foreground rounded-tl-sm"}`}>
-                          {msg.text}
-                        </p>
+                        <>
+                          <p className={`text-sm mt-1 p-3 rounded-xl ${msg.sender === "You" ? "bg-primary/10 text-foreground rounded-tr-sm" : msg.sender === "System" ? "bg-warning/10 text-foreground border border-warning/20 rounded-tl-sm" : "bg-muted text-foreground rounded-tl-sm"}`}>
+                            {msg.text}
+                          </p>
+                          {msg.attachment && (
+                            <div className={`mt-1 flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs ${msg.sender === "You" ? "justify-end" : ""}`}>
+                              <FileText className="w-4 h-4 text-primary" />
+                              <span className="text-foreground font-medium">{msg.attachment.name}</span>
+                              <span className="text-muted-foreground">{msg.attachment.size}</span>
+                            </div>
+                          )}
+                        </>
                       )}
                       <div className={`absolute top-0 ${msg.sender === "You" ? "-left-24" : "-right-24"} hidden group-hover:flex items-center gap-0.5 bg-card border border-border rounded-lg p-0.5 shadow-md z-10`}>
                         <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)} className="p-1 rounded hover:bg-muted"><Smile className="w-3.5 h-3.5 text-muted-foreground" /></button>
@@ -312,7 +338,6 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Reply indicator */}
           {replyTo && (
             <div className="px-4 py-2 border-t border-border bg-muted/30 flex items-center gap-2 animate-fade-in">
               <MessageSquare className="w-3.5 h-3.5 text-primary" />
@@ -323,7 +348,10 @@ export default function ChatPage() {
 
           <div className="p-3 border-t border-border">
             <div className="flex items-center gap-2 bg-muted rounded-xl px-4 py-3">
-              <Paperclip className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-foreground shrink-0" />
+              <button onClick={() => fileInputRef.current?.click()} className="shrink-0">
+                <Paperclip className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-foreground" />
+              </button>
+              <input ref={fileInputRef} type="file" multiple className="hidden" onChange={(e) => handleFileAttach(e.target.files)} />
               <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder={`Message ${activeChannelData?.type === "channel" ? "#" : ""}${activeChannelData?.name || ""}...`}
