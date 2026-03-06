@@ -454,8 +454,8 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
 function WarehouseTab({ warehouses }: { warehouses: OrgWarehouse[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+      {warehouses.length === 0 && <p className="text-sm text-muted-foreground col-span-2 text-center py-10">No warehouses configured. Add warehouses in Organization → Warehouses.</p>}
       {warehouses.map((wh) => {
-        const sc = statusConfig[wh.status];
         const capacityColor = wh.capacity >= 85 ? "bg-destructive" : wh.capacity >= 60 ? "bg-warning" : "bg-success";
         return (
           <div key={wh.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
@@ -467,16 +467,16 @@ function WarehouseTab({ warehouses }: { warehouses: OrgWarehouse[] }) {
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5"><MapPin className="w-3 h-3" />{wh.location}</div>
                 </div>
               </div>
-              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">Operational</span>
             </div>
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs mb-1.5"><span className="text-muted-foreground">Capacity</span><span className="font-semibold text-foreground">{wh.capacity}%</span></div>
               <div className="h-2 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${capacityColor} transition-all duration-500`} style={{ width: `${wh.capacity}%` }} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Box className="w-4 h-4 text-primary mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.items.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Items</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Box className="w-4 h-4 text-primary mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.sqft || "—"}</p><p className="text-[10px] text-muted-foreground">Sq. Ft.</p></div>
               <div className="text-center p-2.5 rounded-lg bg-muted/50"><MapPin className="w-4 h-4 text-info mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.zones}</p><p className="text-[10px] text-muted-foreground">Zones</p></div>
-              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Eye className="w-4 h-4 text-warning mx-auto mb-1" /><p className="text-sm font-bold text-foreground truncate">{wh.manager.split(" ")[0]}</p><p className="text-[10px] text-muted-foreground">Manager</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Eye className="w-4 h-4 text-warning mx-auto mb-1" /><p className="text-sm font-bold text-foreground truncate">{wh.manager ? wh.manager.split(" ")[0] : "—"}</p><p className="text-[10px] text-muted-foreground">Manager</p></div>
             </div>
           </div>
         );
