@@ -119,7 +119,7 @@ export default function InventoryPage() {
         </div>
 
         {tab === "stock" && <StockTab items={inventory} onDelete={deleteInventoryItem} onAdjustQty={adjustInventoryQty} onEdit={setEditingItem} formatCurrency={formatCurrency} />}
-        {tab === "warehouses" && <WarehouseTab warehouses={warehouses} />}
+        {tab === "warehouses" && <WarehouseTab warehouses={orgWarehouses} />}
         {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
       </div>
 
@@ -451,7 +451,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
   );
 }
 
-function WarehouseTab({ warehouses }: { warehouses: WarehouseData[] }) {
+function WarehouseTab({ warehouses }: { warehouses: OrgWarehouse[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
       {warehouses.map((wh) => {
