@@ -10,6 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { useSharedData, InventoryItem } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers";
 
