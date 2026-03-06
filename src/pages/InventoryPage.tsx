@@ -245,10 +245,11 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
 }
 
 function NewTransferForm({ inventoryItems, onAdd, onCancel }: { inventoryItems: InventoryItem[]; onAdd: (tr: Transfer) => void; onCancel: () => void }) {
+  const { warehouseNames } = useSharedData();
   const [selectedItem, setSelectedItem] = useState(inventoryItems[0]?.sku || "");
   const [transferQty, setTransferQty] = useState("10");
-  const [from, setFrom] = useState("Main HQ"); const [to, setTo] = useState("West DC");
-  const wh = ["Main HQ", "West DC", "East DC", "South Hub"];
+  const [from, setFrom] = useState(warehouseNames[0] || ""); const [to, setTo] = useState(warehouseNames[1] || "");
+  const wh = warehouseNames;
   const item = inventoryItems.find(i => i.sku === selectedItem);
 
   return (
