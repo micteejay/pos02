@@ -14,6 +14,7 @@ export interface AppSettings {
   showQRCode: boolean;
   language: string;
   timezone: string;
+  logoUrl: string;
 }
 
 export type Permission =
@@ -91,14 +92,7 @@ const defaultRoles: AppRole[] = [
 ];
 
 const defaultUsers: AppUser[] = [
-  { id: "u1", name: "Sarah Chen", email: "sarah@enterprise.com", avatar: "SC", role: "Super Admin", status: "active", lastActive: "2 min ago", department: "Technology", store: "Main HQ" },
-  { id: "u2", name: "Mike Ross", email: "mike@enterprise.com", avatar: "MR", role: "Manager", status: "active", lastActive: "15 min ago", department: "Operations", store: "West Store" },
-  { id: "u3", name: "Lisa Park", email: "lisa@enterprise.com", avatar: "LP", role: "Manager", status: "active", lastActive: "1 hr ago", department: "Inventory", store: "Main HQ" },
-  { id: "u4", name: "James Wilson", email: "james@enterprise.com", avatar: "JW", role: "Viewer", status: "inactive", lastActive: "2 days ago", department: "Finance", store: "Main HQ" },
-  { id: "u5", name: "Emma Davis", email: "emma@enterprise.com", avatar: "ED", role: "Sales Rep", status: "active", lastActive: "5 min ago", department: "Sales", store: "East Store" },
-  { id: "u6", name: "Tom Harris", email: "tom@enterprise.com", avatar: "TH", role: "Sales Rep", status: "active", lastActive: "30 min ago", department: "Sales", store: "South Hub" },
-  { id: "u7", name: "Anna Kowalski", email: "anna@enterprise.com", avatar: "AK", role: "Admin", status: "active", lastActive: "10 min ago", department: "Technology", store: "Main HQ" },
-  { id: "u8", name: "Robert Chen", email: "robert@enterprise.com", avatar: "RC", role: "Warehouse Staff", status: "active", lastActive: "45 min ago", department: "Operations", store: "Main HQ" },
+  { id: "u1", name: "Admin", email: "admin@app.com", avatar: "A", role: "Super Admin", status: "active", lastActive: "Now", department: "", store: "" },
 ];
 
 interface AppSettingsContextType {
@@ -129,7 +123,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       currencySymbol: "$",
       taxRate: 8,
       receiptStyle: "modern",
-      receiptHeader: "Enterprise Hub",
+      receiptHeader: "",
       receiptFooter: "Thank you for your purchase!",
       receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
       paperWidth: "80mm",
@@ -137,6 +131,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       showQRCode: true,
       language: "en",
       timezone: "UTC-05:00 Eastern",
+      logoUrl: "",
     };
   });
 
@@ -150,8 +145,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     return stored ? JSON.parse(stored) : defaultUsers;
   });
 
-  const currentUser = users[0]; // Simulated logged-in user (Super Admin)
-
+  const currentUser = users[0];
   const currentRole = roles.find(r => r.name === currentUser.role);
 
   const hasPermission = useCallback((permission: Permission) => {
