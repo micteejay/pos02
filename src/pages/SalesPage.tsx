@@ -105,10 +105,10 @@ export default function SalesPage() {
     const totalRevenue = completed.reduce((s, t) => s + t.total, 0);
     const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
     return [
-      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: "+12.4%", trend: "up" as const, icon: DollarSign },
-      { label: "Transactions", value: transactions.length.toString(), change: `+${transactions.length - 5}`, trend: "up" as const, icon: ShoppingCart },
-      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "+$4.20", trend: "up" as const, icon: Receipt },
-      { label: "Active Reps", value: "5", change: "0", trend: "up" as const, icon: Users },
+      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: transactions.length > 0 ? `${transactions.length} sales` : "", trend: "up" as const, icon: DollarSign },
+      { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
+      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "", trend: "up" as const, icon: Receipt },
+      { label: "Active Reps", value: salesReps.length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
   }, [transactions]);
 
