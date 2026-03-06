@@ -56,24 +56,9 @@ type Tab = "transactions" | "analytics" | "reps";
 type SortKey = "time" | "total" | "customer";
 
 // --- Initial Data ---
-const initialTransactions: Transaction[] = [
-  { id: "TXN-9201", customer: "John Rivera", items: 3, total: 247.50, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "2:34 PM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9200", customer: "Sara Mitchell", items: 1, total: 89.00, method: "Cash", store: "West Store", rep: "Bob Tran", time: "2:18 PM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9199", customer: "Mike Thompson", items: 5, total: 512.75, method: "Credit Card", store: "Main HQ", rep: "Alice Chen", time: "1:55 PM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9198", customer: "Emily Watts", items: 2, total: 164.00, method: "Debit Card", store: "East Store", rep: "Diana Lee", time: "1:30 PM", status: "refunded", date: "2026-03-01" },
-  { id: "TXN-9197", customer: "Carlos Diaz", items: 4, total: 328.20, method: "Credit Card", store: "Main HQ", rep: "Frank Kim", time: "12:45 PM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9196", customer: "Linda Park", items: 1, total: 45.99, method: "Mobile Pay", store: "South Hub", rep: "Grace Wu", time: "12:10 PM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9195", customer: "David Brown", items: 6, total: 689.40, method: "Credit Card", store: "West Store", rep: "Bob Tran", time: "11:42 AM", status: "completed", date: "2026-03-01" },
-  { id: "TXN-9194", customer: "Rachel Green", items: 2, total: 175.00, method: "Cash", store: "Main HQ", rep: "Alice Chen", time: "11:05 AM", status: "pending", date: "2026-03-01" },
-];
+const initialTransactions: Transaction[] = [];
 
-const salesReps = [
-  { name: "Alice Chen", store: "Main HQ", sales: 142, revenue: 18420, target: 20000, avgTicket: 129.72, rating: 4.8, trend: "up" as const },
-  { name: "Bob Tran", store: "West Store", sales: 118, revenue: 15890, target: 16000, avgTicket: 134.66, rating: 4.6, trend: "up" as const },
-  { name: "Diana Lee", store: "East Store", sales: 95, revenue: 11200, target: 14000, avgTicket: 117.89, rating: 4.4, trend: "down" as const },
-  { name: "Frank Kim", store: "Main HQ", sales: 130, revenue: 16750, target: 18000, avgTicket: 128.85, rating: 4.7, trend: "up" as const },
-  { name: "Grace Wu", store: "South Hub", sales: 88, revenue: 9850, target: 12000, avgTicket: 111.93, rating: 4.3, trend: "down" as const },
-];
+const salesReps: { name: string; store: string; sales: number; revenue: number; target: number; avgTicket: number; rating: number; trend: "up" | "down" }[] = [];
 
 const revenueData = [
   { day: "Mon", revenue: 4200, orders: 38 },
@@ -120,10 +105,10 @@ export default function SalesPage() {
     const totalRevenue = completed.reduce((s, t) => s + t.total, 0);
     const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
     return [
-      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: "+12.4%", trend: "up" as const, icon: DollarSign },
-      { label: "Transactions", value: transactions.length.toString(), change: `+${transactions.length - 5}`, trend: "up" as const, icon: ShoppingCart },
-      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "+$4.20", trend: "up" as const, icon: Receipt },
-      { label: "Active Reps", value: "5", change: "0", trend: "up" as const, icon: Users },
+      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: transactions.length > 0 ? `${transactions.length} sales` : "", trend: "up" as const, icon: DollarSign },
+      { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
+      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "", trend: "up" as const, icon: Receipt },
+      { label: "Active Reps", value: salesReps.length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
   }, [transactions]);
 

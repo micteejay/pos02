@@ -10,31 +10,13 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import { useSharedData, InventoryItem } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers";
-
-interface WarehouseData {
-  id: string; name: string; location: string; capacity: number; items: number; zones: number; manager: string; status: "operational" | "maintenance";
-}
 
 interface Transfer {
   id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
-
-const initialWarehouses: WarehouseData[] = [
-  { id: "WH-001", name: "Main HQ Warehouse", location: "San Francisco, CA", capacity: 85, items: 4280, zones: 12, manager: "Sarah Chen", status: "operational" },
-  { id: "WH-002", name: "West Distribution Center", location: "Portland, OR", capacity: 62, items: 2150, zones: 8, manager: "James Wilson", status: "operational" },
-  { id: "WH-003", name: "East Distribution Center", location: "Atlanta, GA", capacity: 91, items: 5420, zones: 15, manager: "Maria Garcia", status: "maintenance" },
-  { id: "WH-004", name: "South Fulfillment Hub", location: "Houston, TX", capacity: 34, items: 890, zones: 6, manager: "David Kim", status: "operational" },
-];
-
-const initialTransfers: Transfer[] = [
-  { id: "TRF-4501", items: "Widget Alpha ×200", from: "West DC", to: "Main HQ", initiated: "Feb 12, 2026", eta: "Feb 14, 2026", status: "in_transit", requester: "Lisa Park" },
-  { id: "TRF-4498", items: "Sensor X10 ×50", from: "Main HQ", to: "East DC", initiated: "Feb 11, 2026", eta: "Feb 13, 2026", status: "in_transit", requester: "Mike Ross" },
-  { id: "TRF-4495", items: "Motor 500W ×30", from: "East DC", to: "South Hub", initiated: "Feb 10, 2026", eta: "Feb 12, 2026", status: "delivered", requester: "Sarah Chen" },
-  { id: "TRF-4490", items: "Cat6 Cable ×100", from: "Main HQ", to: "West DC", initiated: "Feb 9, 2026", eta: "Feb 11, 2026", status: "delivered", requester: "James Wilson" },
-  { id: "TRF-4488", items: "PCB Board Rev3 ×100", from: "South Hub", to: "Main HQ", initiated: "Feb 8, 2026", eta: "Feb 14, 2026", status: "pending", requester: "David Kim" },
-];
 
 const statusConfig = {
   critical: { label: "Critical", className: "bg-destructive/10 text-destructive" },
@@ -50,12 +32,11 @@ const statusConfig = {
 const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
 
 export default function InventoryPage() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty } = useSharedData();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames } = useSharedData();
   const { addNotification, addApprovalItem } = useAppEvents();
   const { formatCurrency } = useAppSettings();
   const [tab, setTab] = useState<Tab>("stock");
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
-  const [transfers, setTransfers] = useState(initialTransfers);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
@@ -138,7 +119,7 @@ export default function InventoryPage() {
         </div>
 
         {tab === "stock" && <StockTab items={inventory} onDelete={deleteInventoryItem} onAdjustQty={adjustInventoryQty} onEdit={setEditingItem} formatCurrency={formatCurrency} />}
-        {tab === "warehouses" && <WarehouseTab warehouses={warehouses} />}
+        {tab === "warehouses" && <WarehouseTab warehouses={orgWarehouses} />}
         {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
       </div>
 
@@ -182,6 +163,7 @@ export default function InventoryPage() {
 }
 
 function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave: (updates: Partial<InventoryItem>) => void; onCancel: () => void }) {
+  const { warehouseNames } = useSharedData();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState(item.category);
   const [warehouse, setWarehouse] = useState(item.warehouse);
@@ -221,8 +203,9 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
 }
 
 function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void; onCancel: () => void }) {
+  const { warehouseNames } = useSharedData();
   const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
-  const [warehouse, setWarehouse] = useState("Main HQ"); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
+  const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
 
   return (
     <div className="space-y-3">
@@ -238,7 +221,7 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
           <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
+            {warehouseNames.length > 0 ? warehouseNames.map(w => <option key={w}>{w}</option>) : <option>No warehouses</option>}
           </select>
         </div>
       </div>
@@ -262,10 +245,11 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
 }
 
 function NewTransferForm({ inventoryItems, onAdd, onCancel }: { inventoryItems: InventoryItem[]; onAdd: (tr: Transfer) => void; onCancel: () => void }) {
+  const { warehouseNames } = useSharedData();
   const [selectedItem, setSelectedItem] = useState(inventoryItems[0]?.sku || "");
   const [transferQty, setTransferQty] = useState("10");
-  const [from, setFrom] = useState("Main HQ"); const [to, setTo] = useState("West DC");
-  const wh = ["Main HQ", "West DC", "East DC", "South Hub"];
+  const [from, setFrom] = useState(warehouseNames[0] || ""); const [to, setTo] = useState(warehouseNames[1] || "");
+  const wh = warehouseNames;
   const item = inventoryItems.find(i => i.sku === selectedItem);
 
   return (
@@ -470,11 +454,11 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
   );
 }
 
-function WarehouseTab({ warehouses }: { warehouses: WarehouseData[] }) {
+function WarehouseTab({ warehouses }: { warehouses: OrgWarehouse[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
+      {warehouses.length === 0 && <p className="text-sm text-muted-foreground col-span-2 text-center py-10">No warehouses configured. Add warehouses in Organization → Warehouses.</p>}
       {warehouses.map((wh) => {
-        const sc = statusConfig[wh.status];
         const capacityColor = wh.capacity >= 85 ? "bg-destructive" : wh.capacity >= 60 ? "bg-warning" : "bg-success";
         return (
           <div key={wh.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
@@ -486,16 +470,16 @@ function WarehouseTab({ warehouses }: { warehouses: WarehouseData[] }) {
                   <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5"><MapPin className="w-3 h-3" />{wh.location}</div>
                 </div>
               </div>
-              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
+              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-success/10 text-success">Operational</span>
             </div>
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs mb-1.5"><span className="text-muted-foreground">Capacity</span><span className="font-semibold text-foreground">{wh.capacity}%</span></div>
               <div className="h-2 rounded-full bg-muted overflow-hidden"><div className={`h-full rounded-full ${capacityColor} transition-all duration-500`} style={{ width: `${wh.capacity}%` }} /></div>
             </div>
             <div className="grid grid-cols-3 gap-3">
-              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Box className="w-4 h-4 text-primary mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.items.toLocaleString()}</p><p className="text-[10px] text-muted-foreground">Items</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Box className="w-4 h-4 text-primary mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.sqft || "—"}</p><p className="text-[10px] text-muted-foreground">Sq. Ft.</p></div>
               <div className="text-center p-2.5 rounded-lg bg-muted/50"><MapPin className="w-4 h-4 text-info mx-auto mb-1" /><p className="text-sm font-bold text-foreground">{wh.zones}</p><p className="text-[10px] text-muted-foreground">Zones</p></div>
-              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Eye className="w-4 h-4 text-warning mx-auto mb-1" /><p className="text-sm font-bold text-foreground truncate">{wh.manager.split(" ")[0]}</p><p className="text-[10px] text-muted-foreground">Manager</p></div>
+              <div className="text-center p-2.5 rounded-lg bg-muted/50"><Eye className="w-4 h-4 text-warning mx-auto mb-1" /><p className="text-sm font-bold text-foreground truncate">{wh.manager ? wh.manager.split(" ")[0] : "—"}</p><p className="text-[10px] text-muted-foreground">Manager</p></div>
             </div>
           </div>
         );

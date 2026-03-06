@@ -201,14 +201,31 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">App Branding</h3>
               </div>
               <div className="flex items-center gap-6 mb-4">
-                <div className="w-20 h-20 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-primary">{settings.appName.charAt(0)}</span>
+                <div className="w-20 h-20 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center overflow-hidden">
+                  {settings.logoUrl ? (
+                    <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl font-bold text-primary">{settings.appName.charAt(0)}</span>
+                  )}
                 </div>
                 <div className="space-y-2">
-                  <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-foreground text-sm font-medium hover:bg-muted/80 transition-colors">
+                  <label className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-foreground text-sm font-medium hover:bg-muted/80 transition-colors cursor-pointer">
                     <Upload className="w-4 h-4" />Upload Logo
-                  </button>
-                  <p className="text-[10px] text-muted-foreground">PNG, SVG up to 2MB</p>
+                    <input type="file" accept="image/png,image/svg+xml,image/jpeg,image/webp" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file || file.size > 2 * 1024 * 1024) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const result = ev.target?.result as string;
+                        updateSettings({ logoUrl: result });
+                      };
+                      reader.readAsDataURL(file);
+                    }} />
+                  </label>
+                  <p className="text-[10px] text-muted-foreground">PNG, SVG, JPG up to 2MB</p>
+                  {settings.logoUrl && (
+                    <button onClick={() => updateSettings({ logoUrl: "" })} className="text-[10px] text-destructive hover:underline">Remove logo</button>
+                  )}
                 </div>
               </div>
               <div>

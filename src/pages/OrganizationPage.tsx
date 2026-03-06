@@ -1,54 +1,14 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useSharedData } from "@/hooks/use-shared-data";
 import {
   Building2, Warehouse, Users, Network, Search, MapPin, Phone, Mail,
-  ChevronRight, ChevronDown, Plus, MoreVertical, Globe, Boxes, X, Edit2, Trash2, Check,
+  ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2,
 } from "lucide-react";
 
-interface Store {
-  id: number; name: string; type: string; address: string; phone: string; email: string; status: string; employees: number; revenue: string;
-}
-interface WHData {
-  id: number; name: string; location: string; capacity: number; sqft: string; manager: string; zones: number; activePicks: number;
-}
-interface Department {
-  id: number; name: string; head: string; headcount: number; budget: string; teams: string[];
-}
-
-const initialStores: Store[] = [
-  { id: 1, name: "Downtown Flagship", type: "Retail", address: "123 Main St, Metro City", phone: "+1 555-0100", email: "downtown@enterprise.com", status: "Active", employees: 45, revenue: "$1.2M/mo" },
-  { id: 2, name: "Mall of Nations", type: "Retail", address: "456 Commerce Ave, Metro City", phone: "+1 555-0200", email: "mall@enterprise.com", status: "Active", employees: 32, revenue: "$890K/mo" },
-  { id: 3, name: "Airport Express", type: "Kiosk", address: "Terminal 3, Int'l Airport", phone: "+1 555-0300", email: "airport@enterprise.com", status: "Active", employees: 12, revenue: "$340K/mo" },
-  { id: 4, name: "Suburban Outlet", type: "Outlet", address: "789 Outlet Blvd, Greenfield", phone: "+1 555-0400", email: "outlet@enterprise.com", status: "Maintenance", employees: 18, revenue: "$520K/mo" },
-];
-
-const initialWarehouses: WHData[] = [
-  { id: 1, name: "Central Distribution Hub", location: "Industrial Park, Zone A", capacity: 85, sqft: "120,000", manager: "Robert Chen", zones: 12, activePicks: 234 },
-  { id: 2, name: "West Coast Fulfillment", location: "Port District, Bay Area", capacity: 62, sqft: "85,000", manager: "Maria Santos", zones: 8, activePicks: 156 },
-  { id: 3, name: "Cold Storage Facility", location: "North Industrial, Metro City", capacity: 91, sqft: "45,000", manager: "James Park", zones: 6, activePicks: 89 },
-];
-
-const initialDepartments: Department[] = [
-  { id: 1, name: "Operations", head: "Sarah Mitchell", headcount: 128, budget: "$2.4M", teams: ["Logistics", "Quality Control", "Procurement"] },
-  { id: 2, name: "Sales & Marketing", head: "David Kumar", headcount: 85, budget: "$3.1M", teams: ["Retail Sales", "E-Commerce", "Brand Marketing", "Digital Ads"] },
-  { id: 3, name: "Finance", head: "Lisa Zhang", headcount: 42, budget: "$1.8M", teams: ["Accounting", "Treasury", "Audit"] },
-  { id: 4, name: "Human Resources", head: "Michael Brown", headcount: 28, budget: "$900K", teams: ["Recruitment", "Training", "Payroll"] },
-  { id: 5, name: "Technology", head: "Anna Kowalski", headcount: 64, budget: "$4.2M", teams: ["Infrastructure", "Development", "Support", "Security"] },
-];
-
 interface OrgNode { name: string; role: string; children?: OrgNode[]; }
-
-const orgTree: OrgNode = {
-  name: "James Wilson", role: "CEO",
-  children: [
-    { name: "Sarah Mitchell", role: "COO", children: [{ name: "Robert Chen", role: "VP Logistics" }, { name: "Tom Harris", role: "VP Quality" }] },
-    { name: "David Kumar", role: "CMO", children: [{ name: "Emily Rose", role: "Dir. Retail" }, { name: "Alex Kim", role: "Dir. E-Commerce" }] },
-    { name: "Lisa Zhang", role: "CFO", children: [{ name: "Mark Davis", role: "Controller" }, { name: "Nina Patel", role: "Treasurer" }] },
-    { name: "Anna Kowalski", role: "CTO", children: [{ name: "Chris Lee", role: "VP Engineering" }, { name: "Sam Wright", role: "VP Infrastructure" }] },
-  ],
-};
 
 function OrgTreeNode({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
   const [expanded, setExpanded] = useState(depth < 2);
@@ -69,14 +29,16 @@ type Tab = "stores" | "warehouses" | "departments" | "hierarchy";
 
 export default function OrganizationPage() {
   const { settings } = useAppSettings();
+  const {
+    stores, addStore, updateStore, deleteStore,
+    warehouses, addWarehouse, deleteWarehouse,
+    departments, addDepartment, updateDepartment, deleteDepartment,
+  } = useSharedData();
   const [activeTab, setActiveTab] = useState<Tab>("stores");
   const [search, setSearch] = useState("");
-  const [stores, setStores] = useState(initialStores);
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
-  const [departments, setDepartments] = useState(initialDepartments);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingStore, setEditingStore] = useState<Store | null>(null);
-  const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [editingStore, setEditingStore] = useState<typeof stores[0] | null>(null);
+  const [editingDept, setEditingDept] = useState<typeof departments[0] | null>(null);
 
   const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stores", label: "Stores", icon: Building2 },
@@ -96,9 +58,14 @@ export default function OrganizationPage() {
   const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
   const filteredDepts = departments.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
 
-  const deleteStore = (id: number) => setStores(prev => prev.filter(s => s.id !== id));
-  const deleteDept = (id: number) => setDepartments(prev => prev.filter(d => d.id !== id));
-  const deleteWarehouse = (id: number) => setWarehouses(prev => prev.filter(w => w.id !== id));
+  // Build org tree from departments
+  const orgTree: OrgNode = {
+    name: settings.appName, role: "Organization",
+    children: departments.map(d => ({
+      name: d.head || d.name, role: `Head of ${d.name}`,
+      children: d.teams.map(t => ({ name: t, role: `Team — ${d.name}` })),
+    })),
+  };
 
   return (
     <AppLayout>
@@ -146,6 +113,7 @@ export default function OrganizationPage() {
         {/* Stores */}
         {activeTab === "stores" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredStores.length === 0 && <p className="text-sm text-muted-foreground col-span-2 text-center py-10">No stores yet. Click "Add Store" to create one.</p>}
             {filteredStores.map((store) => (
               <div key={store.id} className="glass-card rounded-xl p-5 hover:border-primary/30 transition-colors">
                 <div className="flex items-start justify-between">
@@ -162,9 +130,9 @@ export default function OrganizationPage() {
                   </div>
                 </div>
                 <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{store.address}</div>
-                  <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{store.phone}</div>
-                  <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5" />{store.email}</div>
+                  {store.address && <div className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" />{store.address}</div>}
+                  {store.phone && <div className="flex items-center gap-2"><Phone className="w-3.5 h-3.5" />{store.phone}</div>}
+                  {store.email && <div className="flex items-center gap-2"><Mail className="w-3.5 h-3.5" />{store.email}</div>}
                 </div>
                 <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between text-xs">
                   <div><span className="text-muted-foreground">Employees: </span><span className="font-medium text-foreground">{store.employees}</span></div>
@@ -179,6 +147,7 @@ export default function OrganizationPage() {
         {/* Warehouses */}
         {activeTab === "warehouses" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {filteredWarehouses.length === 0 && <p className="text-sm text-muted-foreground col-span-3 text-center py-10">No warehouses yet. Click "Add Warehouse" to create one.</p>}
             {filteredWarehouses.map((wh) => (
               <div key={wh.id} className="glass-card rounded-xl p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -213,6 +182,7 @@ export default function OrganizationPage() {
         {/* Departments */}
         {activeTab === "departments" && (
           <div className="space-y-3">
+            {filteredDepts.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">No departments yet. Click "Add Department" to create one.</p>}
             {filteredDepts.map((dept) => (
               <div key={dept.id} className="glass-card rounded-xl p-5">
                 <div className="flex items-center justify-between">
@@ -226,7 +196,7 @@ export default function OrganizationPage() {
                       <div className="text-right"><p className="font-semibold text-primary">{dept.budget}</p><p className="text-muted-foreground">Budget</p></div>
                     </div>
                     <button onClick={() => setEditingDept(dept)} className="p-1 rounded hover:bg-muted"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>
-                    <button onClick={() => deleteDept(dept.id)} className="p-1 rounded hover:bg-destructive/10"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
+                    <button onClick={() => deleteDepartment(dept.id)} className="p-1 rounded hover:bg-destructive/10"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
@@ -241,7 +211,11 @@ export default function OrganizationPage() {
         {activeTab === "hierarchy" && (
           <div className="glass-card rounded-xl p-6">
             <div className="flex items-center gap-2 mb-4"><Globe className="w-4 h-4 text-primary" /><h3 className="text-sm font-semibold text-foreground">Organization Hierarchy</h3></div>
-            <OrgTreeNode node={orgTree} />
+            {departments.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-10">Add departments to see the org chart.</p>
+            ) : (
+              <OrgTreeNode node={orgTree} />
+            )}
           </div>
         )}
       </div>
@@ -254,7 +228,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Store</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <StoreForm onSave={(data) => { setStores(prev => [...prev, { ...data, id: Date.now() }]); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <StoreForm onSave={(data) => { addStore(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
@@ -267,7 +241,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Edit Store</h3>
               <button onClick={() => setEditingStore(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <StoreForm store={editingStore} onSave={(data) => { setStores(prev => prev.map(s => s.id === editingStore.id ? { ...s, ...data } : s)); setEditingStore(null); }} onCancel={() => setEditingStore(null)} />
+            <StoreForm store={editingStore} onSave={(data) => { updateStore(editingStore.id, data); setEditingStore(null); }} onCancel={() => setEditingStore(null)} />
           </div>
         </div>
       )}
@@ -280,7 +254,20 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Department</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <DeptForm onSave={(data) => { setDepartments(prev => [...prev, { ...data, id: Date.now() }]); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <DeptForm onSave={(data) => { addDepartment(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Edit Department Modal */}
+      {editingDept && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingDept(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Edit Department</h3>
+              <button onClick={() => setEditingDept(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <DeptForm dept={editingDept} onSave={(data) => { updateDepartment(editingDept.id, data); setEditingDept(null); }} onCancel={() => setEditingDept(null)} />
           </div>
         </div>
       )}
@@ -293,7 +280,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Warehouse</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <WHForm onSave={(data) => { setWarehouses(prev => [...prev, { ...data, id: Date.now() }]); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <WHForm onSave={(data) => { addWarehouse(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
@@ -301,7 +288,7 @@ export default function OrganizationPage() {
   );
 }
 
-function StoreForm({ store, onSave, onCancel }: { store?: Store; onSave: (data: any) => void; onCancel: () => void }) {
+function StoreForm({ store, onSave, onCancel }: { store?: any; onSave: (data: any) => void; onCancel: () => void }) {
   const [name, setName] = useState(store?.name || ""); const [type, setType] = useState(store?.type || "Retail");
   const [address, setAddress] = useState(store?.address || ""); const [phone, setPhone] = useState(store?.phone || "");
   const [email, setEmail] = useState(store?.email || ""); const [employees, setEmployees] = useState(store?.employees?.toString() || "");
@@ -333,10 +320,10 @@ function StoreForm({ store, onSave, onCancel }: { store?: Store; onSave: (data: 
   );
 }
 
-function DeptForm({ dept, onSave, onCancel }: { dept?: Department; onSave: (data: any) => void; onCancel: () => void }) {
+function DeptForm({ dept, onSave, onCancel }: { dept?: any; onSave: (data: any) => void; onCancel: () => void }) {
   const [name, setName] = useState(dept?.name || ""); const [head, setHead] = useState(dept?.head || "");
   const [headcount, setHeadcount] = useState(dept?.headcount?.toString() || ""); const [budget, setBudget] = useState(dept?.budget || "");
-  const [teams, setTeams] = useState(dept?.teams.join(", ") || "");
+  const [teams, setTeams] = useState(dept?.teams?.join(", ") || "");
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">

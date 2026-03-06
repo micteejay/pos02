@@ -12,39 +12,17 @@ export interface SharedDocument {
   id: string; name: string; type: "pdf" | "xlsx" | "docx" | "png" | "jpg" | "folder" | "txt"; size: string; modified: string; author: string; folder: string; source?: string;
 }
 
-const initialStock: InventoryItem[] = [
-  { sku: "WDG-A100", name: "Widget Alpha", category: "Components", warehouse: "Main HQ", qty: 12, reorder: 50, price: 24.99, status: "critical" },
-  { sku: "WDG-B200", name: "Widget Beta", category: "Components", warehouse: "Main HQ", qty: 340, reorder: 100, price: 18.50, status: "ok" },
-  { sku: "SEN-X10", name: "Sensor X10", category: "Electronics", warehouse: "West DC", qty: 45, reorder: 40, price: 89.00, status: "low" },
-  { sku: "MTR-500", name: "Motor 500W", category: "Machinery", warehouse: "East DC", qty: 78, reorder: 30, price: 145.00, status: "ok" },
-  { sku: "CBL-CAT6", name: "Cat6 Cable (100ft)", category: "Networking", warehouse: "Main HQ", qty: 520, reorder: 200, price: 34.99, status: "ok" },
-  { sku: "PCB-R3", name: "PCB Board Rev3", category: "Electronics", warehouse: "West DC", qty: 8, reorder: 25, price: 12.75, status: "critical" },
-  { sku: "FAN-120", name: "Cooling Fan 120mm", category: "Components", warehouse: "East DC", qty: 190, reorder: 100, price: 9.99, status: "ok" },
-  { sku: "PSU-750", name: "PSU 750W Gold", category: "Electronics", warehouse: "Main HQ", qty: 62, reorder: 50, price: 119.00, status: "low" },
-  { sku: "USB-H7", name: "USB Hub 7-Port", category: "Accessories", warehouse: "Main HQ", qty: 200, reorder: 80, price: 29.99, status: "ok" },
-  { sku: "LED-5M", name: "LED Strip 5m", category: "Accessories", warehouse: "Main HQ", qty: 310, reorder: 100, price: 15.99, status: "ok" },
-  { sku: "THP-10", name: "Thermal Paste 10g", category: "Components", warehouse: "Main HQ", qty: 450, reorder: 150, price: 8.49, status: "ok" },
-  { sku: "NSW-8P", name: "Network Switch 8P", category: "Networking", warehouse: "Main HQ", qty: 85, reorder: 40, price: 64.99, status: "ok" },
-];
+export interface OrgStore {
+  id: number; name: string; type: string; address: string; phone: string; email: string; status: string; employees: number; revenue: string;
+}
 
-const initialDocs: SharedDocument[] = [
-  { id: "1", name: "Finance", type: "folder", size: "8 items", modified: "Feb 12, 2026", author: "System", folder: "/" },
-  { id: "2", name: "HR Documents", type: "folder", size: "5 items", modified: "Feb 10, 2026", author: "System", folder: "/" },
-  { id: "3", name: "Marketing Assets", type: "folder", size: "12 items", modified: "Feb 8, 2026", author: "System", folder: "/" },
-  { id: "4", name: "Chat Attachments", type: "folder", size: "0 items", modified: "Feb 14, 2026", author: "System", folder: "/" },
-  { id: "5", name: "Q4 Inventory Report.pdf", type: "pdf", size: "2.4 MB", modified: "Feb 12, 2026", author: "Sarah Chen", folder: "/" },
-  { id: "6", name: "Sales Forecast 2026.xlsx", type: "xlsx", size: "1.8 MB", modified: "Feb 11, 2026", author: "Mike Ross", folder: "/" },
-  { id: "7", name: "Employee Handbook v3.docx", type: "docx", size: "4.1 MB", modified: "Feb 10, 2026", author: "HR Department", folder: "/" },
-  { id: "8", name: "Warehouse Layout.png", type: "png", size: "890 KB", modified: "Feb 9, 2026", author: "Lisa Park", folder: "/" },
-  { id: "9", name: "Purchase Orders - Jan.pdf", type: "pdf", size: "3.2 MB", modified: "Feb 8, 2026", author: "James Wilson", folder: "/" },
-  { id: "10", name: "Tax Filing 2025.pdf", type: "pdf", size: "5.1 MB", modified: "Jan 28, 2026", author: "Lisa Zhang", folder: "/Finance" },
-  { id: "11", name: "Budget Overview.xlsx", type: "xlsx", size: "2.2 MB", modified: "Jan 25, 2026", author: "Lisa Zhang", folder: "/Finance" },
-  { id: "12", name: "Invoice Template.docx", type: "docx", size: "340 KB", modified: "Jan 20, 2026", author: "Mark Davis", folder: "/Finance" },
-  { id: "13", name: "Onboarding Checklist.docx", type: "docx", size: "520 KB", modified: "Feb 5, 2026", author: "Michael Brown", folder: "/HR Documents" },
-  { id: "14", name: "Company Policy.pdf", type: "pdf", size: "1.9 MB", modified: "Feb 1, 2026", author: "HR Department", folder: "/HR Documents" },
-  { id: "15", name: "Brand Guidelines.pdf", type: "pdf", size: "8.4 MB", modified: "Feb 7, 2026", author: "David Kumar", folder: "/Marketing Assets" },
-  { id: "16", name: "Logo Pack.png", type: "png", size: "12 MB", modified: "Feb 6, 2026", author: "Design Team", folder: "/Marketing Assets" },
-];
+export interface OrgWarehouse {
+  id: number; name: string; location: string; capacity: number; sqft: string; manager: string; zones: number; activePicks: number;
+}
+
+export interface OrgDepartment {
+  id: number; name: string; head: string; headcount: number; budget: string; teams: string[];
+}
 
 interface SharedDataContextType {
   // Inventory
@@ -63,6 +41,27 @@ interface SharedDataContextType {
   documents: SharedDocument[];
   addDocument: (doc: Omit<SharedDocument, "id">) => void;
   deleteDocument: (id: string) => void;
+
+  // Organization
+  stores: OrgStore[];
+  addStore: (store: Omit<OrgStore, "id">) => void;
+  updateStore: (id: number, updates: Partial<OrgStore>) => void;
+  deleteStore: (id: number) => void;
+
+  warehouses: OrgWarehouse[];
+  addWarehouse: (wh: Omit<OrgWarehouse, "id">) => void;
+  updateWarehouse: (id: number, updates: Partial<OrgWarehouse>) => void;
+  deleteWarehouse: (id: number) => void;
+
+  departments: OrgDepartment[];
+  addDepartment: (dept: Omit<OrgDepartment, "id">) => void;
+  updateDepartment: (id: number, updates: Partial<OrgDepartment>) => void;
+  deleteDepartment: (id: number) => void;
+
+  // Helpers
+  warehouseNames: string[];
+  storeNames: string[];
+  departmentNames: string[];
 }
 
 const SharedDataContext = createContext<SharedDataContextType>(null!);
@@ -74,10 +73,14 @@ function calcStatus(qty: number, reorder: number): InventoryItem["status"] {
 }
 
 export function SharedDataProvider({ children }: { children: ReactNode }) {
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialStock);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
-  const [documents, setDocuments] = useState<SharedDocument[]>(initialDocs);
+  const [documents, setDocuments] = useState<SharedDocument[]>([]);
+  const [stores, setStores] = useState<OrgStore[]>([]);
+  const [warehouses, setWarehouses] = useState<OrgWarehouse[]>([]);
+  const [departments, setDepartments] = useState<OrgDepartment[]>([]);
 
+  // Inventory
   const addInventoryItem = useCallback((item: InventoryItem) => {
     setInventory(prev => [...prev, item]);
   }, []);
@@ -124,6 +127,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Sales
   const addSale = useCallback((sale: Omit<SaleRecord, "id" | "date">) => {
     setSales(prev => [{
       ...sale,
@@ -132,6 +136,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     }, ...prev]);
   }, []);
 
+  // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
     setDocuments(prev => [...prev, { ...doc, id: `doc-${Date.now()}` }]);
   }, []);
@@ -140,11 +145,59 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     setDocuments(prev => prev.filter(d => d.id !== id));
   }, []);
 
+  // Organization - Stores
+  const addStore = useCallback((store: Omit<OrgStore, "id">) => {
+    setStores(prev => [...prev, { ...store, id: Date.now() }]);
+  }, []);
+
+  const updateStore = useCallback((id: number, updates: Partial<OrgStore>) => {
+    setStores(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+  }, []);
+
+  const deleteStore = useCallback((id: number) => {
+    setStores(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  // Organization - Warehouses
+  const addWarehouse = useCallback((wh: Omit<OrgWarehouse, "id">) => {
+    setWarehouses(prev => [...prev, { ...wh, id: Date.now() }]);
+  }, []);
+
+  const updateWarehouse = useCallback((id: number, updates: Partial<OrgWarehouse>) => {
+    setWarehouses(prev => prev.map(w => w.id === id ? { ...w, ...updates } : w));
+  }, []);
+
+  const deleteWarehouse = useCallback((id: number) => {
+    setWarehouses(prev => prev.filter(w => w.id !== id));
+  }, []);
+
+  // Organization - Departments
+  const addDepartment = useCallback((dept: Omit<OrgDepartment, "id">) => {
+    setDepartments(prev => [...prev, { ...dept, id: Date.now() }]);
+  }, []);
+
+  const updateDepartment = useCallback((id: number, updates: Partial<OrgDepartment>) => {
+    setDepartments(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+  }, []);
+
+  const deleteDepartment = useCallback((id: number) => {
+    setDepartments(prev => prev.filter(d => d.id !== id));
+  }, []);
+
+  // Derived helpers
+  const warehouseNames = warehouses.map(w => w.name);
+  const storeNames = stores.map(s => s.name);
+  const departmentNames = departments.map(d => d.name);
+
   return (
     <SharedDataContext.Provider value={{
       inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, addStockFromPO,
       sales, addSale,
       documents, addDocument, deleteDocument,
+      stores, addStore, updateStore, deleteStore,
+      warehouses, addWarehouse, updateWarehouse, deleteWarehouse,
+      departments, addDepartment, updateDepartment, deleteDepartment,
+      warehouseNames, storeNames, departmentNames,
     }}>
       {children}
     </SharedDataContext.Provider>
