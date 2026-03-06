@@ -14,28 +14,9 @@ import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers";
 
-interface WarehouseData {
-  id: string; name: string; location: string; capacity: number; items: number; zones: number; manager: string; status: "operational" | "maintenance";
-}
-
 interface Transfer {
   id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
-
-const initialWarehouses: WarehouseData[] = [
-  { id: "WH-001", name: "Main HQ Warehouse", location: "San Francisco, CA", capacity: 85, items: 4280, zones: 12, manager: "Sarah Chen", status: "operational" },
-  { id: "WH-002", name: "West Distribution Center", location: "Portland, OR", capacity: 62, items: 2150, zones: 8, manager: "James Wilson", status: "operational" },
-  { id: "WH-003", name: "East Distribution Center", location: "Atlanta, GA", capacity: 91, items: 5420, zones: 15, manager: "Maria Garcia", status: "maintenance" },
-  { id: "WH-004", name: "South Fulfillment Hub", location: "Houston, TX", capacity: 34, items: 890, zones: 6, manager: "David Kim", status: "operational" },
-];
-
-const initialTransfers: Transfer[] = [
-  { id: "TRF-4501", items: "Widget Alpha ×200", from: "West DC", to: "Main HQ", initiated: "Feb 12, 2026", eta: "Feb 14, 2026", status: "in_transit", requester: "Lisa Park" },
-  { id: "TRF-4498", items: "Sensor X10 ×50", from: "Main HQ", to: "East DC", initiated: "Feb 11, 2026", eta: "Feb 13, 2026", status: "in_transit", requester: "Mike Ross" },
-  { id: "TRF-4495", items: "Motor 500W ×30", from: "East DC", to: "South Hub", initiated: "Feb 10, 2026", eta: "Feb 12, 2026", status: "delivered", requester: "Sarah Chen" },
-  { id: "TRF-4490", items: "Cat6 Cable ×100", from: "Main HQ", to: "West DC", initiated: "Feb 9, 2026", eta: "Feb 11, 2026", status: "delivered", requester: "James Wilson" },
-  { id: "TRF-4488", items: "PCB Board Rev3 ×100", from: "South Hub", to: "Main HQ", initiated: "Feb 8, 2026", eta: "Feb 14, 2026", status: "pending", requester: "David Kim" },
-];
 
 const statusConfig = {
   critical: { label: "Critical", className: "bg-destructive/10 text-destructive" },
@@ -51,12 +32,11 @@ const statusConfig = {
 const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
 
 export default function InventoryPage() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty } = useSharedData();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames } = useSharedData();
   const { addNotification, addApprovalItem } = useAppEvents();
   const { formatCurrency } = useAppSettings();
   const [tab, setTab] = useState<Tab>("stock");
-  const [warehouses, setWarehouses] = useState(initialWarehouses);
-  const [transfers, setTransfers] = useState(initialTransfers);
+  const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
