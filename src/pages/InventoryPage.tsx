@@ -205,7 +205,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option><option>Accessories</option><option>Uncategorized</option>
+            {inventoryCategories.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
