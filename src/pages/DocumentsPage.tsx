@@ -412,6 +412,16 @@ export default function DocumentsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {virtualFolders.map((folderName) => (
+                <div key={`vf-${folderName}`} className="glass-card rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-colors group"
+                  onClick={() => handleFolderClick(folderName)}>
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                    <Folder className="w-6 h-6 text-warning" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground text-center truncate">{folderName}</p>
+                  <p className="text-[10px] text-muted-foreground text-center mt-0.5">Folder</p>
+                </div>
+              ))}
               {currentDocs.map((doc) => {
                 const Icon = iconMap[doc.type] || File;
                 return (
