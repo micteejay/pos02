@@ -1,11 +1,9 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
-import { useAppSettings } from "@/hooks/use-app-settings";
-import { useSharedData } from "@/hooks/use-shared-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Phone, Video, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2 } from "lucide-react";
+import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check } from "lucide-react";
 
 interface Message {
   id: string; sender_id: string; sender_name: string; avatar: string; time: string; text: string; channel_id: string;
@@ -19,19 +17,23 @@ interface Channel {
   description?: string; muted?: boolean;
 }
 
+interface UserProfile {
+  id: string; name: string; email: string; avatar: string; status: string; role?: string;
+}
+
 const emojiList = ["👍", "❤️", "😂", "🎉", "🔥", "✅", "👀", "💯"];
+
+type CreateMode = "channel" | "dm" | "group" | null;
 
 export default function ChatPage() {
   const { addNotification } = useAppEvents();
-  const { currentUser } = useAppSettings();
-  const { addDocument } = useSharedData();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeChannel, setActiveChannel] = useState<string>("");
   const [inputText, setInputText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
-  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [createMode, setCreateMode] = useState<CreateMode>(null);
   const [newChannelName, setNewChannelName] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -40,10 +42,14 @@ export default function ChatPage() {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>("");
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [showNewMenu, setShowNewMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch channels and set up
+  // Fetch channels, users, and set up
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -51,13 +57,71 @@ export default function ChatPage() {
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
 
+      // Fetch channels with member count
       const { data: chData } = await supabase.from("chat_channels").select("*, chat_channel_members(count)").order("created_at");
-      if (chData) {
-        const mapped: Channel[] = chData.map((ch: any) => ({
-          id: ch.id, name: ch.name, type: ch.type,
-          unread: 0, members: ch.chat_channel_members?.[0]?.count || 0,
-          description: ch.description || "", muted: false,
+
+      // Fetch all channel members to resolve DM display names
+      const { data: memberData } = await supabase.from("chat_channel_members").select("channel_id, user_id");
+
+      // Fetch all profiles
+      const { data: profilesData } = await supabase.from("profiles").select("id, name, email, avatar, status");
+
+      // Fetch roles for each user
+      const { data: rolesData } = await supabase.from("user_roles").select("user_id, roles(name)");
+      const roleMap = new Map<string, string>();
+      if (rolesData) {
+        rolesData.forEach((ur: any) => {
+          if (ur.roles?.name) roleMap.set(ur.user_id, ur.roles.name);
+        });
+      }
+
+      const profileMap = new Map<string, UserProfile>();
+      if (profilesData) {
+        const users: UserProfile[] = profilesData.map(p => ({
+          id: p.id,
+          name: p.name || p.email?.split("@")[0] || "User",
+          email: p.email || "",
+          avatar: (p.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase(),
+          status: p.status || "active",
+          role: roleMap.get(p.id) || "Viewer",
         }));
+        users.forEach(u => profileMap.set(u.id, u));
+        setAllUsers(users.filter(u => u.id !== user.id));
+      }
+
+      // Build member-to-channel mapping for DM name resolution
+      const channelMembers = new Map<string, string[]>();
+      if (memberData) {
+        memberData.forEach((m: any) => {
+          const arr = channelMembers.get(m.channel_id) || [];
+          arr.push(m.user_id);
+          channelMembers.set(m.channel_id, arr);
+        });
+      }
+
+      if (chData) {
+        const mapped: Channel[] = chData.map((ch: any) => {
+          let displayName = ch.name;
+          // For DMs, show the other person's name
+          if (ch.type === "dm") {
+            const members = channelMembers.get(ch.id) || [];
+            const otherUserId = members.find((id: string) => id !== user.id);
+            if (otherUserId && profileMap.has(otherUserId)) {
+              displayName = profileMap.get(otherUserId)!.name;
+            }
+          }
+          // For groups, show the channel name or member names
+          if (ch.type === "group" && ch.name.startsWith("group-")) {
+            const members = channelMembers.get(ch.id) || [];
+            const names = members.filter(id => id !== user.id).map(id => profileMap.get(id)?.name || "User").slice(0, 3);
+            displayName = names.join(", ") || ch.name;
+          }
+          return {
+            id: ch.id, name: displayName, type: ch.type,
+            unread: 0, members: ch.chat_channel_members?.[0]?.count || 0,
+            description: ch.description || "", muted: false,
+          };
+        });
         setChannels(mapped);
         if (mapped.length > 0 && !activeChannel) setActiveChannel(mapped[0].id);
       }
@@ -98,10 +162,8 @@ export default function ChatPage() {
         filter: `channel_id=eq.${activeChannel}`,
       }, async (payload) => {
         const m = payload.new as any;
-        // Don't duplicate if we already added it optimistically
         setMessages(prev => {
           if (prev.find(msg => msg.id === m.id)) return prev;
-          // Fetch sender info
           return [...prev, {
             id: m.id, sender_id: m.sender_id, sender_name: "...", avatar: "?",
             time: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
@@ -109,7 +171,6 @@ export default function ChatPage() {
             reactions: [], pinned: m.is_pinned, edited: m.edited, replyTo: m.reply_to,
           }];
         });
-        // Fetch sender info async
         const { data: profile } = await supabase.from("profiles").select("name, avatar").eq("id", m.sender_id).single();
         if (profile) {
           setMessages(prev => prev.map(msg => msg.id === m.id ? {
@@ -157,7 +218,6 @@ export default function ChatPage() {
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${(file.size / 1024).toFixed(0)} KB`;
       const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
-
       const content = `📎 Shared a file: ${file.name}`;
       const attachments = [{ name: file.name, size: sizeStr, type: ext }];
 
@@ -182,7 +242,6 @@ export default function ChatPage() {
   }, [inputText, activeChannel, userId, replyTo]);
 
   const addReaction = useCallback(async (msgId: string, emoji: string) => {
-    // Update locally for now (reactions stored as jsonb)
     setMessages(prev => prev.map(m => {
       if (m.id !== msgId) return m;
       const reactions = m.reactions || [];
@@ -215,6 +274,100 @@ export default function ChatPage() {
     setEditingMsg(null); setEditText("");
   }, [editText]);
 
+  const toggleUserSelection = (uid: string) => {
+    setSelectedUsers(prev => prev.includes(uid) ? prev.filter(id => id !== uid) : [...prev, uid]);
+  };
+
+  // Start or open existing DM
+  const startDirectMessage = useCallback(async (targetUserId: string) => {
+    if (!userId) return;
+
+    // Check if DM already exists between these two users
+    const { data: myMemberships } = await supabase
+      .from("chat_channel_members")
+      .select("channel_id")
+      .eq("user_id", userId);
+
+    const { data: theirMemberships } = await supabase
+      .from("chat_channel_members")
+      .select("channel_id")
+      .eq("user_id", targetUserId);
+
+    if (myMemberships && theirMemberships) {
+      const myChannelIds = new Set(myMemberships.map(m => m.channel_id));
+      const sharedChannelIds = theirMemberships.filter(m => myChannelIds.has(m.channel_id)).map(m => m.channel_id);
+
+      if (sharedChannelIds.length > 0) {
+        // Check if any shared channel is a DM
+        const { data: dmChannels } = await supabase
+          .from("chat_channels")
+          .select("id")
+          .in("id", sharedChannelIds)
+          .eq("type", "dm");
+
+        if (dmChannels && dmChannels.length > 0) {
+          setActiveChannel(dmChannels[0].id);
+          setCreateMode(null); setSelectedUsers([]); setUserSearch("");
+          setShowMobileSidebar(false);
+          return;
+        }
+      }
+    }
+
+    // Create new DM channel
+    const targetUser = allUsers.find(u => u.id === targetUserId);
+    const dmName = `dm-${Date.now()}`;
+
+    const { data: ch, error } = await supabase.from("chat_channels").insert({
+      name: dmName, type: "dm" as const, created_by: userId, is_private: true,
+    }).select().single();
+
+    if (error || !ch) { toast.error("Failed to create conversation"); return; }
+
+    // Add both users as members
+    await supabase.from("chat_channel_members").insert([
+      { channel_id: ch.id, user_id: userId, role: "member" },
+      { channel_id: ch.id, user_id: targetUserId, role: "member" },
+    ]);
+
+    const displayName = targetUser?.name || "User";
+    setChannels(prev => [...prev, { id: ch.id, name: displayName, type: "dm", unread: 0, members: 2 }]);
+    setActiveChannel(ch.id);
+    setCreateMode(null); setSelectedUsers([]); setUserSearch("");
+    toast.success(`Conversation with ${displayName} started`);
+  }, [userId, allUsers]);
+
+  // Create group chat
+  const createGroupChat = useCallback(async () => {
+    if (!userId || selectedUsers.length < 1) return;
+
+    const groupName = newChannelName.trim() || selectedUsers.map(id => allUsers.find(u => u.id === id)?.name?.split(" ")[0]).filter(Boolean).join(", ");
+    const dbName = `group-${Date.now()}`;
+
+    const { data: ch, error } = await supabase.from("chat_channels").insert({
+      name: newChannelName.trim() || dbName, type: "group" as const, created_by: userId,
+      description: `Group with ${selectedUsers.length + 1} members`,
+    }).select().single();
+
+    if (error || !ch) { toast.error("Failed to create group"); return; }
+
+    // Add all members
+    const memberInserts = [userId, ...selectedUsers].map(uid => ({
+      channel_id: ch.id, user_id: uid, role: uid === userId ? "admin" : "member",
+    }));
+    await supabase.from("chat_channel_members").insert(memberInserts);
+
+    setChannels(prev => [...prev, {
+      id: ch.id, name: newChannelName.trim() || groupName, type: "group",
+      unread: 0, members: selectedUsers.length + 1,
+      description: `Group with ${selectedUsers.length + 1} members`,
+    }]);
+    setActiveChannel(ch.id);
+    setCreateMode(null); setSelectedUsers([]); setNewChannelName(""); setUserSearch("");
+    toast.success(`Group "${newChannelName.trim() || groupName}" created`);
+  }, [userId, selectedUsers, newChannelName, allUsers]);
+
+  // Create channel
   const createChannel = useCallback(async () => {
     if (!newChannelName.trim() || !userId) return;
     const name = newChannelName.toLowerCase().replace(/\s+/g, "-");
@@ -223,11 +376,11 @@ export default function ChatPage() {
     }).select().single();
     if (error || !ch) { toast.error("Failed to create channel"); return; }
 
-    // Join the channel
     await supabase.from("chat_channel_members").insert({ channel_id: ch.id, user_id: userId, role: "admin" });
 
     setChannels(prev => [...prev, { id: ch.id, name: ch.name, type: "channel", unread: 0, members: 1, description: ch.description || "" }]);
-    setActiveChannel(ch.id); setNewChannelName(""); setShowNewChannel(false);
+    setActiveChannel(ch.id); setNewChannelName("");
+    setCreateMode(null); setUserSearch("");
     toast.success(`Channel #${name} created`);
   }, [newChannelName, userId]);
 
@@ -235,8 +388,15 @@ export default function ChatPage() {
     setChannels(prev => prev.map(c => c.id === activeChannel ? { ...c, muted: !c.muted } : c));
   }, [activeChannel]);
 
+  const filteredUsers = useMemo(() => {
+    if (!userSearch) return allUsers;
+    const q = userSearch.toLowerCase();
+    return allUsers.filter(u => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.role || "").toLowerCase().includes(q));
+  }, [allUsers, userSearch]);
+
   const pinnedMessages = channelMessages.filter(m => m.pinned);
   const totalUnread = channels.reduce((s, c) => s + c.unread, 0);
+  const groupChannels = channels.filter(c => c.type === "group");
 
   if (loading) {
     return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
@@ -249,8 +409,21 @@ export default function ChatPage() {
           <div className="w-64 h-full border-r border-border bg-muted/30 flex flex-col shrink-0">
             <div className="p-3 border-b border-border flex items-center justify-between">
               <h3 className="text-sm font-semibold text-foreground">Messages {totalUnread > 0 && <span className="text-xs text-primary">({totalUnread})</span>}</h3>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setShowNewChannel(true)} className="p-1.5 rounded-md hover:bg-muted"><Plus className="w-4 h-4 text-muted-foreground" /></button>
+              <div className="flex items-center gap-1 relative">
+                <button onClick={() => setShowNewMenu(!showNewMenu)} className="p-1.5 rounded-md hover:bg-muted"><Plus className="w-4 h-4 text-muted-foreground" /></button>
+                {showNewMenu && (
+                  <div className="absolute top-8 right-0 bg-card border border-border rounded-lg shadow-lg z-20 w-44 py-1 animate-fade-in">
+                    <button onClick={() => { setCreateMode("channel"); setShowNewMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted">
+                      <Hash className="w-3.5 h-3.5 text-muted-foreground" /> New Channel
+                    </button>
+                    <button onClick={() => { setCreateMode("dm"); setShowNewMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted">
+                      <MessageSquare className="w-3.5 h-3.5 text-muted-foreground" /> Direct Message
+                    </button>
+                    <button onClick={() => { setCreateMode("group"); setShowNewMenu(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted">
+                      <Users className="w-3.5 h-3.5 text-muted-foreground" /> Group Chat
+                    </button>
+                  </div>
+                )}
                 <button onClick={() => setShowMobileSidebar(false)} className="p-1.5 rounded-md hover:bg-muted lg:hidden"><X className="w-4 h-4 text-muted-foreground" /></button>
               </div>
             </div>
@@ -266,18 +439,55 @@ export default function ChatPage() {
                   </button>
                 ))}
               </div>
+              {groupChannels.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 mb-1.5">Groups</p>
+                  {groupChannels.map(gr => (
+                    <button key={gr.id} onClick={() => switchChannel(gr.id)}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeChannel === gr.id ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:bg-muted/50"}`}>
+                      <Users className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{gr.name}</span>
+                      {gr.unread > 0 && <span className="ml-auto bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">{gr.unread}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 mb-1.5">Direct Messages</p>
                 {channels.filter(c => c.type === "dm").map(dm => (
                   <button key={dm.id} onClick={() => switchChannel(dm.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${activeChannel === dm.id ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:bg-muted/50"}`}>
                     <div className="relative shrink-0">
-                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">{dm.name.split(" ").map(n => n[0]).join("")}</div>
+                      <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">{dm.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</div>
                     </div>
                     <span className="truncate">{dm.name}</span>
                     {dm.unread > 0 && <span className="ml-auto bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">{dm.unread}</span>}
                   </button>
                 ))}
+                {channels.filter(c => c.type === "dm").length === 0 && (
+                  <p className="text-[10px] text-muted-foreground/60 px-2 py-1">No conversations yet</p>
+                )}
+              </div>
+              {/* Online users section */}
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground px-2 mb-1.5">People ({allUsers.length})</p>
+                {allUsers.slice(0, 10).map(u => (
+                  <button key={u.id} onClick={() => startDirectMessage(u.id)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
+                    <div className="relative shrink-0">
+                      <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-medium text-accent-foreground">{u.avatar}</div>
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background ${u.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`} />
+                    </div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <span className="truncate block text-xs">{u.name}</span>
+                    </div>
+                    <span className="text-[9px] text-muted-foreground/60">{u.role}</span>
+                  </button>
+                ))}
+                {allUsers.length > 10 && (
+                  <button onClick={() => setCreateMode("dm")} className="w-full text-[10px] text-primary hover:underline px-2 py-1">
+                    View all {allUsers.length} people
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -288,10 +498,11 @@ export default function ChatPage() {
             <div className="flex items-center gap-2">
               <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-1.5 rounded-md hover:bg-muted mr-1"><MessageSquare className="w-4 h-4 text-muted-foreground" /></button>
               {activeChannelData?.type === "channel" ? <Hash className="w-4 h-4 text-muted-foreground" /> :
-                <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">{activeChannelData?.name.split(" ").map(n => n[0]).join("")}</div>}
+                activeChannelData?.type === "group" ? <Users className="w-4 h-4 text-muted-foreground" /> :
+                <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[10px] font-medium text-secondary-foreground">{activeChannelData?.name.split(" ").map(n => n[0]).join("").slice(0, 2)}</div>}
               <div>
                 <h2 className="font-semibold text-foreground text-sm">{activeChannelData?.name || "Select a channel"}</h2>
-                {activeChannelData?.type === "channel" && <p className="text-[10px] text-muted-foreground">{activeChannelData.members} members · {activeChannelData.description}</p>}
+                {activeChannelData && <p className="text-[10px] text-muted-foreground">{activeChannelData.members} members{activeChannelData.description ? ` · ${activeChannelData.description}` : ""}</p>}
               </div>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -429,23 +640,102 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {showNewChannel && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNewChannel(false)}>
-          <div className="glass-card rounded-2xl p-6 max-w-sm w-full animate-fade-in" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-foreground mb-4">Create Channel</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Channel Name</label>
+      {/* Create modal */}
+      {createMode && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setCreateMode(null); setSelectedUsers([]); setUserSearch(""); setNewChannelName(""); }}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-foreground mb-1">
+              {createMode === "channel" ? "Create Channel" : createMode === "dm" ? "Direct Message" : "Create Group"}
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              {createMode === "channel" ? "Create a new channel for your team" : createMode === "dm" ? "Start a conversation with someone" : "Create a group chat with multiple people"}
+            </p>
+
+            {/* Channel/Group name input */}
+            {(createMode === "channel" || createMode === "group") && (
+              <div className="mb-3">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {createMode === "channel" ? "Channel Name" : "Group Name (optional)"}
+                </label>
                 <div className="flex items-center gap-2 mt-1">
-                  <Hash className="w-4 h-4 text-muted-foreground" />
-                  <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createChannel()}
-                    placeholder="e.g. project-alpha" className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none" />
+                  {createMode === "channel" ? <Hash className="w-4 h-4 text-muted-foreground" /> : <Users className="w-4 h-4 text-muted-foreground" />}
+                  <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && createMode === "channel" && createChannel()}
+                    placeholder={createMode === "channel" ? "e.g. project-alpha" : "e.g. Sales Team"}
+                    className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary" />
                 </div>
               </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button onClick={() => setShowNewChannel(false)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-              <button onClick={createChannel} disabled={!newChannelName.trim()} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create</button>
+            )}
+
+            {/* User selection for DM and Group */}
+            {(createMode === "dm" || createMode === "group") && (
+              <>
+                <div className="mb-3">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted text-sm">
+                    <Search className="w-4 h-4 text-muted-foreground" />
+                    <input value={userSearch} onChange={(e) => setUserSearch(e.target.value)}
+                      placeholder="Search people by name, email, or role..."
+                      className="bg-transparent outline-none w-full text-foreground placeholder:text-muted-foreground" autoFocus />
+                  </div>
+                </div>
+
+                {/* Selected users chips (group only) */}
+                {createMode === "group" && selectedUsers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {selectedUsers.map(uid => {
+                      const u = allUsers.find(u => u.id === uid);
+                      return (
+                        <span key={uid} className="flex items-center gap-1 px-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                          {u?.name}
+                          <button onClick={() => toggleUserSelection(uid)}><X className="w-3 h-3" /></button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto space-y-1 min-h-0 max-h-64">
+                  {filteredUsers.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No users found</p>
+                  ) : filteredUsers.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => createMode === "dm" ? startDirectMessage(u.id) : toggleUserSelection(u.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        selectedUsers.includes(u.id) ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"
+                      }`}
+                    >
+                      <div className="relative shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-accent-foreground">{u.avatar}</div>
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-background ${u.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`} />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="font-medium text-foreground truncate">{u.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground shrink-0">{u.role}</span>
+                      {createMode === "group" && selectedUsers.includes(u.id) && (
+                        <Check className="w-4 h-4 text-primary shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-2 mt-4 pt-3 border-t border-border">
+              <button onClick={() => { setCreateMode(null); setSelectedUsers([]); setUserSearch(""); setNewChannelName(""); }}
+                className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
+              {createMode === "channel" && (
+                <button onClick={createChannel} disabled={!newChannelName.trim()}
+                  className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create Channel</button>
+              )}
+              {createMode === "group" && (
+                <button onClick={createGroupChat} disabled={selectedUsers.length < 1}
+                  className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                  Create Group ({selectedUsers.length} selected)
+                </button>
+              )}
             </div>
           </div>
         </div>
