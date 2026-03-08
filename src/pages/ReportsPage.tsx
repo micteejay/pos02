@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { useSharedData } from "@/hooks/use-shared-data";
+import { useSharedData, Expense } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
@@ -9,13 +9,16 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   Download, Calendar, FileText, PieChart as PieIcon, Printer,
   Building2, Warehouse, ClipboardCheck, Activity, GitBranch,
+  Plus, Trash2, Receipt, X,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
 
-type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "operations";
+type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "expenses" | "operations";
+
+const EXPENSE_CATEGORIES = ["Rent", "Utilities", "Salaries", "Marketing", "Maintenance", "Logistics", "Supplies", "Other"];
 
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
