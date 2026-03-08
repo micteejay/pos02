@@ -1719,13 +1719,15 @@ CREATE TRIGGER tr_chat_attachment_to_doc
 
 CREATE TABLE public.expenses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  category TEXT NOT NULL, -- 'Rent', 'Utilities', 'Salaries', 'Marketing', 'Maintenance', 'Logistics', 'Supplies', 'Other'
+  category TEXT NOT NULL,
   description TEXT NOT NULL,
   amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
   date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL,
   recurring BOOLEAN DEFAULT FALSE,
-  recurring_interval TEXT, -- 'daily', 'weekly', 'monthly', 'yearly'
+  recurring_interval TEXT CHECK (recurring_interval IN ('daily', 'weekly', 'monthly', 'yearly')),
+  next_due_date TIMESTAMPTZ,
+  parent_id UUID REFERENCES public.expenses(id) ON DELETE SET NULL,
   created_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
