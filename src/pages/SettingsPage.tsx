@@ -157,14 +157,50 @@ export default function SettingsPage() {
     { key: "security", label: "Security", icon: Shield },
   ];
 
-  const integrations = [
-    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳" },
-    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧" },
-    { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "💬" },
-    { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊" },
-    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒" },
-    { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱" },
+  const [integrations, setIntegrations] = useState([
+    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳", category: "payment", configFields: ["API Key", "Secret Key", "Webhook Secret"] },
+    { name: "Paystack", description: "African payment processing", connected: false, icon: "💰", category: "payment", configFields: ["Public Key", "Secret Key"] },
+    { name: "Flutterwave", description: "Pan-African payments", connected: false, icon: "🦋", category: "payment", configFields: ["Public Key", "Secret Key", "Encryption Key"] },
+    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧", category: "communication", configFields: ["API Key", "From Email", "From Name"] },
+    { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱", category: "communication", configFields: ["Account SID", "Auth Token", "Phone Number"] },
+    { name: "WhatsApp Business", description: "WhatsApp messaging API", connected: false, icon: "💬", category: "communication", configFields: ["Phone Number ID", "Access Token", "Business Account ID"] },
+    { name: "SMTP Email", description: "Custom SMTP email server", connected: false, icon: "✉️", category: "communication", configFields: ["Host", "Port", "Username", "Password"] },
+    { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊", category: "accounting", configFields: ["Client ID", "Client Secret", "Realm ID"] },
+    { name: "Xero", description: "Cloud-based accounting", connected: false, icon: "📒", category: "accounting", configFields: ["Client ID", "Client Secret", "Tenant ID"] },
+    { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "🔔", category: "communication", configFields: ["Webhook URL", "Channel"] },
+    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒", category: "other", configFields: ["Store URL", "API Key", "Secret Key"] },
+  ]);
+  const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
+  const [configValues, setConfigValues] = useState<Record<string, string>>({});
+  const [intCategoryFilter, setIntCategoryFilter] = useState("all");
+
+  const toggleIntegration = (name: string) => {
+    setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: !i.connected } : i));
+  };
+
+  const openConfig = (integration: typeof integrations[0]) => {
+    setConfigModal(integration);
+    setConfigValues({});
+  };
+
+  const saveConfig = () => {
+    if (configModal) {
+      toggleIntegration(configModal.name);
+      setConfigModal(null);
+    }
+  };
+
+  const intCategories = [
+    { key: "all", label: "All" },
+    { key: "payment", label: "Payment" },
+    { key: "communication", label: "Communication" },
+    { key: "accounting", label: "Accounting" },
+    { key: "other", label: "Other" },
   ];
+
+  const filteredIntegrations = intCategoryFilter === "all"
+    ? integrations
+    : integrations.filter(i => i.category === intCategoryFilter);
 
   return (
     <AppLayout>
@@ -381,28 +417,76 @@ export default function SettingsPage() {
 
         {/* Integrations Tab */}
         {activeTab === "integrations" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {integrations.map((int) => (
-              <div key={int.name} className="glass-card rounded-xl p-5 hover:border-primary/30 transition-colors">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl">{int.icon}</div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground">{int.name}</h3>
-                      <p className="text-[10px] text-muted-foreground">{int.description}</p>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-1.5">
+              {intCategories.map(c => (
+                <button key={c.key} onClick={() => setIntCategoryFilter(c.key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${intCategoryFilter === c.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredIntegrations.map((int) => (
+                <div key={int.name} className="glass-card rounded-xl p-5 hover:border-primary/30 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl">{int.icon}</div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground">{int.name}</h3>
+                        <p className="text-[10px] text-muted-foreground">{int.description}</p>
+                      </div>
                     </div>
                   </div>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${int.connected ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+                      {int.connected ? "Connected" : "Not Connected"}
+                    </span>
+                    <button onClick={() => int.connected ? toggleIntegration(int.name) : openConfig(int)}
+                      className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${int.connected ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                      {int.connected ? "Disconnect" : "Connect"}
+                    </button>
+                  </div>
                 </div>
-                <div className="mt-4 flex items-center justify-between">
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${int.connected ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-                    {int.connected ? "Connected" : "Not Connected"}
-                  </span>
-                  <button className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${int.connected ? "bg-muted text-foreground hover:bg-muted/80" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-                    {int.connected ? "Configure" : "Connect"}
-                  </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Integration Config Modal */}
+        {configModal && (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setConfigModal(null)}>
+            <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{configModal.icon}</span>
+                  <h3 className="text-lg font-semibold text-foreground">Connect {configModal.name}</h3>
                 </div>
+                <button onClick={() => setConfigModal(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
               </div>
-            ))}
+              <p className="text-sm text-muted-foreground mb-4">{configModal.description}. Enter your credentials to connect.</p>
+              <div className="space-y-3">
+                {configModal.configFields.map((field) => (
+                  <div key={field}>
+                    <label className="text-xs font-medium text-muted-foreground">{field}</label>
+                    <Input
+                      type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("password") || field.toLowerCase().includes("token") ? "password" : "text"}
+                      value={configValues[field] || ""}
+                      onChange={(e) => setConfigValues(prev => ({ ...prev, [field]: e.target.value }))}
+                      placeholder={`Enter ${field.toLowerCase()}`}
+                      className="mt-1"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-5">
+                <button onClick={() => setConfigModal(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
+                <button onClick={saveConfig} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4" /> Connect
+                </button>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-3">Credentials are stored securely. Enable Lovable Cloud for production use.</p>
+            </div>
           </div>
         )}
 

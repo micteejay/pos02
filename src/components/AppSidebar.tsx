@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, MessageSquare, FileText, GitBranch, Bell, Users, Shield, Settings,
   ChevronLeft, ChevronRight, Search, Building2, Package, BarChart3, ClipboardCheck,
-  ShoppingCart, PieChart, Truck,
+  ShoppingCart, PieChart, Truck, Receipt, LogOut,
 } from "lucide-react";
 
 interface NavItem {
@@ -31,6 +32,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
   { title: "Communication", items: [
     { label: "Chat", icon: MessageSquare, path: "/chat", badgeKey: "chat" },
     { label: "Documents", icon: FileText, path: "/documents" },
+    { label: "Invoices", icon: Receipt, path: "/invoices" },
   ]},
   { title: "Analytics", items: [
     { label: "Reports", icon: PieChart, path: "/reports" },
@@ -52,6 +54,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
   const { settings } = useAppSettings();
   const { unreadCount, approvalItems } = useAppEvents();
+  const { logout, user } = useAuth();
 
   const pendingApprovals = approvalItems.filter(a => a.status === "pending").length;
 
@@ -118,10 +121,29 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
         ))}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3 shrink-0 hidden lg:block">
-        <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors">
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
+      <div className="border-t border-sidebar-border p-3 shrink-0">
+        {!collapsed && user && (
+          <div className="flex items-center gap-3 px-3 py-2 mb-2">
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">{user.name.charAt(0)}</div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">{user.name}</p>
+              <p className="text-[10px] text-sidebar-foreground truncate">{user.role}</p>
+            </div>
+            <button onClick={logout} className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-destructive transition-colors" title="Logout">
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {collapsed && (
+          <button onClick={logout} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors mb-2" title="Logout">
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
+        <div className="hidden lg:block">
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors">
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
     </aside>
   );
