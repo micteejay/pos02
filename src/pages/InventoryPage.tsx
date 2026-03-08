@@ -82,8 +82,6 @@ export default function InventoryPage() {
     };
     fetchTransfers();
   }, []);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const stats = useMemo(() => {
     const totalSkus = inventory.length;
