@@ -152,16 +152,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
     let email = identifier;
-    // If not an email, look up the email by username in profiles
     if (!identifier.includes("@")) {
+      // Try synthetic email pattern first (used by create-user edge function)
+      const syntheticEmail = `${identifier.toLowerCase().replace(/\s+/g, ".")}@staff.internal`;
+      const { error: syntheticError } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password });
+      if (!syntheticError) return true;
+
+      // Fallback: look up by display name in profiles
       const { data } = await supabase
         .from("profiles")
         .select("email")
         .ilike("name", identifier)
         .limit(1)
         .single();
-      if (!data?.email) return false;
-      email = data.email;
+      if (data?.email) {
+        const { error } = await supabase.auth.signInWithPassword({ email: data.email, password });
+        return !error;
+      }
+      return false;
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return !error;
