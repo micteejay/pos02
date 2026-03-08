@@ -329,7 +329,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
       {showFilters && (
         <div className="glass-card rounded-xl p-4 flex flex-wrap gap-3 animate-fade-in">
           <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {stores.map((s) => <option key={s}>{s}</option>)}
+            {defaultStores.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
             {statuses.map((s) => <option key={s}>{s}</option>)}
