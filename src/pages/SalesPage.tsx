@@ -199,13 +199,14 @@ export default function SalesPage() {
 }
 
 // --- New Sale Modal ---
-function NewSaleModal({ onAdd, onClose }: { onAdd: (data: any) => void; onClose: () => void }) {
+function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any) => void; onClose: () => void; storeNames: string[]; users: { name: string; status: string }[] }) {
+  const activeUsers = users.filter(u => u.status === "active");
   const [customer, setCustomer] = useState("");
   const [total, setTotal] = useState("");
   const [items, setItems] = useState("1");
   const [method, setMethod] = useState("Credit Card");
-  const [store, setStore] = useState("Main HQ");
-  const [rep, setRep] = useState("Alice Chen");
+  const [store, setStore] = useState(storeNames[0] || "");
+  const [rep, setRep] = useState(activeUsers[0]?.name || "");
 
   const handleSubmit = () => {
     if (!customer || !total) return;
