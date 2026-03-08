@@ -1,28 +1,29 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Truck, Package, Search, Plus, Clock, CheckCircle2, XCircle,
   FileText, Send, Building2, DollarSign, ChevronRight, MapPin, Phone, Mail, Star,
-  Users, TrendingUp, TrendingDown, X, Edit2, Trash2, RefreshCw,
+  Users, TrendingUp, TrendingDown, X, Edit2, Trash2, RefreshCw, Loader2,
 } from "lucide-react";
 
 type Tab = "orders" | "suppliers";
 type POStatus = "draft" | "submitted" | "approved" | "shipped" | "received" | "cancelled";
 
 interface PurchaseOrder {
-  id: string; supplier: string; items: { name: string; qty: number; unitPrice: number }[]; status: POStatus; created: string; expectedDelivery: string; total: number; warehouse: string; notes: string; approvedBy: string | null;
+  id: string; po_number: string; supplier_id: string | null; supplier_name: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string }[];
+  status: POStatus; created: string; expectedDelivery: string; total: number; warehouse: string; warehouse_id: string | null; notes: string; approvedBy: string | null;
 }
 
 interface Supplier {
-  id: string; name: string; contact: string; email: string; phone: string; address: string; rating: number; totalOrders: number; onTimeRate: number; categories: string[]; status: "active" | "inactive";
+  id: string; name: string; contact: string; email: string; phone: string; address: string;
+  rating: number; totalOrders: number; onTimeRate: number; categories: string[]; status: "active" | "inactive";
 }
-
-const initialOrders: PurchaseOrder[] = [];
-const initialSuppliers: Supplier[] = [];
 
 const statusConfig: Record<POStatus, { label: string; className: string; icon: React.ElementType }> = {
   draft: { label: "Draft", className: "bg-muted text-muted-foreground", icon: FileText },
@@ -38,14 +39,55 @@ export default function SupplyPage() {
   const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
-  const [orders, setOrders] = useState(initialOrders);
-  const [suppliers, setSuppliers] = useState(initialSuppliers);
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showNewPO, setShowNewPO] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch POs and suppliers from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      const [posRes, suppRes] = await Promise.all([
+        supabase.from("purchase_orders").select("*, purchase_order_items(*), suppliers(name)").order("created_at", { ascending: false }),
+        supabase.from("suppliers").select("*").order("name"),
+      ]);
+
+      if (posRes.data) {
+        setOrders(posRes.data.map((po: any) => ({
+          id: po.id,
+          po_number: po.po_number,
+          supplier_id: po.supplier_id,
+          supplier_name: po.suppliers?.name || "Unknown",
+          items: (po.purchase_order_items || []).map((i: any) => ({ name: i.name, qty: i.qty, unitPrice: i.unit_price, inventory_item_id: i.inventory_item_id })),
+          status: po.status as POStatus,
+          created: new Date(po.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          expectedDelivery: po.expected_date ? new Date(po.expected_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—",
+          total: po.total,
+          warehouse: po.warehouse_id || "",
+          warehouse_id: po.warehouse_id,
+          notes: po.notes || "",
+          approvedBy: po.approved_by || null,
+        })));
+      }
+
+      if (suppRes.data) {
+        setSuppliers(suppRes.data.map((s: any) => ({
+          id: s.id, name: s.name, contact: s.contact_name || "", email: s.email || "",
+          phone: s.phone || "", address: s.address || "", rating: s.rating || 0,
+          totalOrders: s.total_orders || 0, onTimeRate: s.on_time_rate || 0,
+          categories: s.categories || [], status: s.status === "active" ? "active" : "inactive",
+        })));
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
 
   const stats = useMemo(() => {
     const active = orders.filter(o => !["received", "cancelled"].includes(o.status)).length;
@@ -60,40 +102,57 @@ export default function SupplyPage() {
   }, [orders, suppliers, formatCurrency]);
 
   const filteredOrders = useMemo(() => orders.filter((o) => {
-    const matchSearch = !search || o.id.toLowerCase().includes(search.toLowerCase()) || o.supplier.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = !search || o.po_number.toLowerCase().includes(search.toLowerCase()) || o.supplier_name.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || o.status === statusFilter;
     return matchSearch && matchStatus;
   }), [orders, search, statusFilter]);
 
   const filteredSuppliers = useMemo(() => suppliers.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase())), [suppliers, search]);
 
-  const updateOrderStatus = useCallback((id: string, newStatus: POStatus) => {
+  const updateOrderStatus = useCallback(async (id: string, newStatus: POStatus) => {
+    const { error } = await supabase.from("purchase_orders").update({ status: newStatus }).eq("id", id);
+    if (error) { toast.error("Failed to update PO status"); return; }
+
     setOrders(prev => prev.map(o => {
       if (o.id !== id) return o;
       const updated = { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy };
       if (newStatus === "submitted") {
-        addApprovalItem({ title: `${o.id}: ${o.supplier}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")} — ${o.warehouse}`, priority: "medium" });
-        addNotification({ type: "supply", title: `PO ${o.id} submitted for approval`, message: `${o.supplier} order for ${formatCurrency(o.total)}`, link: "/approvals" });
+        addApprovalItem({ title: `${o.po_number}: ${o.supplier_name}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")}`, priority: "medium" });
+        addNotification({ type: "supply", title: `PO ${o.po_number} submitted for approval`, message: `${o.supplier_name} order for ${formatCurrency(o.total)}`, link: "/approvals" });
       }
       if (newStatus === "received") {
         addStockFromPO(o.items, o.warehouse);
-        addNotification({ type: "inventory", title: `PO ${o.id} received at ${o.warehouse}`, message: `${o.items.length} item(s) from ${o.supplier} added to inventory`, link: "/inventory" });
+        addNotification({ type: "inventory", title: `PO ${o.po_number} received`, message: `${o.items.length} item(s) from ${o.supplier_name} added to inventory`, link: "/inventory" });
       }
       return updated;
     }));
+    toast.success(`PO status updated to ${newStatus}`);
+  }, [formatCurrency, addApprovalItem, addNotification, addStockFromPO]);
+
+  const deleteOrder = useCallback(async (id: string) => {
+    const { error } = await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
+    if (!error) {
+      const { error: poErr } = await supabase.from("purchase_orders").delete().eq("id", id);
+      if (!poErr) { setOrders(prev => prev.filter(o => o.id !== id)); toast.success("PO deleted"); return; }
+    }
+    toast.error("Failed to delete PO");
   }, []);
 
-  const deleteOrder = useCallback((id: string) => {
-    setOrders(prev => prev.filter(o => o.id !== id));
-  }, []);
-
-  const deleteSupplier = useCallback((id: string) => {
+  const deleteSupplier = useCallback(async (id: string) => {
+    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+    if (error) { toast.error("Failed to delete supplier"); return; }
     setSuppliers(prev => prev.filter(s => s.id !== id));
+    toast.success("Supplier deleted");
   }, []);
 
-  const toggleSupplierStatus = useCallback((id: string) => {
-    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: s.status === "active" ? "inactive" : "active" } : s));
-  }, []);
+  const toggleSupplierStatus = useCallback(async (id: string) => {
+    const sup = suppliers.find(s => s.id === id);
+    if (!sup) return;
+    const newStatus = sup.status === "active" ? "inactive" : "active";
+    const { error } = await supabase.from("suppliers").update({ status: newStatus }).eq("id", id);
+    if (error) { toast.error("Failed to update supplier"); return; }
+    setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s));
+  }, [suppliers]);
 
   const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "orders", label: "Purchase Orders", icon: FileText },
@@ -102,6 +161,10 @@ export default function SupplyPage() {
 
   const tabPermMap: Record<Tab, string> = { orders: "pages.supply.orders", suppliers: "pages.supply.suppliers" };
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
+
+  if (loading) {
+    return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
+  }
 
   return (
     <AppLayout>
@@ -176,14 +239,13 @@ export default function SupplyPage() {
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${sc.className}`}><StatusIcon className="w-5 h-5" /></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <span className="text-xs font-mono text-primary">{po.id}</span>
+                        <span className="text-xs font-mono text-primary">{po.po_number}</span>
                         <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
                       </div>
-                      <p className="text-sm font-semibold text-foreground">{po.supplier}</p>
+                      <p className="text-sm font-semibold text-foreground">{po.supplier_name}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span>{po.items.length} item{po.items.length > 1 ? "s" : ""}</span>
                         <span className="font-semibold text-foreground">{formatCurrency(po.total)}</span>
-                        <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{po.warehouse}</span>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -235,7 +297,9 @@ export default function SupplyPage() {
         {/* Suppliers */}
         {tab === "suppliers" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
-            {filteredSuppliers.map((sup) => (
+            {filteredSuppliers.length === 0 ? (
+              <div className="col-span-2 text-center py-12 text-sm text-muted-foreground">No suppliers found.</div>
+            ) : filteredSuppliers.map((sup) => (
               <div key={sup.id} className={`glass-card rounded-xl p-5 transition-all ${sup.status === "inactive" ? "opacity-60" : "hover:border-primary/30"}`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -280,9 +344,43 @@ export default function SupplyPage() {
               <button onClick={() => setShowNewPO(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory} warehouseNames={warehouseNames}
-              onSubmit={(data) => {
-                setOrders(prev => [{ id: `PO-${5007 + prev.length}`, ...data, status: "draft" as POStatus, created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), expectedDelivery: "—", approvedBy: null }, ...prev]);
+              onSubmit={async (data) => {
+                // Generate PO number
+                const { data: poNum } = await supabase.rpc("generate_po_number");
+                const { data: po, error } = await supabase.from("purchase_orders").insert({
+                  po_number: poNum || `PO-${Date.now()}`,
+                  supplier_id: data.supplier_id || null,
+                  warehouse_id: data.warehouse_id || null,
+                  notes: data.notes,
+                  status: "draft" as const,
+                  subtotal: data.total,
+                  total: data.total,
+                  created_by: (await supabase.auth.getUser()).data.user?.id,
+                }).select().single();
+
+                if (error || !po) { toast.error("Failed to create PO"); return; }
+
+                // Insert items
+                if (data.items.length > 0) {
+                  await supabase.from("purchase_order_items").insert(
+                    data.items.map((i: any) => ({
+                      purchase_order_id: po.id, name: i.name, qty: i.qty,
+                      unit_price: i.unitPrice, total: i.qty * i.unitPrice,
+                      inventory_item_id: i.inventory_item_id || null,
+                    }))
+                  );
+                }
+
+                setOrders(prev => [{
+                  id: po.id, po_number: po.po_number, supplier_id: po.supplier_id,
+                  supplier_name: data.supplier_name || "Unknown",
+                  items: data.items, status: "draft", total: data.total,
+                  created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+                  expectedDelivery: "—", warehouse: data.warehouse_name || "", warehouse_id: data.warehouse_id,
+                  notes: data.notes, approvedBy: null,
+                }, ...prev]);
                 setShowNewPO(false);
+                toast.success("Purchase order created");
               }} onCancel={() => setShowNewPO(false)} />
           </div>
         </div>
@@ -296,7 +394,21 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Supplier</h3>
               <button onClick={() => setShowNewSupplier(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <SupplierForm onSave={(data) => { setSuppliers(prev => [...prev, { id: `SUP-${prev.length + 1}`, ...data, rating: 0, totalOrders: 0, onTimeRate: 0 }]); setShowNewSupplier(false); }} onCancel={() => setShowNewSupplier(false)} />
+            <SupplierForm onSave={async (data) => {
+              const { data: sup, error } = await supabase.from("suppliers").insert({
+                name: data.name, contact_name: data.contact, email: data.email,
+                phone: data.phone, address: data.address, categories: data.categories,
+                status: data.status,
+              }).select().single();
+              if (error || !sup) { toast.error("Failed to add supplier"); return; }
+              setSuppliers(prev => [...prev, {
+                id: sup.id, name: sup.name, contact: sup.contact_name || "", email: sup.email || "",
+                phone: sup.phone || "", address: sup.address || "", rating: 0, totalOrders: 0, onTimeRate: 0,
+                categories: sup.categories || [], status: sup.status === "active" ? "active" : "inactive",
+              }]);
+              setShowNewSupplier(false);
+              toast.success("Supplier added");
+            }} onCancel={() => setShowNewSupplier(false)} />
           </div>
         </div>
       )}
@@ -309,7 +421,17 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">Edit Supplier</h3>
               <button onClick={() => setEditingSupplier(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <SupplierForm supplier={editingSupplier} onSave={(data) => { setSuppliers(prev => prev.map(s => s.id === editingSupplier.id ? { ...s, ...data } : s)); setEditingSupplier(null); }} onCancel={() => setEditingSupplier(null)} />
+            <SupplierForm supplier={editingSupplier} onSave={async (data) => {
+              const { error } = await supabase.from("suppliers").update({
+                name: data.name, contact_name: data.contact, email: data.email,
+                phone: data.phone, address: data.address, categories: data.categories,
+                status: data.status,
+              }).eq("id", editingSupplier.id);
+              if (error) { toast.error("Failed to update supplier"); return; }
+              setSuppliers(prev => prev.map(s => s.id === editingSupplier.id ? { ...s, ...data } : s));
+              setEditingSupplier(null);
+              toast.success("Supplier updated");
+            }} onCancel={() => setEditingSupplier(null)} />
           </div>
         </div>
       )}
@@ -318,29 +440,30 @@ export default function SupplyPage() {
 }
 
 function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
-  const [supplier, setSupplier] = useState(suppliers[0]?.name || "");
+  const [supplier, setSupplier] = useState(suppliers[0]?.id || "");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
-  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "" }]);
+  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "", inventory_item_id: "" }]);
   const [notes, setNotes] = useState("");
 
-  const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "" }]);
+  const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "", inventory_item_id: "" }]);
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
   const updateItem = (i: number, field: string, value: string) => setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
 
   const selectInventoryItem = (i: number, sku: string) => {
     const inv = inventoryItems.find(item => item.sku === sku);
     if (inv) {
-      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString() } : item));
+      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString(), inventory_item_id: inv.id } : item));
     }
   };
 
   const total = items.reduce((s, i) => s + (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0), 0);
+  const selectedSupplier = suppliers.find(s => s.id === supplier);
 
   return (
     <div className="space-y-3">
       <div><label className="text-xs font-medium text-muted-foreground">Supplier</label>
         <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-          {suppliers.map((s) => <option key={s.id}>{s.name}</option>)}
+          {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
       </div>
       <div><label className="text-xs font-medium text-muted-foreground">Destination</label>
@@ -373,7 +496,12 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
       {total > 0 && <p className="text-sm font-semibold text-foreground">Total: {formatCurrency(total)}</p>}
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-        <button onClick={() => onSubmit({ supplier, warehouse, items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice) })), total, notes })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
+        <button onClick={() => onSubmit({
+          supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
+          warehouse_name: warehouse, warehouse_id: null,
+          items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined })),
+          total, notes,
+        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
       </div>
     </div>
   );
