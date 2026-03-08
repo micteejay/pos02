@@ -393,7 +393,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No items match filters.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-sm text-muted-foreground">No items match filters.</td></tr>
                 ) : filtered.map((item) => {
                   const sc = statusConfig[item.status];
                   const isExpanded = expandedSku === item.sku;
