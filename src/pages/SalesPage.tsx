@@ -129,11 +129,14 @@ export default function SalesPage() {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "transactions", label: "Transactions", icon: Receipt },
     { key: "analytics", label: "Analytics", icon: TrendingUp },
     { key: "reps", label: "Sales Reps", icon: Users },
   ];
+
+  const tabPermMap: Record<Tab, string> = { transactions: "pages.sales.transactions", analytics: "pages.sales.analytics", reps: "pages.sales.reps" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   return (
     <AppLayout>

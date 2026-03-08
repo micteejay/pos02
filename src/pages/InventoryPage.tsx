@@ -58,12 +58,15 @@ export default function InventoryPage() {
     ];
   }, [inventory, transfers, formatCurrency]);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stock", label: "Stock Levels", icon: Package },
     { key: "warehouses", label: "Warehouses", icon: Warehouse },
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
     { key: "categories", label: "Categories", icon: Tag },
   ];
+
+  const tabPermMap: Record<Tab, string> = { stock: "pages.inventory.stock", warehouses: "pages.inventory.warehouses", transfers: "pages.inventory.transfers", categories: "pages.inventory.categories" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const addTransfer = (tr: Transfer) => {
     setTransfers((prev) => [tr, ...prev]);

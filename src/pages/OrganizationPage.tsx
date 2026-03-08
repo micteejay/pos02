@@ -46,12 +46,15 @@ export default function OrganizationPage() {
   const [editingStore, setEditingStore] = useState<typeof stores[0] | null>(null);
   const [editingDept, setEditingDept] = useState<typeof departments[0] | null>(null);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stores", label: "Stores", icon: Building2 },
     { key: "warehouses", label: "Warehouses", icon: Warehouse },
     { key: "departments", label: "Departments", icon: Users },
     { key: "hierarchy", label: "Org Chart", icon: Network },
   ];
+
+  const tabPermMap: Record<Tab, string> = { stores: "pages.organization.stores", warehouses: "pages.organization.warehouses", departments: "pages.organization.departments", hierarchy: "pages.organization.hierarchy" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const stats = [
     { label: "Total Stores", value: assignedStores.length.toString(), icon: Building2, color: "text-primary" },

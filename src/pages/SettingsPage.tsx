@@ -121,12 +121,15 @@ export default function SettingsPage() {
     { id: "invoice", name: "Invoice", description: "Full invoice format with billing details" },
   ];
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "general", label: "General", icon: Settings },
     { key: "receipt", label: "Receipt Design", icon: Receipt },
     { key: "integrations", label: "Integrations", icon: Plug },
     { key: "security", label: "Security", icon: Shield },
   ];
+
+  const tabPermMap: Record<Tab, string> = { general: "pages.settings.general", receipt: "pages.settings.receipt", integrations: "pages.settings.integrations", security: "pages.settings.security" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});

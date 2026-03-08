@@ -49,10 +49,13 @@ export default function ApprovalsPage() {
     { label: "Types", value: [...new Set(approvalItems.map(a => a.type))].length.toString(), icon: ClipboardCheck, color: "text-primary" },
   ], [approvalItems, pending]);
 
-  const tabs = [
+  const allTabs = [
     { key: "pending" as const, label: "Pending Queue", icon: Clock, count: pending.length },
     { key: "history" as const, label: "History", icon: ClipboardCheck },
   ];
+
+  const tabPermMap: Record<Tab, string> = { pending: "pages.approvals.pending", history: "pages.approvals.history" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission, pending.length]);
 
   const filteredHistory = useMemo(() =>
     history.filter(r => !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.id.toLowerCase().includes(search.toLowerCase())),

@@ -69,11 +69,14 @@ export default function UsersPage() {
     roles.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase())),
   [roles, search]);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "users", label: "Users", icon: Users },
     { key: "roles", label: "Roles", icon: Shield },
     { key: "permissions", label: "Permission Matrix", icon: Lock },
   ];
+
+  const tabPermMap: Record<Tab, string> = { users: "pages.users.users", roles: "pages.users.roles", permissions: "pages.users.permissions" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   return (
     <AppLayout>
