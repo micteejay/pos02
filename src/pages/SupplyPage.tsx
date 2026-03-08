@@ -314,9 +314,9 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ suppliers, formatCurrency, inventoryItems, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; onSubmit: (data: any) => void; onCancel: () => void }) {
+function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
   const [supplier, setSupplier] = useState(suppliers[0]?.name || "");
-  const [warehouse, setWarehouse] = useState("Main HQ");
+  const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
   const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "" }]);
   const [notes, setNotes] = useState("");
 
