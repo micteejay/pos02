@@ -3,8 +3,9 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAuth } from "@/hooks/use-auth";
 import {
-  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X,
+  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2,
 } from "lucide-react";
 
 type Tab = "general" | "receipt" | "integrations" | "security";
@@ -68,7 +69,6 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
   return (
     <div className={`bg-card border border-border rounded-lg p-4 font-mono text-[10px] leading-relaxed max-w-[280px] mx-auto ${isThermal ? "bg-amber-50 dark:bg-amber-950/20 border-dashed" : ""}`}>
       {(isModern || isBranded) && <div className="h-1 rounded-full bg-primary mb-3" />}
-      
       <div className={`${isMinimal ? "text-left" : "text-center"} mb-3`}>
         {!isMinimal && !isCompact && (
           <div className={`w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm ${isMinimal ? "" : "mx-auto"} mb-1`}>
@@ -79,52 +79,22 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
         {!isCompact && <p className="text-muted-foreground">123 Main St, Metro City</p>}
         <p className="text-muted-foreground">Tel: (555) 123-4567</p>
       </div>
-
       {!isMinimal && <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-2`} />}
-      
-      <div className="flex justify-between text-muted-foreground mb-1">
-        <span>Date: Mar 03, 2026</span>
-        <span>TXN-9301</span>
-      </div>
-      <div className="flex justify-between text-muted-foreground mb-2">
-        <span>Cashier: Sarah C.</span>
-        <span>14:32</span>
-      </div>
-
+      <div className="flex justify-between text-muted-foreground mb-1"><span>Date: Mar 03, 2026</span><span>TXN-9301</span></div>
+      <div className="flex justify-between text-muted-foreground mb-2"><span>Cashier: Sarah C.</span><span>14:32</span></div>
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
-
-      {items.map((item, i) => (
-        <div key={i} className="flex justify-between text-foreground">
-          <span>{item.name} ×{item.qty}</span>
-          <span>{formatCurrency(item.qty * item.price)}</span>
-        </div>
-      ))}
-
+      {items.map((item, i) => (<div key={i} className="flex justify-between text-foreground"><span>{item.name} ×{item.qty}</span><span>{formatCurrency(item.qty * item.price)}</span></div>))}
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
-
-      <div className="flex justify-between text-muted-foreground">
-        <span>Subtotal</span><span>{formatCurrency(subtotal)}</span>
-      </div>
-      <div className="flex justify-between text-muted-foreground">
-        <span>Tax ({settings.taxRate}%)</span><span>{formatCurrency(tax)}</span>
-      </div>
-      
+      <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+      <div className="flex justify-between text-muted-foreground"><span>Tax ({settings.taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
       {(isModern || isBranded) && <div className="h-px bg-primary/30 my-1" />}
-      <div className="flex justify-between font-bold text-foreground text-xs mt-1">
-        <span>TOTAL</span><span>{formatCurrency(total)}</span>
-      </div>
-      <div className="flex justify-between text-muted-foreground mt-1">
-        <span>Payment</span><span>Credit Card</span>
-      </div>
-
+      <div className="flex justify-between font-bold text-foreground text-xs mt-1"><span>TOTAL</span><span>{formatCurrency(total)}</span></div>
+      <div className="flex justify-between text-muted-foreground mt-1"><span>Payment</span><span>Credit Card</span></div>
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mt-3 pt-2 text-center`}>
-        {settings.showQRCode && !isCompact && (
-          <div className="w-12 h-12 mx-auto mb-2 border border-border rounded flex items-center justify-center text-[8px] text-muted-foreground">QR</div>
-        )}
+        {settings.showQRCode && !isCompact && (<div className="w-12 h-12 mx-auto mb-2 border border-border rounded flex items-center justify-center text-[8px] text-muted-foreground">QR</div>)}
         <p className="text-muted-foreground">{settings.receiptFooter}</p>
         {!isCompact && <p className="text-muted-foreground mt-1 text-[9px]">{settings.receiptReturnPolicy}</p>}
       </div>
-      
       {isBranded && <div className="h-1 rounded-full bg-primary mt-3" />}
     </div>
   );
@@ -133,7 +103,8 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const { theme, setTheme } = useTheme();
-  const { settings, updateSettings, formatCurrency } = useAppSettings();
+  const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration } = useAppSettings();
+  const { companyProfile } = useAuth();
   const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
   const [twoFactor, setTwoFactor] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -157,35 +128,18 @@ export default function SettingsPage() {
     { key: "security", label: "Security", icon: Shield },
   ];
 
-  const [integrations, setIntegrations] = useState([
-    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳", category: "payment", configFields: ["API Key", "Secret Key", "Webhook Secret"] },
-    { name: "Paystack", description: "African payment processing", connected: false, icon: "💰", category: "payment", configFields: ["Public Key", "Secret Key"] },
-    { name: "Flutterwave", description: "Pan-African payments", connected: false, icon: "🦋", category: "payment", configFields: ["Public Key", "Secret Key", "Encryption Key"] },
-    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧", category: "communication", configFields: ["API Key", "From Email", "From Name"] },
-    { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱", category: "communication", configFields: ["Account SID", "Auth Token", "Phone Number"] },
-    { name: "WhatsApp Business", description: "WhatsApp messaging API", connected: false, icon: "💬", category: "communication", configFields: ["Phone Number ID", "Access Token", "Business Account ID"] },
-    { name: "SMTP Email", description: "Custom SMTP email server", connected: false, icon: "✉️", category: "communication", configFields: ["Host", "Port", "Username", "Password"] },
-    { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊", category: "accounting", configFields: ["Client ID", "Client Secret", "Realm ID"] },
-    { name: "Xero", description: "Cloud-based accounting", connected: false, icon: "📒", category: "accounting", configFields: ["Client ID", "Client Secret", "Tenant ID"] },
-    { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "🔔", category: "communication", configFields: ["Webhook URL", "Channel"] },
-    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒", category: "other", configFields: ["Store URL", "API Key", "Secret Key"] },
-  ]);
   const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [intCategoryFilter, setIntCategoryFilter] = useState("all");
 
-  const toggleIntegration = (name: string) => {
-    setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: !i.connected } : i));
-  };
-
   const openConfig = (integration: typeof integrations[0]) => {
     setConfigModal(integration);
-    setConfigValues({});
+    setConfigValues(integration.configValues || {});
   };
 
   const saveConfig = () => {
     if (configModal) {
-      toggleIntegration(configModal.name);
+      connectIntegration(configModal.name, configValues);
       setConfigModal(null);
     }
   };
@@ -201,6 +155,8 @@ export default function SettingsPage() {
   const filteredIntegrations = intCategoryFilter === "all"
     ? integrations
     : integrations.filter(i => i.category === intCategoryFilter);
+
+  const connectedCount = integrations.filter(i => i.connected).length;
 
   return (
     <AppLayout>
@@ -223,6 +179,9 @@ export default function SettingsPage() {
               className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
               <tab.icon className="w-4 h-4" />
               <span className="hidden sm:inline">{tab.label}</span>
+              {tab.key === "integrations" && connectedCount > 0 && (
+                <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded-full">{connectedCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -230,6 +189,31 @@ export default function SettingsPage() {
         {/* General Tab */}
         {activeTab === "general" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Company Profile Summary */}
+            {companyProfile && (
+              <div className="glass-card rounded-xl p-6 lg:col-span-2">
+                <div className="flex items-center gap-2 mb-4">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Company Profile</h3>
+                  <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full">From Setup</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  {companyProfile.logoUrl ? (
+                    <img src={companyProfile.logoUrl} alt="Logo" className="w-12 h-12 rounded-xl object-cover" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <span className="text-lg font-bold text-primary">{companyProfile.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold text-foreground">{companyProfile.name}</p>
+                    <p className="text-xs text-muted-foreground">{companyProfile.industry} · {companyProfile.businessType} {companyProfile.rcNumber && `· RC: ${companyProfile.rcNumber}`}</p>
+                    <p className="text-xs text-muted-foreground">{companyProfile.phone} · {companyProfile.email}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* App Logo & Name */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
@@ -251,10 +235,7 @@ export default function SettingsPage() {
                       const file = e.target.files?.[0];
                       if (!file || file.size > 2 * 1024 * 1024) return;
                       const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const result = ev.target?.result as string;
-                        updateSettings({ logoUrl: result });
-                      };
+                      reader.onload = (ev) => updateSettings({ logoUrl: ev.target?.result as string });
                       reader.readAsDataURL(file);
                     }} />
                   </label>
@@ -357,7 +338,6 @@ export default function SettingsPage() {
         {/* Receipt Design Tab */}
         {activeTab === "receipt" && (
           <div className="space-y-6">
-            {/* Receipt Style Picker */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {receiptStyles.map((style) => (
                 <button key={style.id} onClick={() => updateSettings({ receiptStyle: style.id })}
@@ -368,25 +348,18 @@ export default function SettingsPage() {
                 </button>
               ))}
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Live Preview */}
               <div className="glass-card rounded-xl p-6">
                 <h3 className="text-sm font-semibold text-foreground mb-4">Live Preview</h3>
                 <ReceiptPreview style={settings.receiptStyle} settings={settings} formatCurrency={formatCurrency} />
               </div>
-
-              {/* Receipt Settings */}
               <div className="space-y-4">
                 <div className="glass-card rounded-xl p-6">
                   <h3 className="text-sm font-semibold text-foreground mb-4">Receipt Content</h3>
                   <div className="space-y-3">
-                    <div><label className="text-xs font-medium text-muted-foreground">Header Text</label>
-                      <Input value={settings.receiptHeader} onChange={(e) => updateSettings({ receiptHeader: e.target.value })} className="mt-1" /></div>
-                    <div><label className="text-xs font-medium text-muted-foreground">Footer Message</label>
-                      <Input value={settings.receiptFooter} onChange={(e) => updateSettings({ receiptFooter: e.target.value })} className="mt-1" /></div>
-                    <div><label className="text-xs font-medium text-muted-foreground">Return Policy Note</label>
-                      <Input value={settings.receiptReturnPolicy} onChange={(e) => updateSettings({ receiptReturnPolicy: e.target.value })} className="mt-1" /></div>
+                    <div><label className="text-xs font-medium text-muted-foreground">Header Text</label><Input value={settings.receiptHeader} onChange={(e) => updateSettings({ receiptHeader: e.target.value })} className="mt-1" /></div>
+                    <div><label className="text-xs font-medium text-muted-foreground">Footer Message</label><Input value={settings.receiptFooter} onChange={(e) => updateSettings({ receiptFooter: e.target.value })} className="mt-1" /></div>
+                    <div><label className="text-xs font-medium text-muted-foreground">Return Policy Note</label><Input value={settings.receiptReturnPolicy} onChange={(e) => updateSettings({ receiptReturnPolicy: e.target.value })} className="mt-1" /></div>
                   </div>
                 </div>
                 <div className="glass-card rounded-xl p-6">
@@ -418,6 +391,11 @@ export default function SettingsPage() {
         {/* Integrations Tab */}
         {activeTab === "integrations" && (
           <div className="space-y-4">
+            {connectedCount > 0 && (
+              <div className="glass-card rounded-xl p-4">
+                <p className="text-sm text-foreground"><span className="font-semibold text-primary">{connectedCount}</span> integration{connectedCount > 1 ? "s" : ""} active — connected services are available across POS, Sales, Invoices, and Notifications.</p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {intCategories.map(c => (
                 <button key={c.key} onClick={() => setIntCategoryFilter(c.key)}
@@ -428,7 +406,7 @@ export default function SettingsPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredIntegrations.map((int) => (
-                <div key={int.name} className="glass-card rounded-xl p-5 hover:border-primary/30 transition-colors">
+                <div key={int.name} className={`glass-card rounded-xl p-5 transition-colors ${int.connected ? "border-success/30" : "hover:border-primary/30"}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-xl">{int.icon}</div>
@@ -442,10 +420,17 @@ export default function SettingsPage() {
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${int.connected ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
                       {int.connected ? "Connected" : "Not Connected"}
                     </span>
-                    <button onClick={() => int.connected ? toggleIntegration(int.name) : openConfig(int)}
-                      className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${int.connected ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
-                      {int.connected ? "Disconnect" : "Connect"}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {int.connected && (
+                        <button onClick={() => openConfig(int)} className="text-xs text-muted-foreground hover:text-foreground">
+                          Configure
+                        </button>
+                      )}
+                      <button onClick={() => int.connected ? disconnectIntegration(int.name) : openConfig(int)}
+                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${int.connected ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
+                        {int.connected ? "Disconnect" : "Connect"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -460,7 +445,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{configModal.icon}</span>
-                  <h3 className="text-lg font-semibold text-foreground">Connect {configModal.name}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{configModal.connected ? "Configure" : "Connect"} {configModal.name}</h3>
                 </div>
                 <button onClick={() => setConfigModal(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
               </div>
@@ -482,10 +467,10 @@ export default function SettingsPage() {
               <div className="flex gap-2 mt-5">
                 <button onClick={() => setConfigModal(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
                 <button onClick={saveConfig} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" /> Connect
+                  <Check className="w-4 h-4" /> {configModal.connected ? "Update" : "Connect"}
                 </button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-3">Credentials are stored securely. Enable Lovable Cloud for production use.</p>
+              <p className="text-[10px] text-muted-foreground text-center mt-3">Credentials are stored locally. Enable Lovable Cloud for production use.</p>
             </div>
           </div>
         )}

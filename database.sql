@@ -69,6 +69,38 @@ CREATE TABLE public.departments (
 );
 
 -- =====================================================
+-- 2b. COMPANY PROFILES TABLE
+-- =====================================================
+
+CREATE TABLE public.company_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  address TEXT,
+  city TEXT,
+  state TEXT,
+  country TEXT DEFAULT 'Nigeria',
+  phone TEXT,
+  email TEXT,
+  website TEXT,
+  tax_id TEXT,
+  industry TEXT DEFAULT 'Retail',
+  currency TEXT DEFAULT 'NGN',
+  tax_rate NUMERIC(5,2) DEFAULT 7.5,
+  business_type TEXT DEFAULT 'Limited Company',
+  logo_url TEXT,
+  rc_number TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.company_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own company profile"
+  ON public.company_profiles FOR ALL TO authenticated
+  USING (owner_id = auth.uid());
+
+-- =====================================================
 -- 3. USER & ROLES TABLES
 -- =====================================================
 
@@ -1108,9 +1140,39 @@ CREATE INDEX idx_user_roles_user ON public.user_roles(user_id);
 CREATE INDEX idx_user_roles_role ON public.user_roles(role_id);
 CREATE INDEX idx_sessions_user ON public.user_sessions(user_id, is_active);
 CREATE INDEX idx_saved_reports_user ON public.saved_reports(created_by);
+CREATE INDEX idx_integrations_category ON public.integration_configs(category);
+CREATE INDEX idx_invoices_company ON public.invoices(company_id);
+CREATE INDEX idx_invoice_items_invoice ON public.invoice_items(invoice_id);
 
 -- =====================================================
--- 32. TRIGGERS FOR updated_at
+-- 32. INTEGRATION CONFIGS TABLE
+-- =====================================================
+
+CREATE TYPE public.integration_category AS ENUM ('payment', 'communication', 'accounting', 'other');
+
+CREATE TABLE public.integration_configs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES public.company_profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  category integration_category NOT NULL DEFAULT 'other',
+  icon TEXT,
+  connected BOOLEAN NOT NULL DEFAULT FALSE,
+  config_fields TEXT[] DEFAULT '{}',
+  config_values JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(company_id, name)
+);
+
+ALTER TABLE public.integration_configs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their company integrations"
+  ON public.integration_configs FOR ALL TO authenticated
+  USING (company_id IN (SELECT id FROM public.company_profiles WHERE owner_id = auth.uid()));
+
+-- =====================================================
+-- 33. TRIGGERS FOR updated_at
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.update_updated_at()
@@ -1232,7 +1294,55 @@ INSERT INTO public.chat_channels (name, type, description)
 VALUES ('general', 'channel', 'Company-wide announcements and discussions');
 
 -- =====================================================
--- 36. STORAGE BUCKETS
+-- 36. INVOICES & QUOTES TABLE
+-- =====================================================
+
+CREATE TYPE public.invoice_type AS ENUM ('quote', 'invoice');
+CREATE TYPE public.invoice_status AS ENUM ('draft', 'sent', 'paid', 'cancelled');
+
+CREATE TABLE public.invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES public.company_profiles(id) ON DELETE CASCADE,
+  type invoice_type NOT NULL DEFAULT 'quote',
+  number TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  customer_name TEXT NOT NULL,
+  customer_address TEXT,
+  service_charge_percent NUMERIC(5,2) DEFAULT 0,
+  notes TEXT,
+  status invoice_status NOT NULL DEFAULT 'draft',
+  sale_id UUID REFERENCES public.sales_transactions(id),
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public.invoice_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID REFERENCES public.invoices(id) ON DELETE CASCADE NOT NULL,
+  description TEXT NOT NULL,
+  qty NUMERIC(10,2) NOT NULL DEFAULT 1,
+  rate NUMERIC(14,2) NOT NULL DEFAULT 0,
+  inventory_item_id UUID REFERENCES public.inventory_items(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage invoices"
+  ON public.invoices FOR ALL TO authenticated USING (TRUE);
+CREATE POLICY "Users can manage invoice items"
+  ON public.invoice_items FOR ALL TO authenticated USING (TRUE);
+
+-- Invoice number sequence
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START WITH 1000;
+CREATE SEQUENCE IF NOT EXISTS quote_number_seq START WITH 1000;
+
+CREATE TRIGGER tr_invoices_updated BEFORE UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+-- =====================================================
+-- 37. STORAGE BUCKETS
 -- =====================================================
 
 INSERT INTO storage.buckets (id, name, public) VALUES

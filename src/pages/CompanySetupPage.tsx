@@ -1,11 +1,17 @@
 import { useState } from "react";
 import { useAuth, CompanyProfile } from "@/hooks/use-auth";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase } from "lucide-react";
 
+const currencyMap: Record<string, string> = {
+  NGN: "₦", USD: "$", EUR: "€", GBP: "£", JPY: "¥", CAD: "C$", AUD: "A$", INR: "₹", BRL: "R$", ZAR: "R",
+};
+
 export default function CompanySetupPage() {
-  const { saveCompanyProfile, hasCompanyProfile } = useAuth();
+  const { saveCompanyProfile } = useAuth();
+  const { updateSettings } = useAppSettings();
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
@@ -39,6 +45,17 @@ export default function CompanySetupPage() {
 
   const handleComplete = () => {
     saveCompanyProfile(form);
+
+    // Sync company setup data into app settings (branding, currency, tax)
+    updateSettings({
+      appName: form.name,
+      currency: form.currency,
+      currencySymbol: currencyMap[form.currency] || form.currency,
+      taxRate: form.taxRate,
+      logoUrl: form.logoUrl,
+      receiptHeader: form.name,
+    });
+
     navigate("/");
   };
 
@@ -139,6 +156,7 @@ export default function CompanySetupPage() {
           {step === 2 && (
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground mb-4">Business Details</h2>
+              <p className="text-xs text-muted-foreground -mt-2 mb-2">These settings will configure your app's currency, tax rate, and branding automatically.</p>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Industry *</label>
                 <select value={form.industry} onChange={(e) => updateForm({ industry: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
@@ -213,6 +231,9 @@ export default function CompanySetupPage() {
                   <div className="flex items-center gap-1.5 text-muted-foreground"><Briefcase className="w-3 h-3" />{form.industry} · {form.businessType}</div>
                   <div className="flex items-center gap-1.5 text-muted-foreground"><Hash className="w-3 h-3" />{form.currency} · {form.taxRate}% tax</div>
                 </div>
+              </div>
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-xs text-primary font-medium">✨ Your company name, logo, currency ({currencyMap[form.currency] || form.currency} {form.currency}), and tax rate ({form.taxRate}%) will be applied across the entire app — POS, invoices, receipts, and reports.</p>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="flex-1 py-3 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Back</button>
