@@ -1821,16 +1821,18 @@ CREATE POLICY "Admins can delete categories"
 
 -- Audit trigger for category changes
 CREATE OR REPLACE FUNCTION public.audit_category_change()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  INSERT INTO public.audit_log (user_id, user_name, user_role, action, module, target, detail, severity)
   VALUES (
     COALESCE(NEW.created_by, OLD.created_by),
-    TG_OP,
-    'category',
-    COALESCE(NEW.id, OLD.id)::TEXT,
-    jsonb_build_object('name', COALESCE(NEW.name, OLD.name), 'type', COALESCE(NEW.type, OLD.type)::TEXT, 'status', COALESCE(NEW.status, OLD.status)::TEXT),
-    CASE WHEN TG_OP = 'DELETE' THEN 'warning' ELSE 'info' END
+    COALESCE((SELECT name FROM public.profiles WHERE id = COALESCE(NEW.created_by, OLD.created_by)), 'System'),
+    COALESCE((SELECT r.name FROM public.user_roles ur JOIN public.roles r ON ur.role_id = r.id WHERE ur.user_id = COALESCE(NEW.created_by, OLD.created_by) LIMIT 1), 'System'),
+    'category.' || LOWER(TG_OP),
+    'Categories',
+    COALESCE(NEW.name, OLD.name),
+    TG_OP || ': ' || COALESCE(NEW.name, OLD.name) || ' (' || COALESCE(NEW.type, OLD.type)::TEXT || ')',
+    CASE WHEN TG_OP = 'DELETE' THEN 'warning'::audit_severity ELSE 'info'::audit_severity END
   );
   RETURN COALESCE(NEW, OLD);
 END;
