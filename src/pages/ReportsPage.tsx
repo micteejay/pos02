@@ -634,7 +634,134 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Gain/Loss */}
+        {/* Expenses */}
+        {reportType === "expenses" && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expenses.length}</p>
+                <p className="text-xs text-muted-foreground">Total Entries</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-warning">{formatCurrency(totalExpenses)}</p>
+                <p className="text-xs text-muted-foreground">Total Expenses</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expensesByCategory.length}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expenses.length > 0 ? formatCurrency(totalExpenses / expenses.length) : formatCurrency(0)}</p>
+                <p className="text-xs text-muted-foreground">Avg per Entry</p>
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-foreground">Operational Expenses</h3>
+                  <p className="text-xs text-muted-foreground">Track rent, utilities, salaries, and other costs</p>
+                </div>
+                <button onClick={() => setShowAddExpense(true)} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                  <Plus className="w-4 h-4" />Add Expense
+                </button>
+              </div>
+
+              {showAddExpense && (
+                <div className="p-4 rounded-lg bg-muted/30 border border-border mb-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground">New Expense</h4>
+                    <button onClick={() => setShowAddExpense(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <select value={expenseForm.category} onChange={e => setExpenseForm(f => ({ ...f, category: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input placeholder="Description" value={expenseForm.description} onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />
+                    <input type="number" placeholder="Amount" value={expenseForm.amount} onChange={e => setExpenseForm(f => ({ ...f, amount: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />
+                    <select value={expenseForm.store} onChange={e => setExpenseForm(f => ({ ...f, store: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                      <option value="">Select Store</option>
+                      {stores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Save Expense</button>
+                </div>
+              )}
+
+              {expenses.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Date</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Category</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Description</th>
+                        <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Amount</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Store</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">By</th>
+                        <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenses.map(exp => (
+                        <tr key={exp.id} className="border-b border-border/50">
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(exp.date).toLocaleDateString()}</td>
+                          <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium">{exp.category}</span></td>
+                          <td className="px-3 py-2 text-sm text-foreground">{exp.description}</td>
+                          <td className="px-3 py-2 text-sm text-right font-semibold text-foreground">{formatCurrency(exp.amount)}</td>
+                          <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{exp.store}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{exp.createdBy}</td>
+                          <td className="px-3 py-2 text-center">
+                            <button onClick={() => { deleteExpense(exp.id); logAction("expense.delete", "Expenses", exp.category, `Deleted expense: ${exp.description}`); }} className="text-muted-foreground hover:text-destructive transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Receipt className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No expenses recorded yet. Add your first expense above.</p>
+                </div>
+              )}
+            </div>
+
+            {expensesByCategory.length > 0 && (
+              <div className="glass-card rounded-xl p-5">
+                <h3 className="font-semibold text-foreground mb-4">Expenses by Category</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" stroke="none">
+                        {expensesByCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-3 flex flex-col justify-center">
+                    {expensesByCategory.map(e => (
+                      <div key={e.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ background: e.color }} />
+                          <span className="text-sm text-muted-foreground">{e.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-semibold text-foreground">{formatCurrency(e.value)}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({totalExpenses > 0 ? ((e.value / totalExpenses) * 100).toFixed(0) : 0}%)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
         {hasData && reportType === "gainloss" && (
           <div className="space-y-4 animate-fade-in">
             {gainLossData.length > 0 ? (
