@@ -180,28 +180,45 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
+      // Fetch profiles for manager/head resolution and employee counts
+      const { data: profilesData } = await supabase.from("profiles").select("id, name, store_id, department_id");
+      const profileMap = new Map((profilesData || []).map(p => [p.id, p.name || "Unknown"]));
+
       if (storeRes.data) {
-        setStores(storeRes.data.map(s => ({
-          id: s.id, name: s.name, type: s.type, address: s.address || "",
-          phone: s.phone || "", email: s.email || "", status: s.status,
-          employees: 0, revenue: "$0",
-        })));
+        setStores(storeRes.data.map(s => {
+          const statusMap: Record<string, string> = { active: "Active", maintenance: "Maintenance", closed: "Closed" };
+          const employeeCount = (profilesData || []).filter(p => p.store_id === s.id).length;
+          return {
+            id: s.id, name: s.name, type: s.type, address: s.address || "",
+            phone: s.phone || "", email: s.email || "",
+            status: statusMap[s.status] || s.status,
+            employees: employeeCount,
+            revenue: "$0/mo",
+            createdBy: s.manager_id ? profileMap.get(s.manager_id) || "" : "",
+          };
+        }));
       }
 
       if (whRes.data) {
         setWarehouses(whRes.data.map(w => ({
           id: w.id, name: w.name, location: w.location || "",
           capacity: w.capacity || 0, sqft: w.sqft || "0",
-          manager: "", zones: w.zones || 0, activePicks: 0,
+          manager: w.manager_id ? profileMap.get(w.manager_id) || "Unassigned" : "Unassigned",
+          zones: w.zones || 0, activePicks: 0,
         })));
       }
 
       if (deptRes.data) {
-        setDepartments(deptRes.data.map(d => ({
-          id: d.id, name: d.name, head: "",
-          headcount: 0, budget: String(d.budget || 0),
-          teams: d.teams || [],
-        })));
+        setDepartments(deptRes.data.map(d => {
+          const headcount = (profilesData || []).filter(p => p.department_id === d.id).length;
+          return {
+            id: d.id, name: d.name,
+            head: d.head_id ? profileMap.get(d.head_id) || "Unassigned" : "Unassigned",
+            headcount,
+            budget: d.budget ? `$${Number(d.budget).toLocaleString()}` : "$0",
+            teams: d.teams || [],
+          };
+        }));
       }
 
       // Resolve warehouse names for inventory
@@ -395,10 +412,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Stores ---
   const addStore = useCallback(async (store: Omit<OrgStore, "id">) => {
+    const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
     const { data, error } = await supabase.from("stores").insert({
       name: store.name, type: store.type, address: store.address || null,
       phone: store.phone || null, email: store.email || null,
-      status: (store.status as any) || "active",
+      status: (statusMap[store.status] || store.status.toLowerCase()) as any,
     }).select().single();
     if (data && !error) {
       setStores(prev => [...prev, { ...store, id: data.id }]);
@@ -406,13 +424,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateStore = useCallback(async (id: string, updates: Partial<OrgStore>) => {
+    const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.type !== undefined) payload.type = updates.type;
     if (updates.address !== undefined) payload.address = updates.address;
     if (updates.phone !== undefined) payload.phone = updates.phone;
     if (updates.email !== undefined) payload.email = updates.email;
-    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.status !== undefined) payload.status = statusMap[updates.status] || updates.status.toLowerCase();
     await supabase.from("stores").update(payload).eq("id", id);
     setStores(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, []);
