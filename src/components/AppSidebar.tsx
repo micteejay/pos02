@@ -78,7 +78,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
         {!collapsed && (
           <div className="animate-fade-in overflow-hidden">
             <h1 className="text-sidebar-accent-foreground font-bold text-sm truncate">{settings.appName}</h1>
-            <p className="text-sidebar-foreground text-[10px] truncate">Command Center</p>
+            <p className="text-sidebar-foreground text-[10px] truncate">{user?.role || "Command Center"}</p>
           </div>
         )}
       </div>
