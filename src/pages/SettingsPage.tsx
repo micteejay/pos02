@@ -158,11 +158,11 @@ export default function SettingsPage() {
   ];
 
   const integrations = [
-    { name: "Stripe", description: "Payment processing and billing", connected: true, icon: "💳" },
-    { name: "SendGrid", description: "Transactional email delivery", connected: true, icon: "📧" },
+    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳" },
+    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧" },
     { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "💬" },
     { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊" },
-    { name: "Shopify", description: "E-commerce platform sync", connected: true, icon: "🛒" },
+    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒" },
     { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱" },
   ];
 
