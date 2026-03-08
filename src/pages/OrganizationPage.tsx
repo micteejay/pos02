@@ -295,7 +295,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Warehouse</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <WHForm onSave={(data) => { addWarehouse(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <WHForm users={users} onSave={(data) => { addWarehouse(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
