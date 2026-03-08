@@ -237,19 +237,29 @@ export default function ReportsPage() {
     const statsHtml = `<div class="stat-grid">${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}</div>`;
 
     if (reportType === "gainloss") {
-      const totalProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
+      const grossProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
       const totalRev = gainLossData.reduce((s, d) => s + d.revenue, 0);
       const totalCost = gainLossData.reduce((s, d) => s + d.cost, 0);
       bodyContent = `${headerHtml}
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-value">${formatCurrency(totalRev)}</div><div class="stat-label">Total Revenue</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(totalCost)}</div><div class="stat-label">Total Cost</div></div>
-          <div class="stat-card"><div class="stat-value ${totalProfit >= 0 ? '' : 'loss'}">${formatCurrency(totalProfit)}</div><div class="stat-label">Net ${totalProfit >= 0 ? 'Gain' : 'Loss'}</div></div>
-          <div class="stat-card"><div class="stat-value">${totalRev > 0 ? ((totalProfit / totalRev) * 100).toFixed(1) : 0}%</div><div class="stat-label">Margin</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalCost)}</div><div class="stat-label">Cost of Goods</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalExpenses)}</div><div class="stat-label">Operational Expenses</div></div>
+          <div class="stat-card"><div class="stat-value ${netGainLoss >= 0 ? '' : 'loss'}">${formatCurrency(netGainLoss)}</div><div class="stat-label">Net ${netGainLoss >= 0 ? 'Gain' : 'Loss'}</div></div>
         </div>
-        <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead><tbody>
+        <h3>Product Breakdown</h3>
+        <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Gross Profit</th><th>Margin</th></tr></thead><tbody>
         ${gainLossData.map(d => `<tr><td>${d.name}</td><td>${d.units}</td><td>${formatCurrency(d.revenue)}</td><td>${formatCurrency(d.cost)}</td><td class="${d.profit >= 0 ? '' : 'loss'}">${formatCurrency(d.profit)}</td><td>${d.margin.toFixed(1)}%</td></tr>`).join("")}
-        </tbody></table>`;
+        </tbody></table>
+        ${expenses.length > 0 ? `<h3>Operational Expenses</h3>
+        <table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Store</th><th>Date</th><th>By</th></tr></thead><tbody>
+        ${expenses.map(e => `<tr><td>${e.category}</td><td>${e.description}</td><td>${formatCurrency(e.amount)}</td><td>${e.store}</td><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.createdBy}</td></tr>`).join("")}
+        </tbody></table>` : ''}
+        <div class="stat-grid" style="margin-top:20px">
+          <div class="stat-card"><div class="stat-value">${formatCurrency(grossProfit)}</div><div class="stat-label">Gross Profit</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalExpenses)}</div><div class="stat-label">− Expenses</div></div>
+          <div class="stat-card" style="grid-column:span 2"><div class="stat-value ${netGainLoss >= 0 ? '' : 'loss'}" style="font-size:28px">${formatCurrency(netGainLoss)}</div><div class="stat-label">NET ${netGainLoss >= 0 ? 'GAIN' : 'LOSS'}</div></div>
+        </div>`;
     } else if (reportType === "eod") {
       bodyContent = `${headerHtml}
         <div class="stat-grid">
