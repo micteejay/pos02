@@ -52,74 +52,8 @@ interface AppEventsContextType {
 
 const AppEventsContext = createContext<AppEventsContextType>(null!);
 
-const defaultNotifications: AppNotification[] = [
-  { id: "n1", type: "approval", title: "Purchase Order #PO-5003 awaiting approval", message: "PowerMax Supply order for $8,050 needs Finance review", time: "2 min ago", read: false, link: "/approvals" },
-  { id: "n2", type: "inventory", title: "Low stock alert: Widget Alpha (12 units)", message: "Widget Alpha has fallen below reorder point of 50 units at Main HQ", time: "15 min ago", read: false, link: "/inventory" },
-  { id: "n3", type: "chat", title: "Sarah Chen mentioned you in #general", message: "Let's sync up after lunch to finalize the approvals.", time: "32 min ago", read: false, link: "/chat" },
-  { id: "n4", type: "workflow", title: "Workflow WF-4521 advanced to Finance Review", message: "Purchase Order - Office Supplies is now at step 2 of 3", time: "1 hr ago", read: true, link: "/workflows" },
-  { id: "n5", type: "supply", title: "Shipment PO-5002 is in transit", message: "Global Sensors order shipped, ETA Feb 18", time: "2 hrs ago", read: true, link: "/supply" },
-  { id: "n6", type: "sales", title: "Daily sales target reached", message: "Main HQ has exceeded daily sales target by 12%", time: "3 hrs ago", read: true, link: "/sales" },
-  { id: "n7", type: "security", title: "Failed login attempt detected", message: "Unknown IP attempted login 3 times — account locked", time: "5 hrs ago", read: true, link: "/audit" },
-];
-
-const defaultApprovals: ApprovalItem[] = [
-  {
-    id: "APR-3001", title: "PO-5003: PowerMax Supply Equipment", type: "purchase_order", sourceId: "PO-5003",
-    requester: "David Kim", department: "Operations", amount: 8050, description: "Q1 equipment refresh — PSU 750W Gold ×50, Motor 500W ×30",
-    submitted: "Feb 12, 2026", priority: "medium", status: "pending", currentStep: 0,
-    steps: [
-      { role: "Operations Manager", approver: null, status: "pending", date: null, comment: null },
-      { role: "Finance Director", approver: null, status: "pending", date: null, comment: null },
-    ],
-  },
-  {
-    id: "APR-3002", title: "Stock Transfer: PCB Board Rev3 ×100", type: "stock_transfer", sourceId: "TRF-4488",
-    requester: "David Kim", department: "Inventory", amount: null, description: "Transfer 100 PCB Board Rev3 from South Hub to Main HQ",
-    submitted: "Feb 13, 2026", priority: "low", status: "pending", currentStep: 0,
-    steps: [
-      { role: "Inventory Manager", approver: null, status: "pending", date: null, comment: null },
-      { role: "Regional Manager", approver: null, status: "pending", date: null, comment: null },
-    ],
-  },
-  {
-    id: "APR-3003", title: "Q1 Marketing Budget Increase", type: "expense", sourceId: "EXP-101",
-    requester: "Lisa Park", department: "Marketing", amount: 24500, description: "Request to increase Q1 marketing budget for new campaign launch.",
-    submitted: "Feb 14, 2026", priority: "high", status: "pending", currentStep: 1,
-    steps: [
-      { role: "Department Head", approver: "James Wilson", status: "approved", date: "Feb 14, 2026", comment: "Aligned with growth targets." },
-      { role: "Finance Manager", approver: null, status: "pending", date: null, comment: null },
-      { role: "CFO", approver: null, status: "pending", date: null, comment: null },
-    ],
-  },
-  {
-    id: "APR-3004", title: "Annual Compliance Report Sign-off", type: "document", sourceId: "DOC-501",
-    requester: "Maria Garcia", department: "Legal", amount: null, description: "Annual compliance report requiring executive sign-off before filing deadline.",
-    submitted: "Feb 12, 2026", priority: "high", status: "pending", currentStep: 1,
-    steps: [
-      { role: "Legal Counsel", approver: "Tom Reed", status: "approved", date: "Feb 12, 2026", comment: "Reviewed and compliant." },
-      { role: "VP Operations", approver: null, status: "pending", date: null, comment: null },
-      { role: "CEO", approver: null, status: "pending", date: null, comment: null },
-    ],
-  },
-  {
-    id: "APR-3005", title: "New POS Terminal Deployment", type: "purchase_order", sourceId: "PO-5010",
-    requester: "Frank Kim", department: "Sales", amount: 8900, description: "Deploy 4 new POS terminals across Main HQ and West Store.",
-    submitted: "Feb 10, 2026", priority: "medium", status: "approved", currentStep: 2,
-    steps: [
-      { role: "Store Manager", approver: "Alice Chen", status: "approved", date: "Feb 10, 2026", comment: "Needed for holiday rush." },
-      { role: "IT Director", approver: "Bob Tran", status: "approved", date: "Feb 11, 2026", comment: "Compatible with current infrastructure." },
-    ],
-  },
-  {
-    id: "APR-3006", title: "Employee Reimbursement — Travel", type: "expense", sourceId: "EXP-102",
-    requester: "Grace Wu", department: "Sales", amount: 1250, description: "Travel reimbursement for client visit to Chicago office.",
-    submitted: "Feb 9, 2026", priority: "low", status: "rejected", currentStep: 1,
-    steps: [
-      { role: "Department Head", approver: "Frank Kim", status: "approved", date: "Feb 9, 2026", comment: null },
-      { role: "Finance Manager", approver: "Diana Lee", status: "rejected", date: "Feb 10, 2026", comment: "Missing receipts for hotel stay. Please resubmit." },
-    ],
-  },
-];
+const defaultNotifications: AppNotification[] = [];
+const defaultApprovals: ApprovalItem[] = [];
 
 export function AppEventsProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>(defaultNotifications);

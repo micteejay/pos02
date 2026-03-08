@@ -102,10 +102,12 @@ export default function DocumentsPage() {
   const SortIcon = ({ k }: { k: SortKey }) =>
     sortKey === k ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : null;
 
+  const totalFiles = documents.filter((d) => d.type !== "folder").length;
+  const totalFolders = documents.filter((d) => d.type === "folder").length;
   const stats = [
-    { label: "Total Files", value: documents.filter((d) => d.type !== "folder").length },
-    { label: "Folders", value: documents.filter((d) => d.type === "folder").length },
-    { label: "Storage Used", value: "42.8 MB" },
+    { label: "Total Files", value: totalFiles },
+    { label: "Folders", value: totalFolders },
+    { label: "Total Items", value: documents.length },
   ];
 
   return (

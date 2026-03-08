@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useSharedData } from "@/hooks/use-shared-data";
+import { useAppEvents } from "@/hooks/use-app-events";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   Download, Calendar, FileText, PieChart as PieIcon, Printer,
@@ -13,60 +15,6 @@ import {
 
 type ReportType = "overview" | "sales" | "inventory" | "operations";
 
-const monthlyRevenue = [
-  { month: "Sep", revenue: 42000, expenses: 28000, profit: 14000 },
-  { month: "Oct", revenue: 48000, expenses: 30000, profit: 18000 },
-  { month: "Nov", revenue: 52000, expenses: 31000, profit: 21000 },
-  { month: "Dec", revenue: 61000, expenses: 35000, profit: 26000 },
-  { month: "Jan", revenue: 55000, expenses: 32000, profit: 23000 },
-  { month: "Feb", revenue: 58000, expenses: 33000, profit: 25000 },
-];
-
-const salesByStore = [
-  { name: "Main HQ", value: 38, color: "hsl(172,66%,50%)" },
-  { name: "West Store", value: 25, color: "hsl(205,80%,55%)" },
-  { name: "East Store", value: 22, color: "hsl(38,92%,50%)" },
-  { name: "South Hub", value: 15, color: "hsl(152,60%,45%)" },
-];
-
-const topProducts = [
-  { name: "Motor 500W", units: 234, revenue: 33930 },
-  { name: "PSU 750W Gold", units: 198, revenue: 23562 },
-  { name: "Sensor X10", units: 312, revenue: 27768 },
-  { name: "Cat6 Cable", units: 450, revenue: 15745 },
-  { name: "Widget Beta", units: 520, revenue: 9620 },
-];
-
-const inventoryTrend = [
-  { week: "W1", inbound: 1200, outbound: 980, stockLevel: 12400 },
-  { week: "W2", inbound: 850, outbound: 1100, stockLevel: 12150 },
-  { week: "W3", inbound: 1500, outbound: 900, stockLevel: 12750 },
-  { week: "W4", inbound: 1100, outbound: 1200, stockLevel: 12650 },
-];
-
-const warehouseUtil = [
-  { name: "Main HQ", capacity: 85, items: 4280 },
-  { name: "West DC", capacity: 62, items: 2150 },
-  { name: "East DC", capacity: 91, items: 5420 },
-  { name: "South Hub", capacity: 34, items: 890 },
-];
-
-const approvalMetrics = [
-  { month: "Sep", approved: 18, rejected: 3, pending: 2 },
-  { month: "Oct", approved: 22, rejected: 4, pending: 1 },
-  { month: "Nov", approved: 19, rejected: 2, pending: 3 },
-  { month: "Dec", approved: 25, rejected: 5, pending: 2 },
-  { month: "Jan", approved: 21, rejected: 3, pending: 4 },
-  { month: "Feb", approved: 23, rejected: 3, pending: 4 },
-];
-
-const stats = [
-  { label: "Total Revenue", value: "$316K", change: "+12.4%", trend: "up" as const, icon: DollarSign },
-  { label: "Total Orders", value: "2,847", change: "+8.2%", trend: "up" as const, icon: ShoppingCart },
-  { label: "Inventory Value", value: "$1.2M", change: "-2.1%", trend: "down" as const, icon: Package },
-  { label: "Active Employees", value: "347", change: "+4", trend: "up" as const, icon: Users },
-];
-
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
   border: "1px solid hsl(220,18%,18%)",
@@ -76,10 +24,85 @@ const tooltipStyle = {
 };
 
 export default function ReportsPage() {
-  const { settings, formatCurrency } = useAppSettings();
+  const { settings, formatCurrency, users } = useAppSettings();
+  const { inventory, sales, stores, warehouses } = useSharedData();
+  const { approvalItems } = useAppEvents();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Derive revenue data from actual sales
+  const monthlyRevenue = useMemo(() => {
+    if (sales.length === 0) return [];
+    const grouped: Record<string, { revenue: number; expenses: number }> = {};
+    sales.forEach(sale => {
+      const d = new Date(sale.date);
+      const key = d.toLocaleDateString("en-US", { month: "short" });
+      if (!grouped[key]) grouped[key] = { revenue: 0, expenses: 0 };
+      grouped[key].revenue += sale.total;
+      grouped[key].expenses += sale.total * 0.6; // estimate
+    });
+    return Object.entries(grouped).map(([month, data]) => ({
+      month,
+      revenue: data.revenue,
+      expenses: data.expenses,
+      profit: data.revenue - data.expenses,
+    }));
+  }, [sales]);
+
+  // Derive sales by store from actual sales
+  const salesByStore = useMemo(() => {
+    if (sales.length === 0) return [];
+    const counts: Record<string, number> = {};
+    sales.forEach(s => { counts[s.store] = (counts[s.store] || 0) + s.total; });
+    const total = Object.values(counts).reduce((s, v) => s + v, 0);
+    const colors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
+    return Object.entries(counts).map(([name, value], i) => ({
+      name, value: total > 0 ? Math.round((value / total) * 100) : 0, color: colors[i % colors.length],
+    }));
+  }, [sales]);
+
+  // Top products from sales
+  const topProducts = useMemo(() => {
+    if (sales.length === 0) return [];
+    const map: Record<string, { units: number; revenue: number }> = {};
+    sales.forEach(s => s.items.forEach(item => {
+      if (!map[item.name]) map[item.name] = { units: 0, revenue: 0 };
+      map[item.name].units += item.qty;
+      map[item.name].revenue += item.qty * item.price;
+    }));
+    return Object.entries(map)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+  }, [sales]);
+
+  // Warehouse utilization from org data
+  const warehouseUtil = useMemo(() => {
+    return warehouses.map(w => ({
+      name: w.name,
+      capacity: w.capacity,
+      items: inventory.filter(i => i.warehouse === w.name).reduce((s, i) => s + i.qty, 0),
+    }));
+  }, [warehouses, inventory]);
+
+  // Approval metrics from actual data
+  const approvalStats = useMemo(() => {
+    const approved = approvalItems.filter(a => a.status === "approved").length;
+    const rejected = approvalItems.filter(a => a.status === "rejected").length;
+    const pending = approvalItems.filter(a => a.status === "pending").length;
+    return { approved, rejected, pending };
+  }, [approvalItems]);
+
+  const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
+  const totalInventoryValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
+
+  const stats = useMemo(() => [
+    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: sales.length > 0 ? `${sales.length} sales` : "—", trend: "up" as const, icon: DollarSign },
+    { label: "Total Orders", value: sales.length.toLocaleString(), change: "", trend: "up" as const, icon: ShoppingCart },
+    { label: "Inventory Value", value: formatCurrency(totalInventoryValue), change: `${inventory.length} items`, trend: "up" as const, icon: Package },
+    { label: "Active Users", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
+  ], [formatCurrency, totalRevenue, sales, totalInventoryValue, inventory, users]);
 
   const tabs: { key: ReportType; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: BarChart3 },
@@ -93,9 +116,9 @@ export default function ReportsPage() {
     if (reportType === "overview" || reportType === "sales") {
       csv = "Month,Revenue,Expenses,Profit\n" + monthlyRevenue.map(r => `${r.month},${r.revenue},${r.expenses},${r.profit}`).join("\n");
     } else if (reportType === "inventory") {
-      csv = "Week,Inbound,Outbound,StockLevel\n" + inventoryTrend.map(r => `${r.week},${r.inbound},${r.outbound},${r.stockLevel}`).join("\n");
+      csv = "Warehouse,Items,Capacity\n" + warehouseUtil.map(r => `${r.name},${r.items},${r.capacity}%`).join("\n");
     } else {
-      csv = "Month,Approved,Rejected,Pending\n" + approvalMetrics.map(r => `${r.month},${r.approved},${r.rejected},${r.pending}`).join("\n");
+      csv = `Approved,${approvalStats.approved}\nRejected,${approvalStats.rejected}\nPending,${approvalStats.pending}`;
     }
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -105,8 +128,6 @@ export default function ReportsPage() {
   };
 
   const printReport = () => {
-    const printContent = printRef.current;
-    if (!printContent) return;
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`
@@ -114,7 +135,6 @@ export default function ReportsPage() {
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; color: #1a1a2e; }
         h1 { font-size: 24px; margin-bottom: 4px; }
-        h2 { font-size: 18px; margin: 24px 0 12px; color: #333; }
         .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
         table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
@@ -124,49 +144,20 @@ export default function ReportsPage() {
         .stat-value { font-size: 22px; font-weight: 700; }
         .stat-label { font-size: 12px; color: #666; }
         .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
-        @media print { body { padding: 20px; } }
       </style></head><body>
       <h1>${settings.appName}</h1>
       <p class="subtitle">${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report — Generated ${new Date().toLocaleDateString()}</p>
       <div class="stat-grid">
-        ${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label} (${s.change})</div></div>`).join("")}
+        ${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}
       </div>
-      ${reportType === "overview" || reportType === "sales" ? `
-        <h2>Revenue & Expenses</h2>
-        <table><tr><th>Month</th><th>Revenue</th><th>Expenses</th><th>Profit</th></tr>
-        ${monthlyRevenue.map(r => `<tr><td>${r.month}</td><td>${formatCurrency(r.revenue)}</td><td>${formatCurrency(r.expenses)}</td><td>${formatCurrency(r.profit)}</td></tr>`).join("")}
-        </table>
-        <h2>Sales by Store</h2>
-        <table><tr><th>Store</th><th>Share</th></tr>
-        ${salesByStore.map(s => `<tr><td>${s.name}</td><td>${s.value}%</td></tr>`).join("")}
-        </table>
-        <h2>Top Products</h2>
-        <table><tr><th>#</th><th>Product</th><th>Units</th><th>Revenue</th></tr>
-        ${topProducts.map((p, i) => `<tr><td>${i + 1}</td><td>${p.name}</td><td>${p.units}</td><td>${formatCurrency(p.revenue)}</td></tr>`).join("")}
-        </table>
-      ` : ""}
-      ${reportType === "inventory" ? `
-        <h2>Stock Movement</h2>
-        <table><tr><th>Week</th><th>Inbound</th><th>Outbound</th><th>Stock Level</th></tr>
-        ${inventoryTrend.map(r => `<tr><td>${r.week}</td><td>${r.inbound}</td><td>${r.outbound}</td><td>${r.stockLevel}</td></tr>`).join("")}
-        </table>
-        <h2>Warehouse Utilization</h2>
-        <table><tr><th>Warehouse</th><th>Items</th><th>Capacity</th></tr>
-        ${warehouseUtil.map(w => `<tr><td>${w.name}</td><td>${w.items.toLocaleString()}</td><td>${w.capacity}%</td></tr>`).join("")}
-        </table>
-      ` : ""}
-      ${reportType === "operations" ? `
-        <h2>Approval Metrics</h2>
-        <table><tr><th>Month</th><th>Approved</th><th>Rejected</th><th>Pending</th></tr>
-        ${approvalMetrics.map(r => `<tr><td>${r.month}</td><td>${r.approved}</td><td>${r.rejected}</td><td>${r.pending}</td></tr>`).join("")}
-        </table>
-      ` : ""}
       <div class="footer">Generated by ${settings.appName} · ${new Date().toLocaleString()}</div>
       </body></html>
     `);
     win.document.close();
     win.print();
   };
+
+  const hasData = sales.length > 0 || inventory.length > 0;
 
   return (
     <AppLayout>
@@ -200,10 +191,11 @@ export default function ReportsPage() {
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                   <s.icon className="w-4 h-4 text-primary" />
                 </div>
-                <div className={`flex items-center gap-1 text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
-                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {s.change}
-                </div>
+                {s.change && (
+                  <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                    {s.change}
+                  </div>
+                )}
               </div>
               <p className="text-xl font-bold text-foreground">{s.value}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
@@ -221,204 +213,205 @@ export default function ReportsPage() {
           ))}
         </div>
 
+        {!hasData && (
+          <div className="glass-card rounded-xl p-10 text-center">
+            <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <h3 className="font-semibold text-foreground">No data to report</h3>
+            <p className="text-sm text-muted-foreground mt-1">Add inventory items and complete sales to generate reports.</p>
+          </div>
+        )}
+
         {/* Overview */}
-        {reportType === "overview" && (
+        {hasData && reportType === "overview" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="lg:col-span-2 glass-card rounded-xl p-5">
-                <h3 className="font-semibold text-foreground mb-1">Revenue vs Expenses</h3>
-                <p className="text-xs text-muted-foreground mb-4">Monthly financial performance</p>
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={monthlyRevenue}>
-                    <defs>
-                      <linearGradient id="revGradR" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(172,66%,50%)" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="hsl(172,66%,50%)" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(0,72%,51%)" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="hsl(0,72%,51%)" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`$${v.toLocaleString()}`]} />
-                    <Legend />
-                    <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGradR)" />
-                    <Area type="monotone" dataKey="expenses" stroke="hsl(0,72%,51%)" strokeWidth={2} fill="url(#expGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+            {monthlyRevenue.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2 glass-card rounded-xl p-5">
+                  <h3 className="font-semibold text-foreground mb-1">Revenue vs Expenses</h3>
+                  <p className="text-xs text-muted-foreground mb-4">Monthly financial performance</p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={monthlyRevenue}>
+                      <defs>
+                        <linearGradient id="revGradR" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(172,66%,50%)" stopOpacity={0.3} />
+                          <stop offset="100%" stopColor="hsl(172,66%,50%)" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="hsl(0,72%,51%)" stopOpacity={0.2} />
+                          <stop offset="100%" stopColor="hsl(0,72%,51%)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${settings.currencySymbol}${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                      <Legend />
+                      <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGradR)" />
+                      <Area type="monotone" dataKey="expenses" stroke="hsl(0,72%,51%)" strokeWidth={2} fill="url(#expGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                {salesByStore.length > 0 && (
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-1">Sales by Store</h3>
+                    <p className="text-xs text-muted-foreground mb-4">Revenue distribution</p>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={salesByStore} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" stroke="none">
+                          {salesByStore.map((e, i) => <Cell key={i} fill={e.color} />)}
+                        </Pie>
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`]} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2 mt-2">
+                      {salesByStore.map((s) => (
+                        <div key={s.name} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+                            <span className="text-muted-foreground">{s.name}</span>
+                          </div>
+                          <span className="font-semibold text-foreground">{s.value}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
+            {topProducts.length > 0 && (
               <div className="glass-card rounded-xl p-5">
-                <h3 className="font-semibold text-foreground mb-1">Sales by Store</h3>
-                <p className="text-xs text-muted-foreground mb-4">Revenue distribution</p>
-                <ResponsiveContainer width="100%" height={180}>
-                  <PieChart>
-                    <Pie data={salesByStore} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" stroke="none">
-                      {salesByStore.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2 mt-2">
-                  {salesByStore.map((s) => (
-                    <div key={s.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-                        <span className="text-muted-foreground">{s.name}</span>
+                <h3 className="font-semibold text-foreground mb-4">Top Products by Revenue</h3>
+                <div className="space-y-3">
+                  {topProducts.map((p, i) => (
+                    <div key={p.name} className="flex items-center gap-4">
+                      <span className="text-xs font-bold text-muted-foreground w-6">#{i + 1}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-foreground">{p.name}</span>
+                          <span className="text-sm font-semibold text-primary">{formatCurrency(p.revenue)}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(p.revenue / topProducts[0].revenue) * 100}%` }} />
+                        </div>
                       </div>
-                      <span className="font-semibold text-foreground">{s.value}%</span>
+                      <span className="text-xs text-muted-foreground w-16 text-right">{p.units} units</span>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-            <div className="glass-card rounded-xl p-5">
-              <h3 className="font-semibold text-foreground mb-4">Top Products by Revenue</h3>
-              <div className="space-y-3">
-                {topProducts.map((p, i) => (
-                  <div key={p.name} className="flex items-center gap-4">
-                    <span className="text-xs font-bold text-muted-foreground w-6">#{i + 1}</span>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-foreground">{p.name}</span>
-                        <span className="text-sm font-semibold text-primary">${p.revenue.toLocaleString()}</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(p.revenue / topProducts[0].revenue) * 100}%` }} />
-                      </div>
-                    </div>
-                    <span className="text-xs text-muted-foreground w-16 text-right">{p.units} units</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Sales */}
-        {reportType === "sales" && (
+        {hasData && reportType === "sales" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="glass-card rounded-xl p-5">
-              <h3 className="font-semibold text-foreground mb-1">Profit Trend</h3>
-              <p className="text-xs text-muted-foreground mb-4">Monthly profit from revenue minus expenses</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <LineChart data={monthlyRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`$${v.toLocaleString()}`]} />
-                  <Line type="monotone" dataKey="profit" stroke="hsl(152,60%,45%)" strokeWidth={3} dot={{ fill: "hsl(152,60%,45%)", strokeWidth: 2 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="glass-card rounded-xl p-5">
-                <h3 className="font-semibold text-foreground mb-4">Revenue Breakdown</h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={monthlyRevenue} barSize={20}>
-                    <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`$${v.toLocaleString()}`]} />
-                    <Bar dataKey="revenue" fill="hsl(172,66%,50%)" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+            {monthlyRevenue.length > 0 ? (
+              <>
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold text-foreground mb-1">Profit Trend</h3>
+                  <p className="text-xs text-muted-foreground mb-4">Monthly profit from revenue minus expenses</p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={monthlyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${settings.currencySymbol}${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                      <Line type="monotone" dataKey="profit" stroke="hsl(152,60%,45%)" strokeWidth={3} dot={{ fill: "hsl(152,60%,45%)", strokeWidth: 2 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-4">Revenue Breakdown</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={monthlyRevenue} barSize={20}>
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                        <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${settings.currencySymbol}${(v / 1000).toFixed(0)}k`} />
+                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                        <Bar dataKey="revenue" fill="hsl(172,66%,50%)" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {salesByStore.length > 0 && (
+                    <div className="glass-card rounded-xl p-5">
+                      <h3 className="font-semibold text-foreground mb-4">Store Comparison</h3>
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={salesByStore} layout="vertical" barSize={16}>
+                          <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" width={80} />
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`]} />
+                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                            {salesByStore.map((e, i) => <Cell key={i} fill={e.color} />)}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="glass-card rounded-xl p-10 text-center">
+                <DollarSign className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No sales data yet. Complete sales in POS to see charts.</p>
               </div>
-              <div className="glass-card rounded-xl p-5">
-                <h3 className="font-semibold text-foreground mb-4">Store Comparison</h3>
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={salesByStore} layout="vertical" barSize={16}>
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" width={80} />
-                    <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`]} />
-                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                      {salesByStore.map((e, i) => <Cell key={i} fill={e.color} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
         {/* Inventory */}
-        {reportType === "inventory" && (
+        {hasData && reportType === "inventory" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="glass-card rounded-xl p-5">
-              <h3 className="font-semibold text-foreground mb-1">Stock Movement</h3>
-              <p className="text-xs text-muted-foreground mb-4">Inbound vs outbound stock flow</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={inventoryTrend} barSize={20}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
-                  <XAxis dataKey="week" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
-                  <Bar dataKey="inbound" fill="hsl(172,66%,50%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="outbound" fill="hsl(38,92%,50%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="glass-card rounded-xl p-5">
-              <h3 className="font-semibold text-foreground mb-4">Warehouse Utilization</h3>
-              <div className="space-y-4">
-                {warehouseUtil.map((wh) => (
-                  <div key={wh.name}>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <Warehouse className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{wh.name}</span>
+            {warehouseUtil.length > 0 ? (
+              <div className="glass-card rounded-xl p-5">
+                <h3 className="font-semibold text-foreground mb-4">Warehouse Utilization</h3>
+                <div className="space-y-4">
+                  {warehouseUtil.map((wh) => (
+                    <div key={wh.name}>
+                      <div className="flex items-center justify-between text-sm mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <Warehouse className="w-4 h-4 text-muted-foreground" />
+                          <span className="font-medium text-foreground">{wh.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted-foreground">{wh.items.toLocaleString()} items</span>
+                          <span className={`text-xs font-semibold ${wh.capacity > 85 ? "text-destructive" : wh.capacity > 70 ? "text-warning" : "text-success"}`}>{wh.capacity}%</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground">{wh.items.toLocaleString()} items</span>
-                        <span className={`text-xs font-semibold ${wh.capacity > 85 ? "text-destructive" : wh.capacity > 70 ? "text-warning" : "text-success"}`}>{wh.capacity}%</span>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${wh.capacity > 85 ? "bg-destructive" : wh.capacity > 70 ? "bg-warning" : "bg-primary"}`} style={{ width: `${wh.capacity}%` }} />
                       </div>
                     </div>
-                    <div className="h-2 rounded-full bg-muted overflow-hidden">
-                      <div className={`h-full rounded-full transition-all ${wh.capacity > 85 ? "bg-destructive" : wh.capacity > 70 ? "bg-warning" : "bg-primary"}`} style={{ width: `${wh.capacity}%` }} />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="glass-card rounded-xl p-10 text-center">
+                <Warehouse className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No warehouses configured. Add warehouses in Organization.</p>
+              </div>
+            )}
           </div>
         )}
 
         {/* Operations */}
-        {reportType === "operations" && (
+        {hasData && reportType === "operations" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="glass-card rounded-xl p-5">
-              <h3 className="font-semibold text-foreground mb-1">Approval Metrics</h3>
-              <p className="text-xs text-muted-foreground mb-4">Monthly approval workflow performance</p>
-              <ResponsiveContainer width="100%" height={280}>
-                <BarChart data={approvalMetrics} barSize={16}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend />
-                  <Bar dataKey="approved" fill="hsl(152,60%,45%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="rejected" fill="hsl(0,72%,51%)" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="pending" fill="hsl(38,92%,50%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="glass-card rounded-xl p-5 text-center">
                 <ClipboardCheck className="w-8 h-8 text-success mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">128</p>
-                <p className="text-xs text-muted-foreground">Total Approvals (6mo)</p>
+                <p className="text-2xl font-bold text-foreground">{approvalStats.approved}</p>
+                <p className="text-xs text-muted-foreground">Total Approved</p>
               </div>
               <div className="glass-card rounded-xl p-5 text-center">
-                <Activity className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">1.4 days</p>
-                <p className="text-xs text-muted-foreground">Avg Resolution Time</p>
+                <Activity className="w-8 h-8 text-warning mx-auto mb-2" />
+                <p className="text-2xl font-bold text-foreground">{approvalStats.pending}</p>
+                <p className="text-xs text-muted-foreground">Pending</p>
               </div>
               <div className="glass-card rounded-xl p-5 text-center">
-                <Building2 className="w-8 h-8 text-info mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">4</p>
-                <p className="text-xs text-muted-foreground">Active Departments</p>
+                <Building2 className="w-8 h-8 text-destructive mx-auto mb-2" />
+                <p className="text-2xl font-bold text-foreground">{approvalStats.rejected}</p>
+                <p className="text-xs text-muted-foreground">Rejected</p>
               </div>
             </div>
           </div>

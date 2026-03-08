@@ -75,7 +75,7 @@ const methodIcons: Record<string, React.ElementType> = {
   "Mobile Pay": DollarSign,
 };
 
-const stores = ["All Stores", "Main HQ", "West Store", "East Store", "South Hub"];
+const defaultStores = ["All Stores"];
 const statuses = ["All Status", "completed", "refunded", "pending"];
 const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
 
