@@ -73,11 +73,13 @@ const methodIcons: Record<string, React.ElementType> = {
   "Mobile Pay": DollarSign,
 };
 
-const defaultStores = ["All Stores"];
 const statuses = ["All Status", "completed", "refunded", "pending"];
 const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
 
 export default function SalesPage() {
+  const { storeNames, stores } = useSharedData();
+  const { users } = useAppSettings();
+  const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [showNewSale, setShowNewSale] = useState(false);
