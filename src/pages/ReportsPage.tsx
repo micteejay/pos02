@@ -30,12 +30,14 @@ const tooltipStyle = {
 
 export default function ReportsPage() {
   const { settings, formatCurrency, users } = useAppSettings();
-  const { inventory, sales, stores, warehouses } = useSharedData();
+  const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense } = useSharedData();
   const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
   const { user } = useAuth();
   const { logAction } = useAudit();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "" });
 
   // Derive revenue data from actual sales
   const monthlyRevenue = useMemo(() => {
