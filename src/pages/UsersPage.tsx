@@ -253,7 +253,7 @@ export default function UsersPage() {
       {/* Edit User Modal */}
       {editingUser && (
         <Modal title="Edit User" onClose={() => setEditingUser(null)}>
-          <EditUserForm user={editingUser} roles={roles} onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }} onCancel={() => setEditingUser(null)} />
+          <EditUserForm user={editingUser} roles={roles} storeNames={storeNames} departmentNames={departmentNames} onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }} onCancel={() => setEditingUser(null)} />
         </Modal>
       )}
 
