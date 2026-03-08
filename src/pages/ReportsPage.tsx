@@ -180,10 +180,28 @@ export default function ReportsPage() {
     { key: "overview", label: "Overview", icon: BarChart3 },
     { key: "sales", label: "Sales", icon: DollarSign },
     { key: "inventory", label: "Inventory", icon: Package },
+    { key: "expenses", label: "Expenses", icon: Receipt },
     { key: "gainloss", label: "Gain/Loss", icon: TrendingUp },
     { key: "eod", label: "End of Day", icon: Calendar },
     { key: "operations", label: "Operations", icon: Activity },
   ];
+
+  const handleAddExpense = () => {
+    if (!expenseForm.description || !expenseForm.amount) return;
+    addExpense({
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amount: parseFloat(expenseForm.amount),
+      date: new Date().toISOString(),
+      store: expenseForm.store || stores[0]?.name || "Main",
+      createdBy: user?.name || "System",
+      createdByRole: user?.role || "Admin",
+      recurring: false,
+    });
+    logAction("expense.add", "Expenses", expenseForm.category, `Added expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
+    setExpenseForm({ category: "Rent", description: "", amount: "", store: "" });
+    setShowAddExpense(false);
+  };
 
   const exportCSV = () => {
     let csv = "";
@@ -192,9 +210,13 @@ export default function ReportsPage() {
     } else if (reportType === "inventory") {
       csv = "SKU,Name,Category,Warehouse,Qty,CostPrice,SellingPrice,Value\n" + inventory.map(i => `${i.sku},${i.name},${i.category},${i.warehouse},${i.qty},${i.costPrice || 0},${i.price},${i.qty * i.price}`).join("\n");
     } else if (reportType === "gainloss") {
-      csv = "Product,Revenue,Cost,Profit,Margin%\n" + gainLossData.map(d => `${d.name},${d.revenue},${d.cost},${d.profit},${d.margin.toFixed(1)}`).join("\n");
+      csv = "Product,Revenue,Cost,Profit,Margin%\n" + gainLossData.map(d => `${d.name},${d.revenue},${d.cost},${d.profit},${d.margin.toFixed(1)}`).join("\n")
+        + `\n\nOperational Expenses\nCategory,Amount\n` + expensesByCategory.map(e => `${e.name},${e.value}`).join("\n")
+        + `\n\nNet Gain/Loss,${netGainLoss}`;
+    } else if (reportType === "expenses") {
+      csv = "ID,Date,Category,Description,Amount,Store,By\n" + expenses.map(e => `${e.id},${new Date(e.date).toLocaleDateString()},${e.category},${e.description},${e.amount},${e.store},${e.createdBy}`).join("\n");
     } else if (reportType === "eod") {
-      csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nTotal Cost,${eodData.totalCost}\nProfit,${eodData.profit}`;
+      csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nCost of Goods,${eodData.totalCost}\nOperational Expenses,${eodData.opExpenses}\nNet Profit,${eodData.profit}`;
     } else {
       csv = `Approved,${approvalStats.approved}\nRejected,${approvalStats.rejected}\nPending,${approvalStats.pending}`;
     }
