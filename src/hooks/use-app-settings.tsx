@@ -270,6 +270,24 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             showQRCode: r.showQRCode ?? prev.showQRCode,
           }));
         }
+        if (parsed.security) {
+          const s = parsed.security;
+          setSettings(prev => ({
+            ...prev,
+            twoFactorEnabled: s.twoFactorEnabled ?? prev.twoFactorEnabled,
+            sessionTimeout: s.sessionTimeout || prev.sessionTimeout,
+            passwordPolicy: s.passwordPolicy || prev.passwordPolicy,
+          }));
+        }
+        if (parsed.notifications) {
+          const n = parsed.notifications;
+          setSettings(prev => ({
+            ...prev,
+            notifyEmail: n.notifyEmail ?? prev.notifyEmail,
+            notifyPush: n.notifyPush ?? prev.notifyPush,
+            notifySms: n.notifySms ?? prev.notifySms,
+          }));
+        }
       }
 
       // Fetch integrations
