@@ -72,12 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(authUser);
 
-    // Fetch company profile
-    const { data: company } = await supabase
+    // Fetch latest company profile for this owner (handles legacy duplicate rows safely)
+    const { data: companyRows } = await supabase
       .from("company_profiles")
       .select("*")
       .eq("owner_id", supaUser.id)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    const company = companyRows?.[0] ?? null;
 
     if (company) {
       setCompanyProfile({
