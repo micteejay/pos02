@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useSharedData } from "@/hooks/use-shared-data";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import {
   DollarSign,
   ShoppingCart,
