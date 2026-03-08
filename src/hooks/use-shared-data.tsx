@@ -412,10 +412,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Stores ---
   const addStore = useCallback(async (store: Omit<OrgStore, "id">) => {
+    const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
     const { data, error } = await supabase.from("stores").insert({
       name: store.name, type: store.type, address: store.address || null,
       phone: store.phone || null, email: store.email || null,
-      status: (store.status as any) || "active",
+      status: (statusMap[store.status] || store.status.toLowerCase()) as any,
     }).select().single();
     if (data && !error) {
       setStores(prev => [...prev, { ...store, id: data.id }]);
