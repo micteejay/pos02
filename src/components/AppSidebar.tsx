@@ -54,6 +54,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
   const location = useLocation();
   const { settings } = useAppSettings();
   const { unreadCount, approvalItems } = useAppEvents();
+  const { logout, user } = useAuth();
 
   const pendingApprovals = approvalItems.filter(a => a.status === "pending").length;
 
