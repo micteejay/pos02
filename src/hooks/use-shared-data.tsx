@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
 export interface InventoryItem {
-  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; price: number; status: "critical" | "low" | "ok";
+  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
 }
 
 export interface SaleRecord {
