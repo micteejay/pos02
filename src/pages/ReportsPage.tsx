@@ -887,22 +887,26 @@ export default function ReportsPage() {
         {/* End of Day */}
         {hasData && reportType === "eod" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className="text-xl font-bold text-foreground">{eodData.count}</p>
-                <p className="text-xs text-muted-foreground">Today's Transactions</p>
+                <p className="text-xs text-muted-foreground">Transactions</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className="text-xl font-bold text-foreground">{formatCurrency(eodData.totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground">Today's Revenue</p>
+                <p className="text-xs text-muted-foreground">Revenue</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xl font-bold text-foreground">{eodData.totalItems}</p>
-                <p className="text-xs text-muted-foreground">Items Sold</p>
+                <p className="text-xl font-bold text-foreground">{formatCurrency(eodData.totalCost)}</p>
+                <p className="text-xs text-muted-foreground">Cost of Goods</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-warning">{formatCurrency(eodData.opExpenses)}</p>
+                <p className="text-xs text-muted-foreground">Op. Expenses</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className={`text-xl font-bold ${eodData.profit >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(eodData.profit)}</p>
-                <p className="text-xs text-muted-foreground">Today's Profit</p>
+                <p className="text-xs text-muted-foreground">Net Profit</p>
               </div>
             </div>
 
