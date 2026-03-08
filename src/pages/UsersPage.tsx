@@ -15,22 +15,29 @@ type Tab = "users" | "roles" | "permissions";
 
 const permissionGroups: { module: string; perms: Permission[] }[] = [
   { module: "Page Access", perms: ["pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply","pages.workflows","pages.approvals","pages.reports","pages.organization","pages.documents","pages.chat","pages.users","pages.settings","pages.audit","pages.notifications"] },
+  { module: "Dashboard", perms: ["dashboard.view"] },
   { module: "Users", perms: ["users.view","users.create","users.edit","users.delete"] },
   { module: "Roles", perms: ["roles.view","roles.create","roles.edit","roles.delete"] },
   { module: "Inventory", perms: ["inventory.view","inventory.create","inventory.edit","inventory.delete"] },
+  { module: "Inventory Tabs", perms: ["inventory.stock","inventory.warehouses","inventory.transfers","inventory.categories"] },
   { module: "Sales", perms: ["sales.view","sales.create","sales.edit","sales.delete"] },
+  { module: "Sales Tabs", perms: ["sales.transactions","sales.analytics","sales.reps"] },
   { module: "POS", perms: ["pos.view","pos.create"] },
   { module: "Supply Chain", perms: ["supply.view","supply.create","supply.edit","supply.approve"] },
+  { module: "Supply Tabs", perms: ["supply.orders","supply.suppliers"] },
   { module: "Workflows", perms: ["workflows.view","workflows.create","workflows.approve","workflows.delete"] },
   { module: "Approvals", perms: ["approvals.view","approvals.approve","approvals.reject"] },
+  { module: "Approvals Tabs", perms: ["approvals.pending","approvals.history"] },
   { module: "Reports", perms: ["reports.view","reports.export"] },
+  { module: "Reports Tabs", perms: ["reports.overview","reports.sales","reports.inventory","reports.gainloss","reports.eod","reports.expenses","reports.operations"] },
   { module: "Organization", perms: ["organization.view","organization.create","organization.edit","organization.delete"] },
+  { module: "Organization Tabs", perms: ["organization.stores","organization.warehouses","organization.departments","organization.hierarchy"] },
   { module: "Documents", perms: ["documents.view","documents.create","documents.edit","documents.delete"] },
   { module: "Settings", perms: ["settings.view","settings.edit"] },
+  { module: "Settings Tabs", perms: ["settings.general","settings.receipt","settings.integrations","settings.security"] },
   { module: "Audit", perms: ["audit.view"] },
   { module: "Chat", perms: ["chat.view","chat.create"] },
   { module: "Notifications", perms: ["notifications.view"] },
-  { module: "Dashboard", perms: ["dashboard.view"] },
 ];
 
 export default function UsersPage() {

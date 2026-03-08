@@ -21,15 +21,22 @@ export type Permission =
   | "users.view" | "users.create" | "users.edit" | "users.delete"
   | "roles.view" | "roles.create" | "roles.edit" | "roles.delete"
   | "inventory.view" | "inventory.create" | "inventory.edit" | "inventory.delete"
+  | "inventory.stock" | "inventory.warehouses" | "inventory.transfers" | "inventory.categories"
   | "sales.view" | "sales.create" | "sales.edit" | "sales.delete"
+  | "sales.transactions" | "sales.analytics" | "sales.reps"
   | "pos.view" | "pos.create"
   | "supply.view" | "supply.create" | "supply.edit" | "supply.approve"
+  | "supply.orders" | "supply.suppliers"
   | "workflows.view" | "workflows.create" | "workflows.approve" | "workflows.delete"
   | "approvals.view" | "approvals.approve" | "approvals.reject"
+  | "approvals.pending" | "approvals.history"
   | "reports.view" | "reports.export"
+  | "reports.overview" | "reports.sales" | "reports.inventory" | "reports.gainloss" | "reports.eod" | "reports.expenses" | "reports.operations"
   | "organization.view" | "organization.create" | "organization.edit" | "organization.delete"
+  | "organization.stores" | "organization.warehouses" | "organization.departments" | "organization.hierarchy"
   | "documents.view" | "documents.create" | "documents.edit" | "documents.delete"
   | "settings.view" | "settings.edit"
+  | "settings.general" | "settings.receipt" | "settings.integrations" | "settings.security"
   | "audit.view"
   | "chat.view" | "chat.create"
   | "notifications.view"
@@ -79,13 +86,20 @@ const allPermissions: Permission[] = [
   "supply.view","supply.create","supply.edit","supply.approve",
   "workflows.view","workflows.create","workflows.approve","workflows.delete",
   "approvals.view","approvals.approve","approvals.reject",
+  "approvals.pending","approvals.history",
   "reports.view","reports.export",
+  "reports.overview","reports.sales","reports.inventory","reports.gainloss","reports.eod","reports.expenses","reports.operations",
   "organization.view","organization.create","organization.edit","organization.delete",
+  "organization.stores","organization.warehouses","organization.departments","organization.hierarchy",
   "documents.view","documents.create","documents.edit","documents.delete",
   "settings.view","settings.edit",
+  "settings.general","settings.receipt","settings.integrations","settings.security",
   "audit.view",
   "chat.view","chat.create",
   "notifications.view","dashboard.view",
+  "inventory.stock","inventory.warehouses","inventory.transfers","inventory.categories",
+  "sales.transactions","sales.analytics","sales.reps",
+  "supply.orders","supply.suppliers",
   "pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply",
   "pages.workflows","pages.approvals","pages.reports","pages.organization",
   "pages.documents","pages.chat","pages.users","pages.settings","pages.audit",
@@ -95,9 +109,31 @@ const allPermissions: Permission[] = [
 const defaultRoles: AppRole[] = [
   { id: "r1", name: "Super Admin", description: "Full system access with all permissions", permissions: [...allPermissions], isSystem: true, color: "bg-destructive/10 text-destructive" },
   { id: "r2", name: "Admin", description: "Administrative access excluding system settings", permissions: allPermissions.filter(p => !p.startsWith("roles.")), isSystem: true, color: "bg-primary/10 text-primary" },
-  { id: "r3", name: "Manager", description: "Manage operations, sales, and inventory", permissions: ["users.view","inventory.view","inventory.create","inventory.edit","sales.view","sales.create","sales.edit","pos.view","pos.create","supply.view","supply.create","supply.edit","supply.approve","workflows.view","workflows.create","workflows.approve","approvals.view","approvals.approve","approvals.reject","reports.view","reports.export","organization.view","documents.view","documents.create","documents.edit","chat.view","chat.create","audit.view"], isSystem: false, color: "bg-info/10 text-info" },
-  { id: "r4", name: "Sales Rep", description: "Point of sale and sales management", permissions: ["sales.view","sales.create","pos.view","pos.create","inventory.view","reports.view","chat.view","chat.create","documents.view"], isSystem: false, color: "bg-success/10 text-success" },
-  { id: "r5", name: "Warehouse Staff", description: "Inventory and supply chain operations", permissions: ["inventory.view","inventory.create","inventory.edit","supply.view","supply.create","workflows.view","documents.view","chat.view","chat.create"], isSystem: false, color: "bg-warning/10 text-warning" },
+  { id: "r3", name: "Manager", description: "Manage operations, sales, and inventory", permissions: [
+    "users.view","inventory.view","inventory.create","inventory.edit",
+    "inventory.stock","inventory.warehouses","inventory.transfers","inventory.categories",
+    "sales.view","sales.create","sales.edit","sales.transactions","sales.analytics","sales.reps",
+    "pos.view","pos.create",
+    "supply.view","supply.create","supply.edit","supply.approve","supply.orders","supply.suppliers",
+    "workflows.view","workflows.create","workflows.approve",
+    "approvals.view","approvals.approve","approvals.reject","approvals.pending","approvals.history",
+    "reports.view","reports.export","reports.overview","reports.sales","reports.inventory","reports.gainloss","reports.eod","reports.expenses","reports.operations",
+    "organization.view","organization.stores","organization.warehouses","organization.departments",
+    "documents.view","documents.create","documents.edit",
+    "settings.view","settings.general","settings.receipt",
+    "chat.view","chat.create","audit.view","notifications.view","dashboard.view",
+  ], isSystem: false, color: "bg-info/10 text-info" },
+  { id: "r4", name: "Sales Rep", description: "Point of sale and sales management", permissions: [
+    "sales.view","sales.create","sales.transactions","sales.analytics",
+    "pos.view","pos.create","inventory.view","inventory.stock",
+    "reports.view","reports.sales","reports.eod",
+    "chat.view","chat.create","documents.view","notifications.view","dashboard.view",
+  ], isSystem: false, color: "bg-success/10 text-success" },
+  { id: "r5", name: "Warehouse Staff", description: "Inventory and supply chain operations", permissions: [
+    "inventory.view","inventory.create","inventory.edit","inventory.stock","inventory.warehouses","inventory.transfers",
+    "supply.view","supply.create","supply.orders",
+    "workflows.view","documents.view","chat.view","chat.create","notifications.view","dashboard.view",
+  ], isSystem: false, color: "bg-warning/10 text-warning" },
   { id: "r6", name: "Viewer", description: "Read-only access to all modules", permissions: allPermissions.filter(p => p.endsWith(".view")), isSystem: false, color: "bg-muted text-muted-foreground" },
 ];
 
