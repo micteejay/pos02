@@ -62,6 +62,7 @@ export default function InventoryPage() {
     { key: "stock", label: "Stock Levels", icon: Package },
     { key: "warehouses", label: "Warehouses", icon: Warehouse },
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
+    { key: "categories", label: "Categories", icon: Tag },
   ];
 
   const addTransfer = (tr: Transfer) => {
