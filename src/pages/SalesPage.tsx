@@ -1,6 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useSharedData } from "@/hooks/use-shared-data";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import {
   DollarSign,
   ShoppingCart,
@@ -58,10 +60,6 @@ type SortKey = "time" | "total" | "customer";
 // --- Initial Data ---
 const initialTransactions: Transaction[] = [];
 
-const salesReps: { name: string; store: string; sales: number; revenue: number; target: number; avgTicket: number; rating: number; trend: "up" | "down" }[] = [];
-
-// Revenue and hourly data derived from transactions in AnalyticsTab
-
 const statusConfig = {
   completed: { label: "Completed", className: "bg-success/10 text-success" },
   refunded: { label: "Refunded", className: "bg-destructive/10 text-destructive" },
@@ -75,11 +73,13 @@ const methodIcons: Record<string, React.ElementType> = {
   "Mobile Pay": DollarSign,
 };
 
-const defaultStores = ["All Stores"];
 const statuses = ["All Status", "completed", "refunded", "pending"];
 const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
 
 export default function SalesPage() {
+  const { storeNames, stores } = useSharedData();
+  const { users } = useAppSettings();
+  const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
   const [showNewSale, setShowNewSale] = useState(false);
@@ -93,7 +93,7 @@ export default function SalesPage() {
       { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: transactions.length > 0 ? `${transactions.length} sales` : "", trend: "up" as const, icon: DollarSign },
       { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
       { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "", trend: "up" as const, icon: Receipt },
-      { label: "Active Reps", value: salesReps.length.toString(), change: "", trend: "up" as const, icon: Users },
+      { label: "Active Reps", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
   }, [transactions]);
 
@@ -186,26 +186,27 @@ export default function SalesPage() {
         </div>
 
         {/* New Sale Modal */}
-        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} />}
+        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} storeNames={storeNames} users={users} />}
 
         {tab === "transactions" && (
-          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
+          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} storeFilters={dynamicStoreFilters} />
         )}
         {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} />}
-        {tab === "reps" && <RepsTab />}
+        {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
       </div>
     </AppLayout>
   );
 }
 
 // --- New Sale Modal ---
-function NewSaleModal({ onAdd, onClose }: { onAdd: (data: any) => void; onClose: () => void }) {
+function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any) => void; onClose: () => void; storeNames: string[]; users: { name: string; status: string }[] }) {
+  const activeUsers = users.filter(u => u.status === "active");
   const [customer, setCustomer] = useState("");
   const [total, setTotal] = useState("");
   const [items, setItems] = useState("1");
   const [method, setMethod] = useState("Credit Card");
-  const [store, setStore] = useState("Main HQ");
-  const [rep, setRep] = useState("Alice Chen");
+  const [store, setStore] = useState(storeNames[0] || "");
+  const [rep, setRep] = useState(activeUsers[0]?.name || "");
 
   const handleSubmit = () => {
     if (!customer || !total) return;
@@ -247,16 +248,15 @@ function NewSaleModal({ onAdd, onClose }: { onAdd: (data: any) => void; onClose:
             <div>
               <label className="text-xs font-medium text-muted-foreground">Store</label>
               <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                <option>Main HQ</option>
-                <option>West Store</option>
-                <option>East Store</option>
-                <option>South Hub</option>
+                {storeNames.length === 0 && <option value="">No stores configured</option>}
+                {storeNames.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Sales Rep</label>
               <select value={rep} onChange={(e) => setRep(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {salesReps.map((r) => <option key={r.name}>{r.name}</option>)}
+                {activeUsers.length === 0 && <option value="">No users configured</option>}
+                {activeUsers.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
               </select>
             </div>
           </div>
@@ -273,10 +273,11 @@ function NewSaleModal({ onAdd, onClose }: { onAdd: (data: any) => void; onClose:
 }
 
 // --- Transactions Tab ---
-function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
+function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters }: {
   transactions: Transaction[];
   onUpdateStatus: (id: string, status: Transaction["status"]) => void;
   onDelete: (id: string) => void;
+  storeFilters: string[];
 }) {
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("All Stores");
@@ -329,7 +330,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
       {showFilters && (
         <div className="glass-card rounded-xl p-4 flex flex-wrap gap-3 animate-fade-in">
           <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {defaultStores.map((s) => <option key={s}>{s}</option>)}
+            {storeFilters.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
             {statuses.map((s) => <option key={s}>{s}</option>)}
@@ -540,62 +541,48 @@ function AnalyticsTab({ paymentBreakdown, transactions }: { paymentBreakdown: { 
 }
 
 // --- Reps Tab ---
-function RepsTab() {
+function RepsTab({ users, storeNames }: { users: { id: string; name: string; role: string; status: string; store: string; avatar: string }[]; storeNames: string[] }) {
+  const activeReps = users.filter(u => u.status === "active");
+
+  if (activeReps.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-10 text-center animate-fade-in">
+        <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">No active users. Add users in the Users & Roles page.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {salesReps.map((rep) => {
-          const progress = Math.round((rep.revenue / rep.target) * 100);
-          const progressColor = progress >= 90 ? "bg-success" : progress >= 70 ? "bg-warning" : "bg-destructive";
-          return (
-            <div key={rep.name} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                    {rep.name.split(" ").map((n) => n[0]).join("")}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{rep.name}</h3>
-                    <p className="text-xs text-muted-foreground">{rep.store}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-xs">
-                  <Star className="w-3.5 h-3.5 text-warning fill-warning" />
-                  <span className="font-semibold text-foreground">{rep.rating}</span>
-                </div>
+        {activeReps.map((user) => (
+          <div key={user.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                {user.avatar}
               </div>
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground flex items-center gap-1"><Target className="w-3 h-3" /> Target Progress</span>
-                  <span className="font-semibold text-foreground">{progress}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className={`h-full rounded-full ${progressColor} transition-all duration-500`} style={{ width: `${Math.min(progress, 100)}%` }} />
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                  <span>${rep.revenue.toLocaleString()}</span>
-                  <span>${rep.target.toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <p className="text-sm font-bold text-foreground">{rep.sales}</p>
-                  <p className="text-[10px] text-muted-foreground">Sales</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <p className="text-sm font-bold text-foreground">${rep.avgTicket.toFixed(0)}</p>
-                  <p className="text-[10px] text-muted-foreground">Avg Ticket</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <div className={`flex items-center justify-center gap-0.5 text-sm font-bold ${rep.trend === "up" ? "text-success" : "text-destructive"}`}>
-                    {rep.trend === "up" ? <ArrowUpRight className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Trend</p>
-                </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{user.name}</h3>
+                <p className="text-xs text-muted-foreground">{user.role}</p>
+                {user.store && <p className="text-[10px] text-muted-foreground">{user.store}</p>}
               </div>
             </div>
-          );
-        })}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center p-2 rounded-lg bg-muted/50">
+                <p className="text-sm font-bold text-foreground">{user.role}</p>
+                <p className="text-[10px] text-muted-foreground">Role</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-muted/50">
+                <span className={`inline-flex items-center gap-1 text-xs ${user.status === "active" ? "text-success" : "text-muted-foreground"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`} />
+                  {user.status}
+                </span>
+                <p className="text-[10px] text-muted-foreground">Status</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

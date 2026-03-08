@@ -36,7 +36,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { formatCurrency } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
-  const { inventory, addStockFromPO } = useSharedData();
+  const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
@@ -276,7 +276,7 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">New Purchase Order</h3>
               <button onClick={() => setShowNewPO(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory}
+            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory} warehouseNames={warehouseNames}
               onSubmit={(data) => {
                 setOrders(prev => [{ id: `PO-${5007 + prev.length}`, ...data, status: "draft" as POStatus, created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), expectedDelivery: "—", approvedBy: null }, ...prev]);
                 setShowNewPO(false);
@@ -314,9 +314,9 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ suppliers, formatCurrency, inventoryItems, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; onSubmit: (data: any) => void; onCancel: () => void }) {
+function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
   const [supplier, setSupplier] = useState(suppliers[0]?.name || "");
-  const [warehouse, setWarehouse] = useState("Main HQ");
+  const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
   const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "" }]);
   const [notes, setNotes] = useState("");
 
@@ -342,7 +342,8 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, onSubmit, onCanc
       </div>
       <div><label className="text-xs font-medium text-muted-foreground">Destination</label>
         <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-          <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
+          {warehouseNames.length === 0 && <option value="">No warehouses configured</option>}
+          {warehouseNames.map(w => <option key={w} value={w}>{w}</option>)}
         </select>
       </div>
       <div>

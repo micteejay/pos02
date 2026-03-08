@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings, Permission, AppRole, AppUser } from "@/hooks/use-app-settings";
+import { useSharedData } from "@/hooks/use-shared-data";
 import {
   Users, Shield, Plus, Search, MoreHorizontal, Mail, X, Check, Trash2, Edit2,
   ChevronRight, ChevronDown, Lock, Eye, EyeOff, UserPlus, Settings, AlertTriangle,
@@ -31,6 +32,7 @@ const permissionGroups: { module: string; perms: Permission[] }[] = [
 
 export default function UsersPage() {
   const { users, roles, addUser, updateUser, deleteUser, addRole, updateRole, deleteRole, hasPermission } = useAppSettings();
+  const { storeNames, departmentNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("users");
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
@@ -244,14 +246,14 @@ export default function UsersPage() {
       {/* Add User Modal */}
       {showAddUser && (
         <Modal title="Add User" onClose={() => setShowAddUser(false)}>
-          <AddUserForm roles={roles} onAdd={(data) => { addUser(data); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
+          <AddUserForm roles={roles} storeNames={storeNames} departmentNames={departmentNames} onAdd={(data) => { addUser(data); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
         </Modal>
       )}
 
       {/* Edit User Modal */}
       {editingUser && (
         <Modal title="Edit User" onClose={() => setEditingUser(null)}>
-          <EditUserForm user={editingUser} roles={roles} onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }} onCancel={() => setEditingUser(null)} />
+          <EditUserForm user={editingUser} roles={roles} storeNames={storeNames} departmentNames={departmentNames} onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }} onCancel={() => setEditingUser(null)} />
         </Modal>
       )}
 
@@ -286,9 +288,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
+function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState("Operations"); const [store, setStore] = useState("Main HQ");
+  const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState(departmentNames[0] || ""); const [store, setStore] = useState(storeNames[0] || "");
   const passwordError = confirmPassword && password !== confirmPassword ? "Passwords do not match" : password && password.length < 8 ? "Min 8 characters" : "";
   const canSubmit = name && email && password && password.length >= 8 && password === confirmPassword;
 
@@ -322,12 +324,14 @@ function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (dat
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Department</label>
           <select value={department} onChange={(e) => setDepartment(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Operations","Sales","Finance","Technology","Marketing","HR","Inventory","Legal"].map(d => <option key={d}>{d}</option>)}
+            {departmentNames.length === 0 && <option value="">No departments configured</option>}
+            {departmentNames.map(d => <option key={d}>{d}</option>)}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Store</label>
           <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Main HQ","West Store","East Store","South Hub"].map(s => <option key={s}>{s}</option>)}
+            {storeNames.length === 0 && <option value="">No stores configured</option>}
+            {storeNames.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
       </div>
@@ -340,7 +344,7 @@ function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (dat
   );
 }
 
-function EditUserForm({ user, roles, onSave, onCancel }: { user: AppUser; roles: AppRole[]; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
+function EditUserForm({ user, roles, storeNames, departmentNames, onSave, onCancel }: { user: AppUser; roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
   const [name, setName] = useState(user.name); const [email, setEmail] = useState(user.email); const [role, setRole] = useState(user.role); const [status, setStatus] = useState(user.status); const [department, setDepartment] = useState(user.department); const [store, setStore] = useState(user.store);
 
   return (
@@ -364,12 +368,16 @@ function EditUserForm({ user, roles, onSave, onCancel }: { user: AppUser; roles:
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Department</label>
           <select value={department} onChange={(e) => setDepartment(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Operations","Sales","Finance","Technology","Marketing","HR","Inventory","Legal"].map(d => <option key={d}>{d}</option>)}
+            {departmentNames.length === 0 && <option value="">No departments configured</option>}
+            {departmentNames.map(d => <option key={d}>{d}</option>)}
+            {department && !departmentNames.includes(department) && <option value={department}>{department}</option>}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Store</label>
           <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Main HQ","West Store","East Store","South Hub"].map(s => <option key={s}>{s}</option>)}
+            {storeNames.length === 0 && <option value="">No stores configured</option>}
+            {storeNames.map(s => <option key={s}>{s}</option>)}
+            {store && !storeNames.includes(store) && <option value={store}>{store}</option>}
           </select>
         </div>
       </div>
