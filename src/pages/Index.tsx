@@ -203,6 +203,9 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* AI Insights */}
+        <AISalesInsights />
+
         {/* Pending Approvals */}
         {pendingApprovals.length > 0 && (
           <div className="glass-card rounded-xl p-5">

@@ -1,1 +1,7 @@
 project_id = "mruzpniuifnmiqqmiokx"
+
+[functions.ai-chat]
+verify_jwt = false
+
+[functions.ai-sales-insights]
+verify_jwt = false

@@ -93,6 +93,7 @@ const App = () => (
                 <BrowserRouter>
                   <CommandPalette />
                   <AppRoutes />
+                  <AIChatAssistant />
                 </BrowserRouter>
               </TooltipProvider>
             </SharedDataProvider>
