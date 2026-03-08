@@ -660,6 +660,11 @@ export default function ChatPage() {
                               <FileText className="w-4 h-4 text-primary" />
                               <span className="text-foreground font-medium">{msg.attachment.name}</span>
                               <span className="text-muted-foreground">{msg.attachment.size}</span>
+                              {msg.attachment.storagePath && (
+                                <button onClick={() => downloadAttachment(msg.attachment)} className="p-1 rounded-md hover:bg-muted ml-1" title="Download">
+                                  <Download className="w-3.5 h-3.5 text-primary" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </>
