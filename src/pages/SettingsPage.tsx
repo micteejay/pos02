@@ -539,15 +539,32 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">Active Sessions</h3>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <Monitor className="w-4 h-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Current Session<span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span></p>
-                      <p className="text-[10px] text-muted-foreground">This device</p>
+                {activeSessions.length === 0 ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Monitor className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Current Session<span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span></p>
+                        <p className="text-[10px] text-muted-foreground">This device</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  activeSessions.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <Monitor className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {s.user_agent ? s.user_agent.slice(0, 50) : "Unknown device"}
+                            {s.is_active && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span>}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{s.ip_address || "Unknown IP"} · {new Date(s.started_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
