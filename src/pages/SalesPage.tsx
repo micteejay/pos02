@@ -191,7 +191,7 @@ export default function SalesPage() {
         {tab === "transactions" && (
           <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
         )}
-        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} />}
+        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} />}
         {tab === "reps" && <RepsTab />}
       </div>
     </AppLayout>
