@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, MessageSquare, FileText, GitBranch, Bell, Users, Shield, Settings,
   ChevronLeft, ChevronRight, Search, Building2, Package, BarChart3, ClipboardCheck,
-  ShoppingCart, PieChart, Truck, Receipt, LogOut,
+  ShoppingCart, PieChart, Truck, Receipt, LogOut, UserCircle,
 } from "lucide-react";
 
 interface NavItem {
