@@ -3,13 +3,13 @@ import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check } from "lucide-react";
+import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check, Download } from "lucide-react";
 
 interface Message {
   id: string; sender_id: string; sender_name: string; avatar: string; time: string; text: string; channel_id: string;
   reactions?: { emoji: string; count: number; reacted: boolean }[];
   pinned?: boolean; edited?: boolean; replyTo?: string;
-  attachment?: { name: string; size: string; type: string };
+  attachment?: { name: string; size: string; type: string; storagePath?: string; storageBucket?: string };
 }
 
 interface Channel {
@@ -181,6 +181,7 @@ export default function ChatPage() {
         const senderProfile = profileMap.get(m.sender_id);
         const senderName = senderProfile?.name || "Unknown";
 
+        const att = Array.isArray(m.attachments) && m.attachments.length > 0 ? m.attachments[0] : null;
         return {
           id: m.id,
           sender_id: m.sender_id,
@@ -199,6 +200,7 @@ export default function ChatPage() {
           pinned: m.is_pinned,
           edited: m.edited,
           replyTo: m.reply_to,
+          attachment: att ? { name: att.name, size: att.size, type: att.type, storagePath: att.storagePath, storageBucket: att.storageBucket } : undefined,
         };
       }));
     };
@@ -270,8 +272,20 @@ export default function ChatPage() {
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${(file.size / 1024).toFixed(0)} KB`;
       const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
+      const storagePath = `${userId}/${Date.now()}-${file.name}`;
+
+      // Upload file to chat-attachments bucket
+      const { error: uploadError } = await supabase.storage
+        .from("chat-attachments")
+        .upload(storagePath, file, { upsert: false });
+
+      if (uploadError) {
+        toast.error(`Failed to upload ${file.name}`);
+        return;
+      }
+
       const content = `📎 Shared a file: ${file.name}`;
-      const attachments = [{ name: file.name, size: sizeStr, type: ext }];
+      const attachments = [{ name: file.name, size: sizeStr, type: ext, storagePath, storageBucket: "chat-attachments" }];
 
       const { error } = await supabase.from("chat_messages").insert({
         channel_id: activeChannel, sender_id: userId, content,
@@ -305,6 +319,23 @@ export default function ChatPage() {
       return { ...m, reactions: [...reactions, { emoji, count: 1, reacted: true }] };
     }));
     setShowEmojiPicker(null);
+  }, []);
+
+  const downloadAttachment = useCallback(async (attachment: Message["attachment"]) => {
+    if (!attachment?.storagePath || !attachment?.storageBucket) {
+      toast.error("No file available for download");
+      return;
+    }
+    const { data, error } = await supabase.storage.from(attachment.storageBucket).download(attachment.storagePath);
+    if (data && !error) {
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url; a.download = attachment.name; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${attachment.name}`);
+    } else {
+      toast.error("Download failed");
+    }
   }, []);
 
   const deleteMessage = useCallback(async (msgId: string) => {
@@ -629,6 +660,11 @@ export default function ChatPage() {
                               <FileText className="w-4 h-4 text-primary" />
                               <span className="text-foreground font-medium">{msg.attachment.name}</span>
                               <span className="text-muted-foreground">{msg.attachment.size}</span>
+                              {msg.attachment.storagePath && (
+                                <button onClick={() => downloadAttachment(msg.attachment)} className="p-1 rounded-md hover:bg-muted ml-1" title="Download">
+                                  <Download className="w-3.5 h-3.5 text-primary" />
+                                </button>
+                              )}
                             </div>
                           )}
                         </>
