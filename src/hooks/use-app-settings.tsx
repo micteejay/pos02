@@ -193,17 +193,24 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      // Fetch users (profiles + roles)
-      const { data: profilesData } = await supabase.from("profiles").select("*, user_roles(role_id, roles(name))").order("name");
+      // Fetch users (profiles + roles + department + store)
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("*, user_roles(role_id, roles(name)), departments(name), stores(name), user_store_assignments(store_id, stores(name))")
+        .order("name");
       if (profilesData) {
-        setUsers(profilesData.map((p: any) => ({
-          id: p.id, name: p.name || "Unknown", email: p.email || "",
-          avatar: p.avatar || (p.name || "U").charAt(0).toUpperCase(),
-          role: p.user_roles?.[0]?.roles?.name || "Viewer",
-          status: p.status as AppUser["status"],
-          lastActive: p.last_active || "",
-          department: "", store: "",
-        })));
+        setUsers(profilesData.map((p: any) => {
+          const storeName = p.stores?.name || p.user_store_assignments?.[0]?.stores?.name || "";
+          const deptName = p.departments?.name || "";
+          return {
+            id: p.id, name: p.name || "Unknown", email: p.email || "",
+            avatar: p.avatar || (p.name || "U").charAt(0).toUpperCase(),
+            role: p.user_roles?.[0]?.roles?.name || "Viewer",
+            status: p.status as AppUser["status"],
+            lastActive: p.last_active || "",
+            department: deptName, store: storeName,
+          };
+        }));
       }
 
       // Fetch current user permissions
