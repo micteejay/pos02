@@ -270,8 +270,20 @@ export default function ChatPage() {
         ? `${(file.size / (1024 * 1024)).toFixed(1)} MB`
         : `${(file.size / 1024).toFixed(0)} KB`;
       const ext = file.name.split(".").pop()?.toLowerCase() || "txt";
+      const storagePath = `${userId}/${Date.now()}-${file.name}`;
+
+      // Upload file to chat-attachments bucket
+      const { error: uploadError } = await supabase.storage
+        .from("chat-attachments")
+        .upload(storagePath, file, { upsert: false });
+
+      if (uploadError) {
+        toast.error(`Failed to upload ${file.name}`);
+        return;
+      }
+
       const content = `📎 Shared a file: ${file.name}`;
-      const attachments = [{ name: file.name, size: sizeStr, type: ext }];
+      const attachments = [{ name: file.name, size: sizeStr, type: ext, storagePath, storageBucket: "chat-attachments" }];
 
       const { error } = await supabase.from("chat_messages").insert({
         channel_id: activeChannel, sender_id: userId, content,
