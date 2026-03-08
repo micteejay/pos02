@@ -57,8 +57,22 @@ export default function ChatPage() {
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
 
-      // Fetch channels with member count
-      const { data: chData } = await supabase.from("chat_channels").select("*, chat_channel_members(count)").order("created_at");
+      // Fetch channels the user is a member of (for DMs/groups) plus public channels
+      const { data: myMemberChannels } = await supabase.from("chat_channel_members").select("channel_id").eq("user_id", user.id);
+      const myChannelIds = myMemberChannels?.map(m => m.channel_id) || [];
+
+      // Fetch public channels + channels user is member of
+      let chData: any[] = [];
+      if (myChannelIds.length > 0) {
+        const { data } = await supabase.from("chat_channels").select("*, chat_channel_members(count)").in("id", myChannelIds).order("created_at");
+        chData = data || [];
+      }
+      // Also fetch public (non-private) channels
+      const { data: publicCh } = await supabase.from("chat_channels").select("*, chat_channel_members(count)").eq("type", "channel").eq("is_private", false).order("created_at");
+      if (publicCh) {
+        const existingIds = new Set(chData.map(c => c.id));
+        publicCh.forEach(ch => { if (!existingIds.has(ch.id)) chData.push(ch); });
+      }
 
       // Fetch all channel members to resolve DM display names
       const { data: memberData } = await supabase.from("chat_channel_members").select("channel_id, user_id");
@@ -99,7 +113,7 @@ export default function ChatPage() {
         });
       }
 
-      if (chData) {
+      if (chData && chData.length > 0) {
         const mapped: Channel[] = chData.map((ch: any) => {
           let displayName = ch.name;
           // For DMs, show the other person's name
