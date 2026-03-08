@@ -3,6 +3,9 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings, Permission, AppRole, AppUser } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { useStoreAccess } from "@/hooks/use-store-access";
+import { useAudit } from "@/hooks/use-audit";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Users, Shield, Plus, Search, MoreHorizontal, Mail, X, Check, Trash2, Edit2,
   ChevronRight, ChevronDown, Lock, Eye, EyeOff, UserPlus, Settings, AlertTriangle,
