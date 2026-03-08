@@ -12,7 +12,7 @@ interface CartItem {
   sku: string; name: string; price: number; qty: number; discount: number; stock: number;
 }
 
-const categories = ["All", "Components", "Electronics", "Machinery", "Networking", "Accessories"];
+const defaultCategories = ["All"];
 const paymentMethods = [
   { id: "card", label: "Credit Card", icon: CreditCard },
   { id: "cash", label: "Cash", icon: Banknote },
