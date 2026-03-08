@@ -52,10 +52,10 @@ export default function SupplyPage() {
     const inTransit = orders.filter(o => o.status === "shipped").length;
     const totalSpend = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
     return [
-      { label: "Active POs", value: active.toString(), change: `+${active}`, trend: "up" as const, icon: FileText },
-      { label: "In Transit", value: inTransit.toString(), change: "0", trend: "up" as const, icon: Truck },
-      { label: "Total Spend", value: formatCurrency(totalSpend), change: "+8.2%", trend: "up" as const, icon: DollarSign },
-      { label: "Suppliers", value: suppliers.filter(s => s.status === "active").length.toString(), change: "+1", trend: "up" as const, icon: Building2 },
+      { label: "Active POs", value: active.toString(), change: "", trend: "up" as const, icon: FileText },
+      { label: "In Transit", value: inTransit.toString(), change: "", trend: "up" as const, icon: Truck },
+      { label: "Total Spend", value: formatCurrency(totalSpend), change: "", trend: "up" as const, icon: DollarSign },
+      { label: "Suppliers", value: suppliers.filter(s => s.status === "active").length.toString(), change: "", trend: "up" as const, icon: Building2 },
     ];
   }, [orders, suppliers, formatCurrency]);
 
