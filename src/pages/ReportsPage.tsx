@@ -142,16 +142,18 @@ export default function ReportsPage() {
     return grossProfit - totalExpenses;
   }, [gainLossData, totalExpenses]);
 
-  // End of Day summary
+  // End of Day summary — includes today's operational expenses
   const eodData = useMemo(() => {
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
+    const todayExpenses = expenses.filter(e => new Date(e.date).toDateString() === today);
     const totalRevenue = todaySales.reduce((s, sale) => s + sale.total, 0);
     const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((a, i) => a + i.qty, 0), 0);
     const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((a, item) => {
       const invItem = inventory.find(i => i.sku === item.sku);
       return a + (invItem?.costPrice || item.price * 0.6) * item.qty;
     }, 0), 0);
+    const todayOpExpenses = todayExpenses.reduce((s, e) => s + e.amount, 0);
     const byMethod: Record<string, number> = {};
     todaySales.forEach(s => { byMethod[s.method] = (byMethod[s.method] || 0) + s.total; });
     const byStaff: Record<string, { name: string; sales: number; revenue: number }> = {};
@@ -160,8 +162,8 @@ export default function ReportsPage() {
       byStaff[s.createdBy].sales++;
       byStaff[s.createdBy].revenue += s.total;
     });
-    return { sales: todaySales, totalRevenue, totalItems, totalCost, profit: totalRevenue - totalCost, byMethod, byStaff: Object.values(byStaff), count: todaySales.length };
-  }, [sales, inventory]);
+    return { sales: todaySales, totalRevenue, totalItems, totalCost, opExpenses: todayOpExpenses, profit: totalRevenue - totalCost - todayOpExpenses, byMethod, byStaff: Object.values(byStaff), count: todaySales.length, todayExpenses };
+  }, [sales, inventory, expenses]);
 
   const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
   const totalInventoryValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
