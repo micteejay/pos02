@@ -714,8 +714,9 @@ export default function ReportsPage() {
                         <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Category</th>
                         <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Description</th>
                         <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Amount</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Store</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">By</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Type</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">Store</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden lg:table-cell">By</th>
                         <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -726,8 +727,20 @@ export default function ReportsPage() {
                           <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium">{exp.category}</span></td>
                           <td className="px-3 py-2 text-sm text-foreground">{exp.description}</td>
                           <td className="px-3 py-2 text-sm text-right font-semibold text-foreground">{formatCurrency(exp.amount)}</td>
-                          <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{exp.store}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{exp.createdBy}</td>
+                          <td className="px-3 py-2 hidden sm:table-cell">
+                            {exp.recurring ? (
+                              <div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium capitalize">{exp.recurringInterval}</span>
+                                {exp.nextDueDate && <p className="text-[10px] text-muted-foreground mt-0.5">Next: {new Date(exp.nextDueDate).toLocaleDateString()}</p>}
+                              </div>
+                            ) : exp.parentId ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">Auto-generated</span>
+                            ) : (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">One-time</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-muted-foreground hidden md:table-cell">{exp.store}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground hidden lg:table-cell">{exp.createdBy}</td>
                           <td className="px-3 py-2 text-center">
                             <button onClick={() => { deleteExpense(exp.id); logAction("expense.delete", "Expenses", exp.category, `Deleted expense: ${exp.description}`); }} className="text-muted-foreground hover:text-destructive transition-colors">
                               <Trash2 className="w-3.5 h-3.5" />
