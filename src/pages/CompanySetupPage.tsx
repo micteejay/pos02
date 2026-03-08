@@ -43,8 +43,8 @@ export default function CompanySetupPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleComplete = () => {
-    saveCompanyProfile(form);
+  const handleComplete = async () => {
+    await saveCompanyProfile(form);
 
     // Sync company setup data into app settings (branding, currency, tax)
     updateSettings({
