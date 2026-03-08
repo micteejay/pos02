@@ -1210,61 +1210,119 @@ INSERT INTO public.roles (name, description, permissions, is_system, color) VALU
     'users.view','users.create','users.edit','users.delete',
     'roles.view','roles.create','roles.edit','roles.delete',
     'inventory.view','inventory.create','inventory.edit','inventory.delete',
+    'inventory.stock','inventory.warehouses','inventory.transfers','inventory.categories',
     'sales.view','sales.create','sales.edit','sales.delete',
+    'sales.transactions','sales.analytics','sales.reps',
     'pos.view','pos.create',
     'supply.view','supply.create','supply.edit','supply.approve',
+    'supply.orders','supply.suppliers',
     'workflows.view','workflows.create','workflows.approve','workflows.delete',
     'approvals.view','approvals.approve','approvals.reject',
+    'approvals.pending','approvals.history',
     'reports.view','reports.export',
+    'reports.overview','reports.sales','reports.inventory','reports.gainloss','reports.eod','reports.expenses','reports.operations',
     'organization.view','organization.create','organization.edit','organization.delete',
+    'organization.stores','organization.warehouses','organization.departments','organization.hierarchy',
     'documents.view','documents.create','documents.edit','documents.delete',
     'settings.view','settings.edit',
+    'settings.general','settings.receipt','settings.integrations','settings.security',
     'audit.view','chat.view','chat.create','notifications.view','dashboard.view',
     'pages.dashboard','pages.inventory','pages.sales','pages.pos','pages.supply',
     'pages.workflows','pages.approvals','pages.reports','pages.organization',
-    'pages.documents','pages.chat','pages.users','pages.settings','pages.audit','pages.notifications'
+    'pages.documents','pages.chat','pages.users','pages.settings','pages.audit','pages.notifications',
+    'pages.inventory.stock','pages.inventory.warehouses','pages.inventory.transfers','pages.inventory.categories',
+    'pages.sales.transactions','pages.sales.analytics','pages.sales.reps',
+    'pages.supply.orders','pages.supply.suppliers',
+    'pages.approvals.pending','pages.approvals.history',
+    'pages.reports.overview','pages.reports.sales','pages.reports.inventory','pages.reports.gainloss','pages.reports.eod','pages.reports.expenses','pages.reports.operations',
+    'pages.organization.stores','pages.organization.warehouses','pages.organization.departments','pages.organization.hierarchy',
+    'pages.settings.general','pages.settings.receipt','pages.settings.integrations','pages.settings.security',
+    'pages.users.users','pages.users.roles','pages.users.permissions'
   ], TRUE, 'bg-destructive/10 text-destructive'),
   ('Admin', 'Administrative access', ARRAY[
     'users.view','users.create','users.edit','users.delete',
     'inventory.view','inventory.create','inventory.edit','inventory.delete',
+    'inventory.stock','inventory.warehouses','inventory.transfers','inventory.categories',
     'sales.view','sales.create','sales.edit','sales.delete',
+    'sales.transactions','sales.analytics','sales.reps',
     'pos.view','pos.create',
     'supply.view','supply.create','supply.edit','supply.approve',
+    'supply.orders','supply.suppliers',
     'workflows.view','workflows.create','workflows.approve','workflows.delete',
     'approvals.view','approvals.approve','approvals.reject',
+    'approvals.pending','approvals.history',
     'reports.view','reports.export',
+    'reports.overview','reports.sales','reports.inventory','reports.gainloss','reports.eod','reports.expenses','reports.operations',
     'organization.view','organization.create','organization.edit','organization.delete',
+    'organization.stores','organization.warehouses','organization.departments','organization.hierarchy',
     'documents.view','documents.create','documents.edit','documents.delete',
     'settings.view','settings.edit',
+    'settings.general','settings.receipt','settings.integrations','settings.security',
     'audit.view','chat.view','chat.create','notifications.view','dashboard.view',
     'pages.dashboard','pages.inventory','pages.sales','pages.pos','pages.supply',
     'pages.workflows','pages.approvals','pages.reports','pages.organization',
-    'pages.documents','pages.chat','pages.users','pages.settings','pages.audit','pages.notifications'
+    'pages.documents','pages.chat','pages.users','pages.settings','pages.audit','pages.notifications',
+    'pages.inventory.stock','pages.inventory.warehouses','pages.inventory.transfers','pages.inventory.categories',
+    'pages.sales.transactions','pages.sales.analytics','pages.sales.reps',
+    'pages.supply.orders','pages.supply.suppliers',
+    'pages.approvals.pending','pages.approvals.history',
+    'pages.reports.overview','pages.reports.sales','pages.reports.inventory','pages.reports.gainloss','pages.reports.eod','pages.reports.expenses','pages.reports.operations',
+    'pages.organization.stores','pages.organization.warehouses','pages.organization.departments','pages.organization.hierarchy',
+    'pages.settings.general','pages.settings.receipt','pages.settings.integrations','pages.settings.security',
+    'pages.users.users','pages.users.roles','pages.users.permissions'
   ], TRUE, 'bg-primary/10 text-primary'),
   ('Manager', 'Manage operations and sales', ARRAY[
     'users.view','inventory.view','inventory.create','inventory.edit',
-    'sales.view','sales.create','sales.edit','pos.view','pos.create',
+    'inventory.stock','inventory.warehouses','inventory.transfers','inventory.categories',
+    'sales.view','sales.create','sales.edit',
+    'sales.transactions','sales.analytics','sales.reps',
+    'pos.view','pos.create',
     'supply.view','supply.create','supply.edit','supply.approve',
+    'supply.orders','supply.suppliers',
     'workflows.view','workflows.create','workflows.approve',
     'approvals.view','approvals.approve','approvals.reject',
-    'reports.view','reports.export','organization.view',
+    'approvals.pending','approvals.history',
+    'reports.view','reports.export',
+    'reports.overview','reports.sales','reports.inventory','reports.gainloss','reports.eod','reports.expenses','reports.operations',
+    'organization.view',
+    'organization.stores','organization.warehouses','organization.departments',
     'documents.view','documents.create','documents.edit',
+    'settings.view','settings.general','settings.receipt',
     'chat.view','chat.create','audit.view','notifications.view','dashboard.view',
     'pages.dashboard','pages.inventory','pages.sales','pages.pos','pages.supply',
     'pages.workflows','pages.approvals','pages.reports','pages.organization',
-    'pages.documents','pages.chat','pages.audit','pages.notifications'
+    'pages.documents','pages.chat','pages.settings','pages.audit','pages.notifications',
+    'pages.inventory.stock','pages.inventory.warehouses','pages.inventory.transfers','pages.inventory.categories',
+    'pages.sales.transactions','pages.sales.analytics','pages.sales.reps',
+    'pages.supply.orders','pages.supply.suppliers',
+    'pages.approvals.pending','pages.approvals.history',
+    'pages.reports.overview','pages.reports.sales','pages.reports.inventory','pages.reports.gainloss','pages.reports.eod','pages.reports.expenses','pages.reports.operations',
+    'pages.organization.stores','pages.organization.warehouses','pages.organization.departments',
+    'pages.settings.general','pages.settings.receipt'
   ], FALSE, 'bg-info/10 text-info'),
   ('Sales Rep', 'Point of sale and sales', ARRAY[
-    'sales.view','sales.create','pos.view','pos.create',
-    'inventory.view','reports.view','chat.view','chat.create','documents.view',
+    'sales.view','sales.create',
+    'sales.transactions','sales.analytics',
+    'pos.view','pos.create',
+    'inventory.view','inventory.stock',
+    'reports.view','reports.sales','reports.eod',
+    'chat.view','chat.create','documents.view',
     'notifications.view','dashboard.view',
-    'pages.dashboard','pages.sales','pages.pos','pages.chat','pages.notifications'
+    'pages.dashboard','pages.sales','pages.pos','pages.inventory','pages.reports','pages.documents','pages.chat','pages.notifications',
+    'pages.sales.transactions','pages.sales.analytics',
+    'pages.inventory.stock',
+    'pages.reports.sales','pages.reports.eod'
   ], FALSE, 'bg-success/10 text-success'),
   ('Warehouse Staff', 'Inventory and supply chain', ARRAY[
     'inventory.view','inventory.create','inventory.edit',
-    'supply.view','supply.create','workflows.view',
-    'documents.view','chat.view','chat.create','notifications.view','dashboard.view',
-    'pages.dashboard','pages.inventory','pages.supply','pages.workflows','pages.documents','pages.chat','pages.notifications'
+    'inventory.stock','inventory.warehouses','inventory.transfers',
+    'supply.view','supply.create',
+    'supply.orders',
+    'workflows.view','documents.view','chat.view','chat.create',
+    'notifications.view','dashboard.view',
+    'pages.dashboard','pages.inventory','pages.supply','pages.workflows','pages.documents','pages.chat','pages.notifications',
+    'pages.inventory.stock','pages.inventory.warehouses','pages.inventory.transfers',
+    'pages.supply.orders'
   ], FALSE, 'bg-warning/10 text-warning'),
   ('Viewer', 'Read-only access', ARRAY[
     'users.view','inventory.view','sales.view','pos.view','supply.view',
@@ -1273,7 +1331,15 @@ INSERT INTO public.roles (name, description, permissions, is_system, color) VALU
     'notifications.view','dashboard.view',
     'pages.dashboard','pages.inventory','pages.sales','pages.pos','pages.supply',
     'pages.workflows','pages.approvals','pages.reports','pages.organization',
-    'pages.documents','pages.chat','pages.settings','pages.audit','pages.notifications'
+    'pages.documents','pages.chat','pages.settings','pages.audit','pages.notifications',
+    'pages.inventory.stock','pages.inventory.warehouses','pages.inventory.transfers','pages.inventory.categories',
+    'pages.sales.transactions','pages.sales.analytics','pages.sales.reps',
+    'pages.supply.orders','pages.supply.suppliers',
+    'pages.approvals.pending','pages.approvals.history',
+    'pages.reports.overview','pages.reports.sales','pages.reports.inventory','pages.reports.gainloss','pages.reports.eod','pages.reports.expenses','pages.reports.operations',
+    'pages.organization.stores','pages.organization.warehouses','pages.organization.departments','pages.organization.hierarchy',
+    'pages.settings.general','pages.settings.receipt','pages.settings.integrations','pages.settings.security',
+    'pages.users.users','pages.users.roles','pages.users.permissions'
   ], FALSE, 'bg-muted text-muted-foreground');
 
 -- =====================================================
@@ -1751,35 +1817,22 @@ CREATE POLICY "Admins can delete categories"
   ON public.categories FOR DELETE TO authenticated
   USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
 
--- Default seed categories
-INSERT INTO public.categories (name, type, status, created_at) VALUES
-  ('Components', 'inventory', 'approved', NOW()),
-  ('Electronics', 'inventory', 'approved', NOW()),
-  ('Machinery', 'inventory', 'approved', NOW()),
-  ('Networking', 'inventory', 'approved', NOW()),
-  ('Accessories', 'inventory', 'approved', NOW()),
-  ('Uncategorized', 'inventory', 'approved', NOW()),
-  ('Rent', 'expense', 'approved', NOW()),
-  ('Utilities', 'expense', 'approved', NOW()),
-  ('Salaries', 'expense', 'approved', NOW()),
-  ('Marketing', 'expense', 'approved', NOW()),
-  ('Maintenance', 'expense', 'approved', NOW()),
-  ('Logistics', 'expense', 'approved', NOW()),
-  ('Supplies', 'expense', 'approved', NOW()),
-  ('Other', 'expense', 'approved', NOW());
+-- No default seed categories — categories are created dynamically by approved users
 
 -- Audit trigger for category changes
 CREATE OR REPLACE FUNCTION public.audit_category_change()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  INSERT INTO public.audit_log (user_id, user_name, user_role, action, module, target, detail, severity)
   VALUES (
     COALESCE(NEW.created_by, OLD.created_by),
-    TG_OP,
-    'category',
-    COALESCE(NEW.id, OLD.id)::TEXT,
-    jsonb_build_object('name', COALESCE(NEW.name, OLD.name), 'type', COALESCE(NEW.type, OLD.type)::TEXT, 'status', COALESCE(NEW.status, OLD.status)::TEXT),
-    CASE WHEN TG_OP = 'DELETE' THEN 'warning' ELSE 'info' END
+    COALESCE((SELECT name FROM public.profiles WHERE id = COALESCE(NEW.created_by, OLD.created_by)), 'System'),
+    COALESCE((SELECT r.name FROM public.user_roles ur JOIN public.roles r ON ur.role_id = r.id WHERE ur.user_id = COALESCE(NEW.created_by, OLD.created_by) LIMIT 1), 'System'),
+    'category.' || LOWER(TG_OP),
+    'Categories',
+    COALESCE(NEW.name, OLD.name),
+    TG_OP || ': ' || COALESCE(NEW.name, OLD.name) || ' (' || COALESCE(NEW.type, OLD.type)::TEXT || ')',
+    CASE WHEN TG_OP = 'DELETE' THEN 'warning'::audit_severity ELSE 'info'::audit_severity END
   );
   RETURN COALESCE(NEW, OLD);
 END;
@@ -1838,16 +1891,18 @@ CREATE POLICY "Admins can delete expenses"
 
 -- Trigger to auto-audit expense changes
 CREATE OR REPLACE FUNCTION public.audit_expense_change()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  INSERT INTO public.audit_log (user_id, user_name, user_role, action, module, target, detail, severity)
   VALUES (
     COALESCE(NEW.created_by, OLD.created_by),
-    TG_OP,
-    'expense',
-    COALESCE(NEW.id, OLD.id)::TEXT,
-    jsonb_build_object('category', COALESCE(NEW.category, OLD.category), 'amount', COALESCE(NEW.amount, OLD.amount), 'description', COALESCE(NEW.description, OLD.description)),
-    'info'
+    COALESCE((SELECT name FROM public.profiles WHERE id = COALESCE(NEW.created_by, OLD.created_by)), 'System'),
+    COALESCE((SELECT r.name FROM public.user_roles ur JOIN public.roles r ON ur.role_id = r.id WHERE ur.user_id = COALESCE(NEW.created_by, OLD.created_by) LIMIT 1), 'System'),
+    'expense.' || LOWER(TG_OP),
+    'Expenses',
+    COALESCE(NEW.category, OLD.category),
+    TG_OP || ': ' || COALESCE(NEW.description, OLD.description) || ' — ' || COALESCE(NEW.amount, OLD.amount)::TEXT,
+    'info'::audit_severity
   );
   RETURN COALESCE(NEW, OLD);
 END;
