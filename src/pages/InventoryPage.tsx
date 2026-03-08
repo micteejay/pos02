@@ -404,6 +404,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                         <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
                         <td className="px-5 py-3 text-right"><span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>{item.qty}</span></td>
+                        <td className="px-5 py-3 text-right text-sm text-muted-foreground hidden lg:table-cell">{formatCurrency(item.costPrice || 0)}</td>
                         <td className="px-5 py-3 text-right text-sm text-foreground hidden sm:table-cell">{formatCurrency(item.price)}</td>
                         <td className="px-5 py-3 text-center"><span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{item.status === "critical" && <AlertTriangle className="w-3 h-3" />}{sc.label}</span></td>
                         <td className="px-3 py-3 text-right"><MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" /></td>
