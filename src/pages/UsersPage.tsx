@@ -15,6 +15,14 @@ type Tab = "users" | "roles" | "permissions";
 
 const permissionGroups: { module: string; perms: Permission[] }[] = [
   { module: "Page Access", perms: ["pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply","pages.workflows","pages.approvals","pages.reports","pages.organization","pages.documents","pages.chat","pages.users","pages.settings","pages.audit","pages.notifications"] },
+  { module: "Page Access – Inventory Tabs", perms: ["pages.inventory.stock","pages.inventory.warehouses","pages.inventory.transfers","pages.inventory.categories"] },
+  { module: "Page Access – Sales Tabs", perms: ["pages.sales.transactions","pages.sales.analytics","pages.sales.reps"] },
+  { module: "Page Access – Supply Tabs", perms: ["pages.supply.orders","pages.supply.suppliers"] },
+  { module: "Page Access – Approvals Tabs", perms: ["pages.approvals.pending","pages.approvals.history"] },
+  { module: "Page Access – Reports Tabs", perms: ["pages.reports.overview","pages.reports.sales","pages.reports.inventory","pages.reports.gainloss","pages.reports.eod","pages.reports.expenses","pages.reports.operations"] },
+  { module: "Page Access – Organization Tabs", perms: ["pages.organization.stores","pages.organization.warehouses","pages.organization.departments","pages.organization.hierarchy"] },
+  { module: "Page Access – Settings Tabs", perms: ["pages.settings.general","pages.settings.receipt","pages.settings.integrations","pages.settings.security"] },
+  { module: "Page Access – Users Tabs", perms: ["pages.users.users","pages.users.roles","pages.users.permissions"] },
   { module: "Dashboard", perms: ["dashboard.view"] },
   { module: "Users", perms: ["users.view","users.create","users.edit","users.delete"] },
   { module: "Roles", perms: ["roles.view","roles.create","roles.edit","roles.delete"] },
