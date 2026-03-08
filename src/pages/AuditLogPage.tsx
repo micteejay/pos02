@@ -68,10 +68,10 @@ const severityConfig = {
 };
 
 const stats = [
-  { label: "Events Today", value: "148", icon: Clock },
-  { label: "Warnings", value: "12", icon: AlertTriangle, color: "text-warning" },
-  { label: "Critical", value: "3", icon: Shield, color: "text-destructive" },
-  { label: "Active Users", value: "24", icon: Users, color: "text-primary" },
+  { label: "Events Today", value: auditEntries.length.toString(), icon: Clock },
+  { label: "Warnings", value: auditEntries.filter(e => e.severity === "warning").length.toString(), icon: AlertTriangle, color: "text-warning" },
+  { label: "Critical", value: auditEntries.filter(e => e.severity === "critical").length.toString(), icon: Shield, color: "text-destructive" },
+  { label: "Active Users", value: [...new Set(auditEntries.map(e => e.user))].length.toString(), icon: Users, color: "text-primary" },
 ];
 
 export default function AuditLogPage() {
