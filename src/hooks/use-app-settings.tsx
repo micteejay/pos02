@@ -195,7 +195,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
       // Fetch users: profiles with departments & stores (FK exists), then user_roles separately
       const [profilesRes, userRolesRes] = await Promise.all([
-        supabase.from("profiles").select("*, departments(name), stores(name)").order("name"),
+        supabase.from("profiles").select("*, departments!profiles_department_id_fkey(name), stores!profiles_store_id_fkey(name)").order("name"),
         supabase.from("user_roles").select("user_id, roles(name)"),
       ]);
       const profilesData = profilesRes.data;
