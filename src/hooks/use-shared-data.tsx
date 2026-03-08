@@ -5,7 +5,7 @@ export interface InventoryItem {
 }
 
 export interface SaleRecord {
-  id: string; items: { name: string; sku: string; qty: number; price: number }[]; total: number; customer: string; method: string; date: string; store: string;
+  id: string; items: { name: string; sku: string; qty: number; price: number }[]; total: number; customer: string; method: string; date: string; store: string; createdBy: string; createdByRole: string;
 }
 
 export interface SharedDocument {
@@ -13,7 +13,7 @@ export interface SharedDocument {
 }
 
 export interface OrgStore {
-  id: number; name: string; type: string; address: string; phone: string; email: string; status: string; employees: number; revenue: string;
+  id: number; name: string; type: string; address: string; phone: string; email: string; status: string; employees: number; revenue: string; createdBy?: string;
 }
 
 export interface OrgWarehouse {
@@ -127,7 +127,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Sales
+  // Sales - now includes createdBy
   const addSale = useCallback((sale: Omit<SaleRecord, "id" | "date">) => {
     setSales(prev => [{
       ...sale,

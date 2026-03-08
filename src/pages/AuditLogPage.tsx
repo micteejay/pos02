@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
+import { useAudit, AuditEntry } from "@/hooks/use-audit";
 import {
   Shield,
   Search,
@@ -28,37 +29,34 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-type Severity = "info" | "warning" | "critical";
-
-interface AuditEntry {
-  id: string;
-  timestamp: string;
-  user: string;
-  role: string;
-  action: string;
-  module: string;
-  moduleIcon: React.ElementType;
-  target: string;
-  detail: string;
-  severity: Severity;
-  ip: string;
-}
-
-const auditEntries: AuditEntry[] = [];
-
 const actionIcons: Record<string, React.ElementType> = {
   "role.update": Edit,
+  "sale.create": DollarSign,
   "sale.refund": DollarSign,
   "workflow.approve": CheckCircle2,
   "workflow.reject": AlertTriangle,
+  "inventory.create": Plus,
+  "inventory.update": Edit,
+  "inventory.delete": Trash2,
   "inventory.transfer": Package,
   "inventory.adjust": Edit,
   "security.alert": Shield,
   "auth.login": LogIn,
   "auth.logout": LogOut,
+  "auth.signup": Plus,
   "document.upload": Plus,
   "permission.change": Lock,
   "system.backup": Settings,
+  "store.create": Plus,
+  "store.update": Edit,
+  "store.delete": Trash2,
+  "user.create": Plus,
+  "user.update": Edit,
+  "user.delete": Trash2,
+  "settings.update": Settings,
+  "invoice.create": FileText,
+  "integration.connect": CheckCircle2,
+  "integration.disconnect": X,
 };
 
 const severityConfig = {
@@ -67,14 +65,10 @@ const severityConfig = {
   critical: { label: "Critical", className: "bg-destructive/10 text-destructive" },
 };
 
-const stats = [
-  { label: "Events Today", value: auditEntries.length.toString(), icon: Clock },
-  { label: "Warnings", value: auditEntries.filter(e => e.severity === "warning").length.toString(), icon: AlertTriangle, color: "text-warning" },
-  { label: "Critical", value: auditEntries.filter(e => e.severity === "critical").length.toString(), icon: Shield, color: "text-destructive" },
-  { label: "Active Users", value: [...new Set(auditEntries.map(e => e.user))].length.toString(), icon: Users, color: "text-primary" },
-];
-
 export default function AuditLogPage() {
+  const { getAuditLog } = useAudit();
+  const auditEntries = getAuditLog();
+
   const [search, setSearch] = useState("");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [filterModule, setFilterModule] = useState<string>("all");
@@ -87,6 +81,13 @@ export default function AuditLogPage() {
   const modules = [...new Set(auditEntries.map((e) => e.module))];
   const users = [...new Set(auditEntries.map((e) => e.user))];
   const activeFilterCount = [filterSeverity, filterModule, filterUser].filter((f) => f !== "all").length;
+
+  const stats = [
+    { label: "Total Events", value: auditEntries.length.toString(), icon: Clock },
+    { label: "Warnings", value: auditEntries.filter(e => e.severity === "warning").length.toString(), icon: AlertTriangle, color: "text-warning" },
+    { label: "Critical", value: auditEntries.filter(e => e.severity === "critical").length.toString(), icon: Shield, color: "text-destructive" },
+    { label: "Active Users", value: [...new Set(auditEntries.map(e => e.user))].length.toString(), icon: Users, color: "text-primary" },
+  ];
 
   const handleSort = (key: "timestamp" | "user" | "action") => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -117,7 +118,7 @@ export default function AuditLogPage() {
       });
     }
     return items;
-  }, [search, filterSeverity, filterModule, filterUser, sortKey, sortDir]);
+  }, [search, filterSeverity, filterModule, filterUser, sortKey, sortDir, auditEntries]);
 
   const clearFilters = () => { setFilterSeverity("all"); setFilterModule("all"); setFilterUser("all"); };
 
@@ -141,7 +142,7 @@ export default function AuditLogPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Audit Log</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Tamper-proof record of all system activities and changes.
+              Tamper-proof record of all system activities. Every change is tracked with user identity.
             </p>
           </div>
           <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
@@ -229,7 +230,9 @@ export default function AuditLogPage() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No matching log entries.</td></tr>
+                <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
+                  {auditEntries.length === 0 ? "No audit events yet. All system changes will be recorded here automatically." : "No matching log entries."}
+                </td></tr>
               ) : (
                 filtered.map((entry) => {
                   const sc = severityConfig[entry.severity];
@@ -273,13 +276,14 @@ export default function AuditLogPage() {
                         <tr key={`${entry.id}-detail`} className="bg-muted/20">
                           <td colSpan={7} className="px-8 py-4 animate-fade-in">
                             <div className="flex items-start gap-3">
-                              <entry.moduleIcon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                              <User className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                               <div>
                                 <p className="text-sm text-foreground">{entry.detail}</p>
                                 <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                   <span>Event ID: {entry.id}</span>
                                   <span>Module: {entry.module}</span>
                                   <span>IP: {entry.ip}</span>
+                                  <span>User ID: {entry.userId}</span>
                                 </div>
                               </div>
                             </div>
@@ -297,7 +301,7 @@ export default function AuditLogPage() {
         {/* Tamper-proof notice */}
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
           <Lock className="w-4 h-4 text-primary shrink-0" />
-          All audit entries are cryptographically signed and tamper-proof. Logs cannot be modified or deleted.
+          All audit entries are cryptographically signed and tamper-proof. Every user action is recorded with their identity and role.
         </div>
       </div>
     </AppLayout>
