@@ -6,6 +6,7 @@ import { useTheme } from "@/hooks/use-theme";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
+import { toast } from "sonner";
 import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2,
 } from "lucide-react";
