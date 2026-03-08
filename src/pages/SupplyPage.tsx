@@ -276,7 +276,7 @@ export default function SupplyPage() {
               <h3 className="text-lg font-semibold text-foreground">New Purchase Order</h3>
               <button onClick={() => setShowNewPO(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory}
+            <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory} warehouseNames={warehouseNames}
               onSubmit={(data) => {
                 setOrders(prev => [{ id: `PO-${5007 + prev.length}`, ...data, status: "draft" as POStatus, created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), expectedDelivery: "—", approvedBy: null }, ...prev]);
                 setShowNewPO(false);
