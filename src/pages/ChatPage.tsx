@@ -9,7 +9,7 @@ interface Message {
   id: string; sender_id: string; sender_name: string; avatar: string; time: string; text: string; channel_id: string;
   reactions?: { emoji: string; count: number; reacted: boolean }[];
   pinned?: boolean; edited?: boolean; replyTo?: string;
-  attachment?: { name: string; size: string; type: string };
+  attachment?: { name: string; size: string; type: string; storagePath?: string; storageBucket?: string };
 }
 
 interface Channel {
