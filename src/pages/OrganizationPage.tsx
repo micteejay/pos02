@@ -6,6 +6,7 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useStoreAccess } from "@/hooks/use-store-access";
 import { useAudit } from "@/hooks/use-audit";
 import { useAuth } from "@/hooks/use-auth";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Building2, Warehouse, Users, Network, Search, MapPin, Phone, Mail,
   ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2, Lock,
