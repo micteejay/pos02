@@ -93,6 +93,8 @@ export default function InvoicePage() {
         customer: form.customerName,
         method: "Invoice",
         store: "Invoice",
+        createdBy: user?.name || "System",
+        createdByRole: user?.role || "",
       });
 
       // Deduct inventory for matched items
