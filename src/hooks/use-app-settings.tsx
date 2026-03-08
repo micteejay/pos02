@@ -338,7 +338,18 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         },
       });
       if (res.error) {
-        const msg = typeof res.error === "object" && "message" in res.error ? res.error.message : String(res.error);
+        // For non-2xx responses, try to extract the JSON body from the error context
+        let msg = "Failed to create user";
+        try {
+          if (res.error.context) {
+            const body = await res.error.context.json();
+            if (body?.error) msg = body.error;
+          } else if (typeof res.error === "object" && "message" in res.error) {
+            msg = res.error.message;
+          }
+        } catch {
+          msg = String(res.error);
+        }
         return { success: false, error: msg };
       }
       if (res.data?.error) {
