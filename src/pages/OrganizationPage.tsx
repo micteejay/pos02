@@ -37,6 +37,9 @@ export default function OrganizationPage() {
     warehouses, addWarehouse, deleteWarehouse,
     departments, addDepartment, updateDepartment, deleteDepartment,
   } = useSharedData();
+  const { isAdminOrSuper, assignedStores, assignedWarehouses, canManageAllStores } = useStoreAccess();
+  const { logAction } = useAudit();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("stores");
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
