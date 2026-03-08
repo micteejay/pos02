@@ -172,7 +172,7 @@ export default function WorkflowsPage() {
   }, [workflows]);
 
   const addWorkflow = async (data: { title: string; type: string; amount: string }) => {
-    const steps = [
+    const steps: WorkflowStep[] = [
       { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
       { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
     ];
