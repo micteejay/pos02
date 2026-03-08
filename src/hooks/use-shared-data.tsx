@@ -24,6 +24,18 @@ export interface OrgDepartment {
   id: number; name: string; head: string; headcount: number; budget: string; teams: string[];
 }
 
+export interface Expense {
+  id: string;
+  category: string; // 'rent', 'utilities', 'salaries', 'marketing', 'maintenance', 'logistics', 'supplies', 'other'
+  description: string;
+  amount: number;
+  date: string;
+  store: string;
+  createdBy: string;
+  createdByRole: string;
+  recurring: boolean;
+}
+
 interface SharedDataContextType {
   // Inventory
   inventory: InventoryItem[];
