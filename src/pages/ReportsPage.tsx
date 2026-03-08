@@ -639,34 +639,34 @@ export default function ReportsPage() {
           <div className="space-y-4 animate-fade-in">
             {gainLossData.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="glass-card rounded-xl p-4 text-center">
                     <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.revenue, 0))}</p>
                     <p className="text-xs text-muted-foreground">Total Revenue</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
                     <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.cost, 0))}</p>
-                    <p className="text-xs text-muted-foreground">Total Cost</p>
+                    <p className="text-xs text-muted-foreground">Cost of Goods</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
-                    {(() => {
-                      const net = gainLossData.reduce((s, d) => s + d.profit, 0);
-                      return <p className={`text-xl font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(net)}</p>;
-                    })()}
-                    <p className="text-xs text-muted-foreground">Net {gainLossData.reduce((s, d) => s + d.profit, 0) >= 0 ? "Gain" : "Loss"}</p>
+                    <p className="text-xl font-bold text-warning">{formatCurrency(totalExpenses)}</p>
+                    <p className="text-xs text-muted-foreground">Op. Expenses</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    <p className={`text-xl font-bold ${netGainLoss >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(netGainLoss)}</p>
+                    <p className="text-xs text-muted-foreground">Net {netGainLoss >= 0 ? "Gain" : "Loss"}</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
                     {(() => {
                       const rev = gainLossData.reduce((s, d) => s + d.revenue, 0);
-                      const prof = gainLossData.reduce((s, d) => s + d.profit, 0);
-                      return <p className="text-xl font-bold text-foreground">{rev > 0 ? ((prof / rev) * 100).toFixed(1) : 0}%</p>;
+                      return <p className="text-xl font-bold text-foreground">{rev > 0 ? ((netGainLoss / rev) * 100).toFixed(1) : 0}%</p>;
                     })()}
-                    <p className="text-xs text-muted-foreground">Avg Margin</p>
+                    <p className="text-xs text-muted-foreground">Net Margin</p>
                   </div>
                 </div>
                 <div className="glass-card rounded-xl p-5">
                   <h3 className="font-semibold text-foreground mb-1">Profit by Product</h3>
-                  <p className="text-xs text-muted-foreground mb-4">Revenue vs Cost breakdown</p>
+                  <p className="text-xs text-muted-foreground mb-4">Revenue vs Cost breakdown (before operational expenses)</p>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={gainLossData.slice(0, 10)} barSize={20}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
@@ -679,8 +679,35 @@ export default function ReportsPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                {expenses.length > 0 && (
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-1">Operational Expenses Breakdown</h3>
+                    <p className="text-xs text-muted-foreground mb-4">Expenses by category reducing your net profit</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" stroke="none">
+                            {expensesByCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
+                          </Pie>
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2 flex flex-col justify-center">
+                        {expensesByCategory.map(e => (
+                          <div key={e.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: e.color }} />
+                              <span className="text-muted-foreground">{e.name}</span>
+                            </div>
+                            <span className="font-semibold text-foreground">{formatCurrency(e.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="glass-card rounded-xl p-5">
-                  <h3 className="font-semibold text-foreground mb-4">Detailed Gain/Loss</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Product Gain/Loss Detail</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -689,7 +716,7 @@ export default function ReportsPage() {
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Units</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Revenue</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Cost</th>
-                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Profit</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Gross Profit</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Margin</th>
                         </tr>
                       </thead>
@@ -706,6 +733,18 @@ export default function ReportsPage() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+                {/* Net Summary */}
+                <div className="glass-card rounded-xl p-5 border-2 border-primary/20">
+                  <h3 className="font-semibold text-foreground mb-3">Net Profit Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Gross Profit (Revenue − COGS)</span><span className="font-semibold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.profit, 0))}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">− Operational Expenses</span><span className="font-semibold text-warning">{formatCurrency(totalExpenses)}</span></div>
+                    <div className="border-t border-border pt-2 flex justify-between">
+                      <span className="font-semibold text-foreground">Net {netGainLoss >= 0 ? "Gain" : "Loss"}</span>
+                      <span className={`text-lg font-bold ${netGainLoss >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(netGainLoss)}</span>
+                    </div>
                   </div>
                 </div>
               </>
