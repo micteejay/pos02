@@ -447,6 +447,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       name: wh.name, location: wh.location || null,
       capacity: wh.capacity || null, sqft: wh.sqft || null,
       zones: wh.zones || null,
+      manager_id: wh.managerId || null,
     }).select().single();
     if (data && !error) {
       setWarehouses(prev => [...prev, { ...wh, id: data.id }]);
