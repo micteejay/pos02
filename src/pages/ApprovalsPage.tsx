@@ -33,7 +33,7 @@ const statusConfig = {
 
 export default function ApprovalsPage() {
   const { approvalItems, approveItem, rejectItem } = useAppEvents();
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, hasPermission } = useAppSettings();
   const [tab, setTab] = useState<Tab>("pending");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
