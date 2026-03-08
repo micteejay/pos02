@@ -56,7 +56,11 @@ Deno.serve(async (req) => {
     });
 
     if (createError || !newUser?.user) {
-      return new Response(JSON.stringify({ error: createError?.message || "Failed to create user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const msg = createError?.message || "Failed to create user";
+      const userMsg = msg.includes("already been registered")
+        ? `Username "${username}" is already taken. Please choose a different username.`
+        : msg;
+      return new Response(JSON.stringify({ error: userMsg }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const userId = newUser.user.id;
