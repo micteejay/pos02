@@ -60,22 +60,7 @@ const initialTransactions: Transaction[] = [];
 
 const salesReps: { name: string; store: string; sales: number; revenue: number; target: number; avgTicket: number; rating: number; trend: "up" | "down" }[] = [];
 
-const revenueData = [
-  { day: "Mon", revenue: 4200, orders: 38 },
-  { day: "Tue", revenue: 5100, orders: 45 },
-  { day: "Wed", revenue: 3800, orders: 32 },
-  { day: "Thu", revenue: 6200, orders: 52 },
-  { day: "Fri", revenue: 7400, orders: 61 },
-  { day: "Sat", revenue: 8900, orders: 74 },
-  { day: "Sun", revenue: 5600, orders: 47 },
-];
-
-const hourlyData = [
-  { hour: "9AM", sales: 12 }, { hour: "10AM", sales: 18 }, { hour: "11AM", sales: 24 },
-  { hour: "12PM", sales: 31 }, { hour: "1PM", sales: 28 }, { hour: "2PM", sales: 22 },
-  { hour: "3PM", sales: 19 }, { hour: "4PM", sales: 26 }, { hour: "5PM", sales: 34 },
-  { hour: "6PM", sales: 29 }, { hour: "7PM", sales: 15 }, { hour: "8PM", sales: 8 },
-];
+// Revenue and hourly data derived from transactions in AnalyticsTab
 
 const statusConfig = {
   completed: { label: "Completed", className: "bg-success/10 text-success" },
@@ -90,7 +75,7 @@ const methodIcons: Record<string, React.ElementType> = {
   "Mobile Pay": DollarSign,
 };
 
-const stores = ["All Stores", "Main HQ", "West Store", "East Store", "South Hub"];
+const defaultStores = ["All Stores"];
 const statuses = ["All Status", "completed", "refunded", "pending"];
 const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
 
@@ -206,7 +191,7 @@ export default function SalesPage() {
         {tab === "transactions" && (
           <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
         )}
-        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} />}
+        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} />}
         {tab === "reps" && <RepsTab />}
       </div>
     </AppLayout>
@@ -344,7 +329,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
       {showFilters && (
         <div className="glass-card rounded-xl p-4 flex flex-wrap gap-3 animate-fade-in">
           <select value={storeFilter} onChange={(e) => setStoreFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {stores.map((s) => <option key={s}>{s}</option>)}
+            {defaultStores.map((s) => <option key={s}>{s}</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
             {statuses.map((s) => <option key={s}>{s}</option>)}
@@ -454,67 +439,102 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
 }
 
 // --- Analytics Tab ---
-function AnalyticsTab({ paymentBreakdown }: { paymentBreakdown: { name: string; value: number; color: string }[] }) {
+function AnalyticsTab({ paymentBreakdown, transactions }: { paymentBreakdown: { name: string; value: number; color: string }[]; transactions: Transaction[] }) {
+  const revenueByDay = useMemo(() => {
+    if (transactions.length === 0) return [];
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const grouped: Record<string, { revenue: number; orders: number }> = {};
+    transactions.filter(t => t.status === "completed").forEach(t => {
+      const d = new Date(t.date);
+      const day = days[d.getDay()];
+      if (!grouped[day]) grouped[day] = { revenue: 0, orders: 0 };
+      grouped[day].revenue += t.total;
+      grouped[day].orders += 1;
+    });
+    return Object.entries(grouped).map(([day, data]) => ({ day, ...data }));
+  }, [transactions]);
+
+  const hourlyBreakdown = useMemo(() => {
+    if (transactions.length === 0) return [];
+    const hours: Record<string, number> = {};
+    transactions.forEach(t => {
+      const h = t.time.split(":")[0] || t.time;
+      hours[h] = (hours[h] || 0) + 1;
+    });
+    return Object.entries(hours).map(([hour, sales]) => ({ hour, sales }));
+  }, [transactions]);
+
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 glass-card rounded-xl p-5">
-          <h3 className="font-semibold text-foreground mb-1">Weekly Revenue</h3>
-          <p className="text-xs text-muted-foreground mb-4">Revenue trend over the past 7 days</p>
-          <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="hsl(172,66%,50%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(172,66%,50%)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-              <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
-              />
-              <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGrad)" />
-            </AreaChart>
-          </ResponsiveContainer>
+      {transactions.length === 0 ? (
+        <div className="glass-card rounded-xl p-10 text-center">
+          <TrendingUp className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">No transaction data for analytics yet.</p>
         </div>
-        <div className="glass-card rounded-xl p-5">
-          <h3 className="font-semibold text-foreground mb-1">Payment Methods</h3>
-          <p className="text-xs text-muted-foreground mb-4">Distribution by payment type</p>
-          <ResponsiveContainer width="100%" height={180}>
-            <PieChart>
-              <Pie data={paymentBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" stroke="none">
-                {paymentBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-              </Pie>
-              <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} formatter={(value: number) => [`${value}%`]} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-2 mt-2">
-            {paymentBreakdown.map((p) => (
-              <div key={p.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
-                  <span className="text-muted-foreground">{p.name}</span>
-                </div>
-                <span className="font-semibold text-foreground">{p.value}%</span>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 glass-card rounded-xl p-5">
+              <h3 className="font-semibold text-foreground mb-1">Revenue by Day</h3>
+              <p className="text-xs text-muted-foreground mb-4">Revenue distribution across days</p>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={revenueByDay}>
+                  <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(172,66%,50%)" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="hsl(172,66%,50%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }}
+                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
+                  />
+                  <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="font-semibold text-foreground mb-1">Payment Methods</h3>
+              <p className="text-xs text-muted-foreground mb-4">Distribution by payment type</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <PieChart>
+                  <Pie data={paymentBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={75} dataKey="value" stroke="none">
+                    {paymentBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} formatter={(value: number) => [`${value}%`]} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 mt-2">
+                {paymentBreakdown.map((p) => (
+                  <div key={p.name} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
+                      <span className="text-muted-foreground">{p.name}</span>
+                    </div>
+                    <span className="font-semibold text-foreground">{p.value}%</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
-      <div className="glass-card rounded-xl p-5">
-        <h3 className="font-semibold text-foreground mb-1">Hourly Sales Volume</h3>
-        <p className="text-xs text-muted-foreground mb-4">Number of transactions per hour today</p>
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={hourlyData} barSize={20}>
-            <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-            <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-            <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} />
-            <Bar dataKey="sales" fill="hsl(205,80%,55%)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+          {hourlyBreakdown.length > 0 && (
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="font-semibold text-foreground mb-1">Sales Volume by Time</h3>
+              <p className="text-xs text-muted-foreground mb-4">Number of transactions by time</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={hourlyBreakdown} barSize={20}>
+                  <XAxis dataKey="hour" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
+                  <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} />
+                  <Bar dataKey="sales" fill="hsl(205,80%,55%)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

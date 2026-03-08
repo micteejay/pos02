@@ -12,7 +12,7 @@ interface CartItem {
   sku: string; name: string; price: number; qty: number; discount: number; stock: number;
 }
 
-const categories = ["All", "Components", "Electronics", "Machinery", "Networking", "Accessories"];
+const defaultCategories = ["All"];
 const paymentMethods = [
   { id: "card", label: "Credit Card", icon: CreditCard },
   { id: "cash", label: "Cash", icon: Banknote },
@@ -21,7 +21,12 @@ const paymentMethods = [
 
 export default function POSPage() {
   const { formatCurrency, settings } = useAppSettings();
-  const { inventory, adjustInventoryQty, addSale } = useSharedData();
+  const { inventory, adjustInventoryQty, addSale, storeNames } = useSharedData();
+  const activeStore = storeNames[0] || "Default Store";
+  const categories = useMemo(() => {
+    const cats = [...new Set(inventory.map(i => i.category))];
+    return ["All", ...cats];
+  }, [inventory]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
@@ -90,7 +95,7 @@ export default function POSPage() {
     // Record sale
     addSale({
       items: cart.map(i => ({ name: i.name, sku: i.sku, qty: i.qty, price: i.price })),
-      total, customer: customerName || "Walk-in", method: paymentMethod, store: "Main HQ",
+      total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
@@ -109,7 +114,7 @@ export default function POSPage() {
                 {heldOrders.length > 0 && (
                   <button onClick={() => setShowHeld(!showHeld)} className="text-xs text-warning font-medium px-2 py-1 rounded-lg bg-warning/10 hover:bg-warning/20">{heldOrders.length} held</button>
                 )}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success animate-pulse" />Store: Main HQ</div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success animate-pulse" />Store: {activeStore}</div>
               </div>
             </div>
             {showHeld && (
