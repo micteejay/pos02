@@ -312,17 +312,30 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
-  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
+function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: any) => void; onCancel: () => void }) {
+  const [name, setName] = useState(""); const [username, setUsername] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState(departmentNames[0] || ""); const [store, setStore] = useState(storeNames[0] || "");
+  const [submitting, setSubmitting] = useState(false); const [error, setError] = useState("");
   const passwordError = confirmPassword && password !== confirmPassword ? "Passwords do not match" : password && password.length < 8 ? "Min 8 characters" : "";
-  const canSubmit = name && email && password && password.length >= 8 && password === confirmPassword;
+  const canSubmit = name && username && password && password.length >= 8 && password === confirmPassword && !submitting;
+
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setError("");
+    onAdd({
+      name, username, password,
+      email: username.includes("@") ? username : `${username.toLowerCase().replace(/\s+/g, ".")}@staff.internal`,
+      avatar: name.split(" ").map(n => n[0]).join("").slice(0, 2),
+      role, status: "active", lastActive: "Just now", department, store,
+    });
+    setSubmitting(false);
+  };
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Full Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
-        <div><label className="text-xs font-medium text-muted-foreground">Email</label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Username</label><Input value={username} onChange={(e) => setUsername(e.target.value)} className="mt-1" placeholder="e.g. john.doe" /></div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -340,6 +353,7 @@ function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { 
         </div>
       </div>
       {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
       <div><label className="text-xs font-medium text-muted-foreground">Role</label>
         <select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
           {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
@@ -361,9 +375,11 @@ function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { 
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-        <button disabled={!canSubmit} onClick={() => onAdd({ name, email, avatar: name.split(" ").map(n => n[0]).join("").slice(0, 2), role, status: "active", lastActive: "Just now", department, store })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Add User</button>
+        <button disabled={!canSubmit} onClick={handleSubmit} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+          {submitting ? "Creating..." : "Add User"}
+        </button>
       </div>
-      <p className="text-[10px] text-muted-foreground text-center">User will receive login credentials via email</p>
+      <p className="text-[10px] text-muted-foreground text-center">User will log in with their username and password</p>
     </div>
   );
 }
