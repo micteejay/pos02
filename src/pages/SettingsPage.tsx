@@ -493,12 +493,12 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div><p className="text-sm font-medium text-foreground">Two-Factor Authentication</p><p className="text-xs text-muted-foreground">Add an extra layer of security</p></div>
-                  <button onClick={() => setTwoFactor(!twoFactor)} className={`w-10 h-6 rounded-full transition-colors relative ${twoFactor ? "bg-primary" : "bg-muted"}`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${twoFactor ? "translate-x-5" : "translate-x-1"}`} />
+                  <button onClick={() => updateSettings({ twoFactorEnabled: !settings.twoFactorEnabled })} className={`w-10 h-6 rounded-full transition-colors relative ${settings.twoFactorEnabled ? "bg-primary" : "bg-muted"}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings.twoFactorEnabled ? "translate-x-5" : "translate-x-1"}`} />
                   </button>
                 </div>
                 <div><label className="text-xs font-medium text-muted-foreground">Session Timeout</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  <select value={settings.sessionTimeout} onChange={(e) => updateSettings({ sessionTimeout: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>8 hours</option>
                   </select>
                 </div>
