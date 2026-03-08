@@ -255,7 +255,8 @@ function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any
             <div>
               <label className="text-xs font-medium text-muted-foreground">Sales Rep</label>
               <select value={rep} onChange={(e) => setRep(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {salesReps.map((r) => <option key={r.name}>{r.name}</option>)}
+                {activeUsers.length === 0 && <option value="">No users configured</option>}
+                {activeUsers.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
               </select>
             </div>
           </div>
