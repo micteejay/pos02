@@ -248,10 +248,8 @@ function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any
             <div>
               <label className="text-xs font-medium text-muted-foreground">Store</label>
               <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                <option>Main HQ</option>
-                <option>West Store</option>
-                <option>East Store</option>
-                <option>South Hub</option>
+                {storeNames.length === 0 && <option value="">No stores configured</option>}
+                {storeNames.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div>
