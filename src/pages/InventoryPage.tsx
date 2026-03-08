@@ -37,7 +37,7 @@ const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "h
 export default function InventoryPage() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames, categories, addCategory, approveCategory, rejectCategory, deleteCategory, inventoryCategories, expenseCategories } = useSharedData();
   const { addNotification, addApprovalItem } = useAppEvents();
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, hasPermission } = useAppSettings();
   const { user } = useAuth();
   const { logAction } = useAudit();
   const [tab, setTab] = useState<Tab>("stock");
