@@ -17,6 +17,14 @@ export interface AppSettings {
   language: string;
   timezone: string;
   logoUrl: string;
+  // Security settings
+  twoFactorEnabled: boolean;
+  sessionTimeout: string;
+  passwordPolicy: string;
+  // Notification preferences
+  notifyEmail: boolean;
+  notifyPush: boolean;
+  notifySms: boolean;
 }
 
 export type Permission =
