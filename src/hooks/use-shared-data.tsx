@@ -26,7 +26,7 @@ export interface OrgDepartment {
 
 export interface Expense {
   id: string;
-  category: string; // 'rent', 'utilities', 'salaries', 'marketing', 'maintenance', 'logistics', 'supplies', 'other'
+  category: string;
   description: string;
   amount: number;
   date: string;
@@ -34,6 +34,9 @@ export interface Expense {
   createdBy: string;
   createdByRole: string;
   recurring: boolean;
+  recurringInterval?: "daily" | "weekly" | "monthly" | "yearly";
+  nextDueDate?: string;
+  parentId?: string; // links generated entries back to the recurring template
 }
 
 interface SharedDataContextType {
