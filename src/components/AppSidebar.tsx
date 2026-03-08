@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, MessageSquare, FileText, GitBranch, Bell, Users, Shield, Settings,
   ChevronLeft, ChevronRight, Search, Building2, Package, BarChart3, ClipboardCheck,
-  ShoppingCart, PieChart, Truck,
+  ShoppingCart, PieChart, Truck, Receipt, LogOut,
 } from "lucide-react";
 
 interface NavItem {
