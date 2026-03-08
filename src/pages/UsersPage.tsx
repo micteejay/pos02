@@ -39,6 +39,7 @@ export default function UsersPage() {
   const { canCreateUsersForStore, getStoreOptionsForUserCreation, isAdminOrSuper } = useStoreAccess();
   const { logAction } = useAudit();
   const { user: authUser } = useAuth();
+  const [tab, setTab] = useState<Tab>("users");
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddRole, setShowAddRole] = useState(false);
