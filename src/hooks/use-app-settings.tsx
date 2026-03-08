@@ -154,7 +154,7 @@ interface AppSettingsContextType {
   updateRole: (id: string, updates: Partial<AppRole>) => void;
   deleteRole: (id: string) => void;
   users: AppUser[];
-  addUser: (user: Omit<AppUser, "id">) => void;
+  addUser: (user: Omit<AppUser, "id"> & { password?: string; username?: string }) => Promise<{ success: boolean; error?: string }>;
   updateUser: (id: string, updates: Partial<AppUser>) => void;
   deleteUser: (id: string) => void;
   currentUser: AppUser;
