@@ -189,10 +189,10 @@ export default function SalesPage() {
         {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} storeNames={storeNames} users={users} />}
 
         {tab === "transactions" && (
-          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
+          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} storeFilters={dynamicStoreFilters} />
         )}
         {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} />}
-        {tab === "reps" && <RepsTab />}
+        {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
       </div>
     </AppLayout>
   );
