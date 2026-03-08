@@ -157,14 +157,50 @@ export default function SettingsPage() {
     { key: "security", label: "Security", icon: Shield },
   ];
 
-  const integrations = [
-    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳" },
-    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧" },
-    { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "💬" },
-    { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊" },
-    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒" },
-    { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱" },
+  const [integrations, setIntegrations] = useState([
+    { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳", category: "payment", configFields: ["API Key", "Secret Key", "Webhook Secret"] },
+    { name: "Paystack", description: "African payment processing", connected: false, icon: "💰", category: "payment", configFields: ["Public Key", "Secret Key"] },
+    { name: "Flutterwave", description: "Pan-African payments", connected: false, icon: "🦋", category: "payment", configFields: ["Public Key", "Secret Key", "Encryption Key"] },
+    { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧", category: "communication", configFields: ["API Key", "From Email", "From Name"] },
+    { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱", category: "communication", configFields: ["Account SID", "Auth Token", "Phone Number"] },
+    { name: "WhatsApp Business", description: "WhatsApp messaging API", connected: false, icon: "💬", category: "communication", configFields: ["Phone Number ID", "Access Token", "Business Account ID"] },
+    { name: "SMTP Email", description: "Custom SMTP email server", connected: false, icon: "✉️", category: "communication", configFields: ["Host", "Port", "Username", "Password"] },
+    { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊", category: "accounting", configFields: ["Client ID", "Client Secret", "Realm ID"] },
+    { name: "Xero", description: "Cloud-based accounting", connected: false, icon: "📒", category: "accounting", configFields: ["Client ID", "Client Secret", "Tenant ID"] },
+    { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "🔔", category: "communication", configFields: ["Webhook URL", "Channel"] },
+    { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒", category: "other", configFields: ["Store URL", "API Key", "Secret Key"] },
+  ]);
+  const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
+  const [configValues, setConfigValues] = useState<Record<string, string>>({});
+  const [intCategoryFilter, setIntCategoryFilter] = useState("all");
+
+  const toggleIntegration = (name: string) => {
+    setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: !i.connected } : i));
+  };
+
+  const openConfig = (integration: typeof integrations[0]) => {
+    setConfigModal(integration);
+    setConfigValues({});
+  };
+
+  const saveConfig = () => {
+    if (configModal) {
+      toggleIntegration(configModal.name);
+      setConfigModal(null);
+    }
+  };
+
+  const intCategories = [
+    { key: "all", label: "All" },
+    { key: "payment", label: "Payment" },
+    { key: "communication", label: "Communication" },
+    { key: "accounting", label: "Accounting" },
+    { key: "other", label: "Other" },
   ];
+
+  const filteredIntegrations = intCategoryFilter === "all"
+    ? integrations
+    : integrations.filter(i => i.category === intCategoryFilter);
 
   return (
     <AppLayout>
