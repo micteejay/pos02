@@ -44,6 +44,44 @@ export default function InventoryPage() {
   const { logAction } = useAudit();
   const [tab, setTab] = useState<Tab>("stock");
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [transfersLoading, setTransfersLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // Fetch transfers from DB
+  useEffect(() => {
+    const fetchTransfers = async () => {
+      setTransfersLoading(true);
+      const { data } = await supabase
+        .from("stock_transfers")
+        .select("*, stock_transfer_items(*), from_wh:warehouses!stock_transfers_from_warehouse_id_fkey(name), to_wh:warehouses!stock_transfers_to_warehouse_id_fkey(name)")
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        const profilesRes = await supabase.from("profiles").select("id, name");
+        const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+
+        setTransfers(data.map((t: any) => {
+          const items = (t.stock_transfer_items || []).map((i: any) => `${i.name} ×${i.qty}`).join(", ");
+          return {
+            id: t.transfer_number,
+            dbId: t.id,
+            items: items || "Items",
+            from: (t.from_wh as any)?.name || "Unknown",
+            to: (t.to_wh as any)?.name || "Unknown",
+            fromId: t.from_warehouse_id,
+            toId: t.to_warehouse_id,
+            initiated: new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            eta: t.eta ? new Date(t.eta).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD",
+            status: t.status as Transfer["status"],
+            requester: t.requester ? (profileMap.get(t.requester) || "Unknown") : "System",
+          };
+        }));
+      }
+      setTransfersLoading(false);
+    };
+    fetchTransfers();
+  }, []);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
