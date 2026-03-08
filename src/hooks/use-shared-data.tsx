@@ -160,7 +160,12 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // Expenses
   const addExpense = useCallback((expense: Omit<Expense, "id">) => {
-    setExpenses(prev => [{ ...expense, id: `EXP-${Date.now()}` }, ...prev]);
+    const newExpense: Expense = { ...expense, id: `EXP-${Date.now()}` };
+    // If recurring, calculate the next due date
+    if (newExpense.recurring && newExpense.recurringInterval && !newExpense.nextDueDate) {
+      newExpense.nextDueDate = calcNextDueDate(new Date(), newExpense.recurringInterval).toISOString();
+    }
+    setExpenses(prev => [newExpense, ...prev]);
   }, []);
 
   const updateExpense = useCallback((id: string, updates: Partial<Expense>) => {
@@ -170,6 +175,43 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const deleteExpense = useCallback((id: string) => {
     setExpenses(prev => prev.filter(e => e.id !== id));
   }, []);
+
+  // Process recurring expenses — generates new entries when due
+  const processRecurringExpenses = useCallback(() => {
+    setExpenses(prev => {
+      const now = new Date();
+      const newEntries: Expense[] = [];
+      const updated = prev.map(exp => {
+        if (!exp.recurring || !exp.recurringInterval || !exp.nextDueDate) return exp;
+        const dueDate = new Date(exp.nextDueDate);
+        if (dueDate > now) return exp;
+        // Generate the expense entry
+        newEntries.push({
+          id: `EXP-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          category: exp.category,
+          description: `${exp.description} (auto)`,
+          amount: exp.amount,
+          date: dueDate.toISOString(),
+          store: exp.store,
+          createdBy: "System",
+          createdByRole: "System",
+          recurring: false,
+          parentId: exp.id,
+        });
+        // Advance the next due date
+        return { ...exp, nextDueDate: calcNextDueDate(dueDate, exp.recurringInterval!).toISOString() };
+      });
+      if (newEntries.length === 0) return prev;
+      return [...newEntries, ...updated];
+    });
+  }, []);
+
+  // Auto-process recurring expenses on mount and every minute
+  useEffect(() => {
+    processRecurringExpenses();
+    const interval = setInterval(processRecurringExpenses, 60_000);
+    return () => clearInterval(interval);
+  }, [processRecurringExpenses]);
 
   // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
