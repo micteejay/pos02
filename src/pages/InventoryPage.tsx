@@ -20,7 +20,7 @@ import type { OrgWarehouse } from "@/hooks/use-shared-data";
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 interface Transfer {
-  id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
+  id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
 
 const statusConfig = {
