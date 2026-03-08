@@ -2,7 +2,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 Deno.serve(async (req) => {
@@ -19,19 +19,21 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Verify caller is admin/super_admin
+    // Verify caller using getClaims (works with signing-keys)
     const callerClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
     });
-    const { data: { user: caller } } = await callerClient.auth.getUser();
-    if (!caller) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await callerClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims?.sub) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    const callerId = claimsData.claims.sub;
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     // Check caller has admin role
-    const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: caller.id, _roles: ["super_admin", "admin"] });
+    const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: callerId, _roles: ["super_admin", "admin"] });
     if (!isAdmin) {
       return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -75,7 +77,7 @@ Deno.serve(async (req) => {
     if (store) {
       const { data: storeRow } = await adminClient.from("stores").select("id").eq("name", store).single();
       if (storeRow) {
-        await adminClient.from("user_store_assignments").insert({ user_id: userId, store_id: storeRow.id, assigned_by: caller.id });
+        await adminClient.from("user_store_assignments").insert({ user_id: userId, store_id: storeRow.id, assigned_by: callerId });
         await adminClient.from("profiles").update({ store_id: storeRow.id }).eq("id", userId);
       }
     }
