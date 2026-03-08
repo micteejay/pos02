@@ -369,8 +369,8 @@ function NewTransferForm({ inventoryItems, onAdd, onCancel }: { inventoryItems: 
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
         <button disabled={!selectedItem || !transferQty} onClick={() => onAdd({
-          id: `TRF-${4600 + Math.floor(Math.random() * 100)}`,
-          items: `${item?.name || "Item"} ×${transferQty}`, from, to,
+          id: "", dbId: "", items: `${item?.name || "Item"} ×${transferQty}`, from, to,
+          fromId: null, toId: null,
           initiated: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
           eta: "TBD", status: "pending", requester: "You"
         })}
