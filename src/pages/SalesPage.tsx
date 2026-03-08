@@ -186,7 +186,7 @@ export default function SalesPage() {
         </div>
 
         {/* New Sale Modal */}
-        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} />}
+        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} storeNames={storeNames} users={users} />}
 
         {tab === "transactions" && (
           <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} />
