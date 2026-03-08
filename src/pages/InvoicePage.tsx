@@ -1,12 +1,19 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import InvoiceTemplate, { InvoiceData, InvoiceItem } from "@/components/InvoiceTemplate";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check } from "lucide-react";
+import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check, Loader2 } from "lucide-react";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
-import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface SavedInvoice extends InvoiceData {
+  id: string;
+  dbId: string;
+  status: "draft" | "sent" | "paid" | "cancelled";
+}
 
 export default function InvoicePage() {
   const { formatCurrency, settings } = useAppSettings();
@@ -28,8 +35,43 @@ export default function InvoicePage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState<number | null>(null);
   const [productSearch, setProductSearch] = useState("");
-  const [savedInvoices, setSavedInvoices] = useState<(InvoiceData & { id: string; status: "draft" | "sent" | "paid" })[]>([]);
+  const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([]);
   const [showSaved, setShowSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch invoices from DB
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("invoices")
+        .select("*, invoice_items(*)")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (data && !error) {
+        setSavedInvoices(data.map((inv: any) => ({
+          id: inv.number,
+          dbId: inv.id,
+          type: inv.type as "quote" | "invoice",
+          number: inv.number,
+          date: new Date(inv.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          customerName: inv.customer_name,
+          customerAddress: inv.customer_address || "",
+          items: (inv.invoice_items || []).map((item: any) => ({
+            description: item.description,
+            qty: Number(item.qty),
+            rate: Number(item.rate),
+          })),
+          serviceChargePercent: Number(inv.service_charge_percent) || 0,
+          notes: inv.notes || "",
+          status: inv.status as SavedInvoice["status"],
+        })));
+      }
+      setLoading(false);
+    };
+    fetchInvoices();
+  }, []);
 
   const filteredProducts = useMemo(() => {
     if (!productSearch) return inventory;
@@ -38,10 +80,7 @@ export default function InvoicePage() {
   }, [inventory, productSearch]);
 
   const updateItem = (index: number, updates: Partial<InvoiceItem>) => {
-    setForm(prev => ({
-      ...prev,
-      items: prev.items.map((item, i) => i === index ? { ...item, ...updates } : item),
-    }));
+    setForm(prev => ({ ...prev, items: prev.items.map((item, i) => i === index ? { ...item, ...updates } : item) }));
   };
 
   const addItem = () => {
@@ -70,14 +109,53 @@ export default function InvoicePage() {
     printWindow.print();
   };
 
-  const handleSaveAndRecord = () => {
+  const handleSaveAndRecord = async () => {
     if (!form.customerName || form.items.every(i => !i.description)) {
-      toast({ title: "Missing info", description: "Please add customer name and at least one item.", variant: "destructive" });
+      toast.error("Please add customer name and at least one item.");
       return;
     }
 
-    const id = `${form.type === "invoice" ? "INV" : "QT"}-${Date.now().toString(36).toUpperCase()}`;
-    setSavedInvoices(prev => [{ ...form, id, status: "draft" }, ...prev]);
+    // Save invoice to DB
+    const { data: companyData } = await supabase.from("company_profiles").select("id").limit(1).single();
+
+    const { data: newInv, error } = await supabase.from("invoices").insert({
+      number: form.number,
+      type: form.type as any,
+      customer_name: form.customerName,
+      customer_address: form.customerAddress || null,
+      date: new Date().toISOString().split("T")[0],
+      notes: form.notes || null,
+      service_charge_percent: form.serviceChargePercent || 0,
+      status: "draft" as any,
+      created_by: user?.id || null,
+      company_id: companyData?.id || null,
+    }).select().single();
+
+    if (!newInv || error) {
+      toast.error("Failed to save invoice: " + (error?.message || "Unknown error"));
+      return;
+    }
+
+    // Insert line items
+    const lineItems = form.items.filter(i => i.description).map(i => {
+      const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
+      return {
+        invoice_id: newInv.id,
+        description: i.description,
+        qty: i.qty,
+        rate: i.rate,
+        inventory_item_id: invItem?.id || null,
+      };
+    });
+
+    if (lineItems.length > 0) {
+      await supabase.from("invoice_items").insert(lineItems);
+    }
+
+    // Add to local state
+    setSavedInvoices(prev => [{
+      ...form, id: form.number, dbId: newInv.id, status: "draft",
+    }, ...prev]);
 
     // If invoice type, record as a sale and deduct inventory
     if (form.type === "invoice") {
@@ -99,17 +177,17 @@ export default function InvoicePage() {
         createdByRole: user?.role || "",
       });
 
-      // Deduct inventory for matched items
       form.items.forEach(item => {
         const invItem = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
-        if (invItem) {
-          adjustInventoryQty(invItem.sku, -item.qty);
-        }
+        if (invItem) adjustInventoryQty(invItem.sku, -item.qty);
       });
 
-      toast({ title: "Invoice recorded", description: `${form.number} saved and recorded as a sale. Inventory updated.` });
+      // Update invoice status
+      await supabase.from("invoices").update({ status: "sent" as any, sale_id: null }).eq("id", newInv.id);
+
+      toast.success(`Invoice ${form.number} saved and recorded as a sale.`);
     } else {
-      toast({ title: "Quote saved", description: `${form.number} saved as draft.` });
+      toast.success(`Quote ${form.number} saved as draft.`);
     }
 
     // Reset form
@@ -117,27 +195,31 @@ export default function InvoicePage() {
       type: form.type,
       number: `${form.type === "quote" ? "QT" : "INV"}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`,
       date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-      customerName: "",
-      customerAddress: "",
+      customerName: "", customerAddress: "",
       items: [{ description: "", qty: 1, rate: 0 }],
-      serviceChargePercent: 0,
-      notes: "",
+      serviceChargePercent: 0, notes: "",
     });
   };
 
-  const convertQuoteToInvoice = (index: number) => {
-    setSavedInvoices(prev => prev.map((inv, i) => {
-      if (i !== index) return inv;
-      const newNum = `INV-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
-      return { ...inv, type: "invoice" as const, number: newNum, status: "sent" as const };
+  const convertQuoteToInvoice = async (index: number) => {
+    const inv = savedInvoices[index];
+    if (!inv) return;
+    const newNum = `INV-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
+    
+    await supabase.from("invoices").update({
+      type: "invoice" as any,
+      number: newNum,
+      status: "sent" as any,
+    }).eq("id", inv.dbId);
+
+    setSavedInvoices(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      return { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const };
     }));
-    toast({ title: "Converted", description: "Quote converted to invoice." });
+    toast.success("Quote converted to invoice.");
   };
 
   const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);
-
-  // Recent sales from invoice channel
-  const invoiceSales = sales.filter(s => s.method === "Invoice").slice(0, 5);
 
   return (
     <AppLayout>
@@ -166,44 +248,31 @@ export default function InvoicePage() {
         </div>
 
         {/* Saved Invoices Panel */}
-        {showSaved && savedInvoices.length > 0 && (
+        {showSaved && (
           <div className="glass-card rounded-xl p-5 space-y-3">
-            <h3 className="text-sm font-semibold text-foreground">Saved Documents</h3>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {savedInvoices.map((inv, idx) => (
-                <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                  <div>
-                    <span className="text-sm font-medium text-foreground">{inv.number}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{inv.customerName} · {formatCurrency(inv.items.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
+            <h3 className="text-sm font-semibold text-foreground">Saved Documents ({savedInvoices.length})</h3>
+            {loading ? (
+              <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+            ) : (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {savedInvoices.map((inv, idx) => (
+                  <div key={inv.dbId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                    <div>
+                      <span className="text-sm font-medium text-foreground">{inv.number}</span>
+                      <span className="text-xs text-muted-foreground ml-2">{inv.customerName} · {formatCurrency(inv.items.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${inv.status === "paid" ? "bg-success/10 text-success" : inv.status === "sent" ? "bg-info/10 text-info" : inv.type === "invoice" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {inv.status} · {inv.type}
+                      </span>
+                      {inv.type === "quote" && inv.status === "draft" && (
+                        <button onClick={() => convertQuoteToInvoice(idx)} className="text-xs text-primary hover:underline">Convert to Invoice</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${inv.type === "invoice" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {inv.type}
-                    </span>
-                    {inv.type === "quote" && (
-                      <button onClick={() => convertQuoteToInvoice(idx)} className="text-xs text-primary hover:underline">
-                        Convert to Invoice
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent Invoice Sales */}
-        {invoiceSales.length > 0 && (
-          <div className="glass-card rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Recent Invoice Sales</h3>
-            <div className="space-y-2">
-              {invoiceSales.map(sale => (
-                <div key={sale.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 text-sm">
-                  <span className="text-foreground">{sale.id} — {sale.customer}</span>
-                  <span className="font-medium text-foreground">{formatCurrency(sale.total)}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -218,8 +287,7 @@ export default function InvoicePage() {
                   <select
                     value={form.type}
                     onChange={(e) => setForm(prev => ({
-                      ...prev,
-                      type: e.target.value as "quote" | "invoice",
+                      ...prev, type: e.target.value as "quote" | "invoice",
                       number: `${e.target.value === "quote" ? "QT" : "INV"}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`,
                     }))}
                     className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
@@ -254,11 +322,9 @@ export default function InvoicePage() {
             <div className="glass-card rounded-xl p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-foreground">Line Items</h3>
-                <div className="flex items-center gap-2">
-                  <button onClick={addItem} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
-                    <Plus className="w-3 h-3" />Add Item
-                  </button>
-                </div>
+                <button onClick={addItem} className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-medium hover:bg-primary/20">
+                  <Plus className="w-3 h-3" />Add Item
+                </button>
               </div>
 
               {inventory.length > 0 && (
@@ -273,56 +339,27 @@ export default function InvoicePage() {
                     <div className="flex-1 relative">
                       <Input value={item.description} onChange={(e) => updateItem(i, { description: e.target.value })} placeholder="Item description" />
                       {inventory.length > 0 && (
-                        <button
-                          onClick={() => { setShowProductPicker(showProductPicker === i ? null : i); setProductSearch(""); }}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
-                          title="Pick from inventory"
-                        >
+                        <button onClick={() => { setShowProductPicker(showProductPicker === i ? null : i); setProductSearch(""); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted" title="Pick from inventory">
                           <Search className="w-3.5 h-3.5 text-muted-foreground" />
                         </button>
                       )}
                     </div>
-                    <div className="w-20">
-                      <Input type="number" value={item.qty || ""} onChange={(e) => updateItem(i, { qty: Number(e.target.value) })} placeholder="Qty" />
-                    </div>
-                    <div className="w-28">
-                      <Input type="number" value={item.rate || ""} onChange={(e) => updateItem(i, { rate: Number(e.target.value) })} placeholder="Rate" />
-                    </div>
-                    <div className="w-28 flex items-center justify-end">
-                      <span className="text-sm font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</span>
-                    </div>
-                    <button onClick={() => removeItem(i)} disabled={form.items.length === 1} className="p-2 rounded hover:bg-destructive/10 disabled:opacity-30">
-                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                    </button>
+                    <div className="w-20"><Input type="number" value={item.qty || ""} onChange={(e) => updateItem(i, { qty: Number(e.target.value) })} placeholder="Qty" /></div>
+                    <div className="w-28"><Input type="number" value={item.rate || ""} onChange={(e) => updateItem(i, { rate: Number(e.target.value) })} placeholder="Rate" /></div>
+                    <div className="w-28 flex items-center justify-end"><span className="text-sm font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</span></div>
+                    <button onClick={() => removeItem(i)} disabled={form.items.length === 1} className="p-2 rounded hover:bg-destructive/10 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                   </div>
 
-                  {/* Product Picker Dropdown */}
                   {showProductPicker === i && (
                     <div className="border border-border rounded-lg bg-card shadow-lg p-3 space-y-2 max-h-48 overflow-y-auto">
-                      <Input
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        placeholder="Search inventory..."
-                        className="h-8 text-xs"
-                        autoFocus
-                      />
+                      <Input value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search inventory..." className="h-8 text-xs" autoFocus />
                       {filteredProducts.length === 0 ? (
                         <p className="text-xs text-muted-foreground text-center py-2">No products found</p>
                       ) : (
                         filteredProducts.slice(0, 10).map(product => (
-                          <button
-                            key={product.sku}
-                            onClick={() => selectProduct(i, product)}
-                            className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted text-left text-xs"
-                          >
-                            <div>
-                              <span className="font-medium text-foreground">{product.name}</span>
-                              <span className="text-muted-foreground ml-2">({product.sku})</span>
-                            </div>
-                            <div className="text-right">
-                              <span className="font-medium text-foreground">{formatCurrency(product.price)}</span>
-                              <span className="text-muted-foreground ml-2">Stock: {product.qty}</span>
-                            </div>
+                          <button key={product.sku} onClick={() => selectProduct(i, product)} className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-muted text-left text-xs">
+                            <div><span className="font-medium text-foreground">{product.name}</span><span className="text-muted-foreground ml-2">({product.sku})</span></div>
+                            <div className="text-right"><span className="font-medium text-foreground">{formatCurrency(product.price)}</span><span className="text-muted-foreground ml-2">Stock: {product.qty}</span></div>
                           </button>
                         ))
                       )}
@@ -366,7 +403,6 @@ export default function InvoicePage() {
         </div>
       </div>
 
-      {/* Full Preview Modal */}
       {showPreview && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setShowPreview(false)}>
           <div className="max-w-3xl w-full animate-fade-in my-8" onClick={(e) => e.stopPropagation()}>

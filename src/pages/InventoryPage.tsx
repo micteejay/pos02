@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import {
   Package, Warehouse, ArrowRightLeft, Search, Filter, Plus, AlertTriangle,
   CheckCircle2, TrendingDown, TrendingUp, MoreHorizontal, MapPin, Box,
   ArrowRight, Clock, Eye, ArrowUpDown, ArrowUp, ArrowDown, X, Check, Trash2, Edit2,
-  Tag, ShieldCheck, XCircle,
+  Tag, ShieldCheck, XCircle, Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -13,12 +13,14 @@ import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 interface Transfer {
-  id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
+  id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
 
 const statusConfig = {
@@ -42,8 +44,44 @@ export default function InventoryPage() {
   const { logAction } = useAudit();
   const [tab, setTab] = useState<Tab>("stock");
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [transfersLoading, setTransfersLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+
+  // Fetch transfers from DB
+  useEffect(() => {
+    const fetchTransfers = async () => {
+      setTransfersLoading(true);
+      const { data } = await supabase
+        .from("stock_transfers")
+        .select("*, stock_transfer_items(*), from_wh:warehouses!stock_transfers_from_warehouse_id_fkey(name), to_wh:warehouses!stock_transfers_to_warehouse_id_fkey(name)")
+        .order("created_at", { ascending: false });
+
+      if (data) {
+        const profilesRes = await supabase.from("profiles").select("id, name");
+        const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+
+        setTransfers(data.map((t: any) => {
+          const items = (t.stock_transfer_items || []).map((i: any) => `${i.name} ×${i.qty}`).join(", ");
+          return {
+            id: t.transfer_number,
+            dbId: t.id,
+            items: items || "Items",
+            from: (t.from_wh as any)?.name || "Unknown",
+            to: (t.to_wh as any)?.name || "Unknown",
+            fromId: t.from_warehouse_id,
+            toId: t.to_warehouse_id,
+            initiated: new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            eta: t.eta ? new Date(t.eta).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "TBD",
+            status: t.status as Transfer["status"],
+            requester: t.requester ? (profileMap.get(t.requester) || "Unknown") : "System",
+          };
+        }));
+      }
+      setTransfersLoading(false);
+    };
+    fetchTransfers();
+  }, []);
 
   const stats = useMemo(() => {
     const totalSkus = inventory.length;
@@ -68,25 +106,47 @@ export default function InventoryPage() {
   const tabPermMap: Record<Tab, string> = { stock: "pages.inventory.stock", warehouses: "pages.inventory.warehouses", transfers: "pages.inventory.transfers", categories: "pages.inventory.categories" };
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
-  const addTransfer = (tr: Transfer) => {
-    setTransfers((prev) => [tr, ...prev]);
-    addApprovalItem({
-      title: `Transfer: ${tr.items}`,
-      type: "stock_transfer",
-      sourceId: tr.id,
-      requester: "You",
-      department: "Inventory",
-      amount: null,
-      description: `${tr.items} from ${tr.from} to ${tr.to}`,
-      priority: "medium",
-    });
-    addNotification({ type: "inventory", title: `Transfer ${tr.id} created`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
+  const addTransfer = async (tr: Transfer) => {
+    // Save to DB
+    const { data: tNum } = await supabase.rpc("generate_transfer_number");
+    const transferNumber = tNum || `TRF-${Date.now()}`;
+    const fromWh = orgWarehouses.find(w => w.name === tr.from);
+    const toWh = orgWarehouses.find(w => w.name === tr.to);
+
+    const { data: newTransfer, error } = await supabase.from("stock_transfers").insert({
+      transfer_number: transferNumber,
+      from_warehouse_id: fromWh?.id || null,
+      to_warehouse_id: toWh?.id || null,
+      status: "pending" as any,
+      requester: user?.id || null,
+      notes: tr.items,
+    }).select().single();
+
+    if (newTransfer && !error) {
+      setTransfers(prev => [{ ...tr, id: transferNumber, dbId: newTransfer.id }, ...prev]);
+      addApprovalItem({
+        title: `Transfer: ${tr.items}`,
+        type: "stock_transfer",
+        sourceId: newTransfer.id,
+        requester: user?.name || "You",
+        department: "Inventory",
+        amount: null,
+        description: `${tr.items} from ${tr.from} to ${tr.to}`,
+        priority: "medium",
+      });
+      addNotification({ type: "inventory", title: `Transfer ${transferNumber} created`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
+      toast.success("Transfer created");
+    }
   };
 
-  const updateTransferStatus = (id: string, status: Transfer["status"]) => {
-    setTransfers((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+  const updateTransferStatus = async (id: string, status: Transfer["status"]) => {
+    const tr = transfers.find(t => t.id === id);
+    if (!tr) return;
+    await supabase.from("stock_transfers").update({ status: status as any }).eq("id", tr.dbId);
+    setTransfers(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     if (status === "delivered") {
       addNotification({ type: "inventory", title: `Transfer ${id} delivered`, message: "Stock has been received at destination", link: "/inventory" });
+      toast.success("Transfer marked as delivered");
     }
   };
 
@@ -309,8 +369,8 @@ function NewTransferForm({ inventoryItems, onAdd, onCancel }: { inventoryItems: 
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
         <button disabled={!selectedItem || !transferQty} onClick={() => onAdd({
-          id: `TRF-${4600 + Math.floor(Math.random() * 100)}`,
-          items: `${item?.name || "Item"} ×${transferQty}`, from, to,
+          id: "", dbId: "", items: `${item?.name || "Item"} ×${transferQty}`, from, to,
+          fromId: null, toId: null,
           initiated: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
           eta: "TBD", status: "pending", requester: "You"
         })}

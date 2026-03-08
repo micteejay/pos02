@@ -1,53 +1,29 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
-  DollarSign,
-  ShoppingCart,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Receipt,
-  CreditCard,
-  Banknote,
-  Search,
-  Eye,
-  ArrowUpRight,
-  Clock,
-  Star,
-  Target,
-  Plus,
-  X,
-  Check,
-  Trash2,
-  Filter,
-  ArrowUp,
-  ArrowDown,
+  DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
+  Banknote, Search, Eye, ArrowUpRight, Clock, Star, Target, Plus, X, Check,
+  Trash2, Filter, ArrowUp, ArrowDown, Loader2,
 } from "lucide-react";
 import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
 } from "recharts";
 
-// --- Types ---
 interface Transaction {
   id: string;
+  dbId: string;
   customer: string;
   items: number;
   total: number;
   method: string;
   store: string;
+  storeName: string;
   rep: string;
   time: string;
   status: "completed" | "refunded" | "pending";
@@ -57,9 +33,6 @@ interface Transaction {
 type Tab = "transactions" | "analytics" | "reps";
 type SortKey = "time" | "total" | "customer";
 
-// --- Initial Data ---
-const initialTransactions: Transaction[] = [];
-
 const statusConfig = {
   completed: { label: "Completed", className: "bg-success/10 text-success" },
   refunded: { label: "Refunded", className: "bg-destructive/10 text-destructive" },
@@ -67,10 +40,7 @@ const statusConfig = {
 };
 
 const methodIcons: Record<string, React.ElementType> = {
-  "Credit Card": CreditCard,
-  "Debit Card": CreditCard,
-  "Cash": Banknote,
-  "Mobile Pay": DollarSign,
+  "Credit Card": CreditCard, "Debit Card": CreditCard, "Cash": Banknote, "Mobile Pay": DollarSign,
 };
 
 const statuses = ["All Status", "completed", "refunded", "pending"];
@@ -78,24 +48,59 @@ const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay
 
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
-  const { users, hasPermission } = useAppSettings();
+  const { users, hasPermission, formatCurrency } = useAppSettings();
+  const { user } = useAuth();
   const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
-  const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showNewSale, setShowNewSale] = useState(false);
 
-  // Computed stats from actual transactions
+  // Fetch from DB
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("sales_transactions")
+        .select("*, sales_transaction_items(*), stores!sales_transactions_store_id_fkey(name)")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (data && !error) {
+        const profilesRes = await supabase.from("profiles").select("id, name");
+        const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+
+        setTransactions(data.map((s: any) => ({
+          id: s.transaction_number,
+          dbId: s.id,
+          customer: s.customer_name || "Walk-in",
+          items: (s.sales_transaction_items || []).reduce((sum: number, i: any) => sum + i.qty, 0),
+          total: Number(s.total),
+          method: s.payment_method,
+          store: s.store_id || "",
+          storeName: s.stores?.name || "Unknown",
+          rep: s.cashier_id ? (profileMap.get(s.cashier_id) || "Unknown") : "System",
+          time: new Date(s.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+          status: s.status as Transaction["status"],
+          date: s.created_at,
+        })));
+      }
+      setLoading(false);
+    };
+    fetchTransactions();
+  }, []);
+
   const stats = useMemo(() => {
     const completed = transactions.filter((t) => t.status === "completed");
     const totalRevenue = completed.reduce((s, t) => s + t.total, 0);
     const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
     return [
-      { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: transactions.length > 0 ? `${transactions.length} sales` : "", trend: "up" as const, icon: DollarSign },
+      { label: "Total Revenue", value: formatCurrency(totalRevenue), change: `${completed.length} sales`, trend: "up" as const, icon: DollarSign },
       { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
-      { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "", trend: "up" as const, icon: Receipt },
+      { label: "Avg. Ticket", value: formatCurrency(avgTicket), change: "", trend: "up" as const, icon: Receipt },
       { label: "Active Reps", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
-  }, [transactions]);
+  }, [transactions, formatCurrency, users]);
 
   const paymentBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -103,31 +108,28 @@ export default function SalesPage() {
     const total = transactions.length;
     const colors: Record<string, string> = { "Credit Card": "hsl(172,66%,50%)", Cash: "hsl(205,80%,55%)", "Debit Card": "hsl(38,92%,50%)", "Mobile Pay": "hsl(152,60%,45%)" };
     return Object.entries(counts).map(([name, count]) => ({
-      name,
-      value: Math.round((count / total) * 100),
+      name, value: total > 0 ? Math.round((count / total) * 100) : 0,
       color: colors[name] || "hsl(220,10%,50%)",
     }));
   }, [transactions]);
 
-  const addTransaction = useCallback((data: { customer: string; total: number; method: string; store: string; rep: string; items: number }) => {
-    const newTxn: Transaction = {
-      id: `TXN-${9202 + transactions.length}`,
-      ...data,
-      time: new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-      status: "completed",
-      date: new Date().toISOString().split("T")[0],
-    };
-    setTransactions((prev) => [newTxn, ...prev]);
-    setShowNewSale(false);
-  }, [transactions.length]);
-
-  const updateStatus = useCallback((id: string, status: Transaction["status"]) => {
+  const updateStatus = useCallback(async (id: string, status: Transaction["status"]) => {
+    const txn = transactions.find(t => t.id === id);
+    if (!txn) return;
+    await supabase.from("sales_transactions").update({ status: status as any }).eq("id", txn.dbId);
     setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
-  }, []);
+    toast.success(`Transaction ${id} marked as ${status}`);
+  }, [transactions]);
 
-  const deleteTransaction = useCallback((id: string) => {
+  const deleteTransaction = useCallback(async (id: string) => {
+    const txn = transactions.find(t => t.id === id);
+    if (!txn) return;
+    // Delete items first, then transaction
+    await supabase.from("sales_transaction_items").delete().eq("transaction_id", txn.dbId);
+    await supabase.from("sales_transactions").delete().eq("id", txn.dbId);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    toast.success(`Transaction ${id} deleted`);
+  }, [transactions]);
 
   const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "transactions", label: "Transactions", icon: Receipt },
@@ -146,13 +148,6 @@ export default function SalesPage() {
             <h1 className="text-2xl font-bold text-foreground">Sales</h1>
             <p className="text-sm text-muted-foreground mt-1">Monitor transactions, track revenue, and measure rep performance.</p>
           </div>
-          <button
-            onClick={() => setShowNewSale(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Sale
-          </button>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -162,10 +157,12 @@ export default function SalesPage() {
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
                   <s.icon className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                 </div>
-                <div className={`flex items-center gap-1 text-[10px] sm:text-xs font-medium ${s.trend === "up" ? "text-success" : "text-destructive"}`}>
-                  {s.trend === "up" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  <span>{s.change}</span>
-                </div>
+                {s.change && (
+                  <div className="flex items-center gap-1 text-[10px] sm:text-xs font-medium text-success">
+                    <TrendingUp className="w-3 h-3" />
+                    <span>{s.change}</span>
+                  </div>
+                )}
               </div>
               <p className="text-lg sm:text-2xl font-bold text-foreground">{s.value}</p>
               <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{s.label}</p>
@@ -188,99 +185,31 @@ export default function SalesPage() {
           ))}
         </div>
 
-        {/* New Sale Modal */}
-        {showNewSale && <NewSaleModal onAdd={addTransaction} onClose={() => setShowNewSale(false)} storeNames={storeNames} users={users} />}
-
-        {tab === "transactions" && (
-          <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} storeFilters={dynamicStoreFilters} />
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 text-primary animate-spin" />
+          </div>
+        ) : (
+          <>
+            {tab === "transactions" && (
+              <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} storeFilters={dynamicStoreFilters} formatCurrency={formatCurrency} />
+            )}
+            {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} formatCurrency={formatCurrency} />}
+            {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
+          </>
         )}
-        {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} />}
-        {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
       </div>
     </AppLayout>
   );
 }
 
-// --- New Sale Modal ---
-function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any) => void; onClose: () => void; storeNames: string[]; users: { name: string; status: string }[] }) {
-  const activeUsers = users.filter(u => u.status === "active");
-  const [customer, setCustomer] = useState("");
-  const [total, setTotal] = useState("");
-  const [items, setItems] = useState("1");
-  const [method, setMethod] = useState("Credit Card");
-  const [store, setStore] = useState(storeNames[0] || "");
-  const [rep, setRep] = useState(activeUsers[0]?.name || "");
-
-  const handleSubmit = () => {
-    if (!customer || !total) return;
-    onAdd({ customer, total: parseFloat(total), items: parseInt(items), method, store, rep });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="glass-card rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-semibold text-foreground">New Sale</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
-            <Input value={customer} onChange={(e) => setCustomer(e.target.value)} placeholder="Enter customer name" className="mt-1" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Total ($)</label>
-              <Input type="number" value={total} onChange={(e) => setTotal(e.target.value)} placeholder="0.00" className="mt-1" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Items</label>
-              <Input type="number" value={items} onChange={(e) => setItems(e.target.value)} className="mt-1" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">Payment Method</label>
-            <select value={method} onChange={(e) => setMethod(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-              <option>Credit Card</option>
-              <option>Cash</option>
-              <option>Debit Card</option>
-              <option>Mobile Pay</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Store</label>
-              <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {storeNames.length === 0 && <option value="">No stores configured</option>}
-                {storeNames.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">Sales Rep</label>
-              <select value={rep} onChange={(e) => setRep(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                {activeUsers.length === 0 && <option value="">No users configured</option>}
-                {activeUsers.map((u) => <option key={u.name} value={u.name}>{u.name}</option>)}
-              </select>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-          <button onClick={handleSubmit} disabled={!customer || !total} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-            <Check className="w-4 h-4 inline mr-1" /> Create Sale
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // --- Transactions Tab ---
-function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters }: {
+function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters, formatCurrency }: {
   transactions: Transaction[];
   onUpdateStatus: (id: string, status: Transaction["status"]) => void;
   onDelete: (id: string) => void;
   storeFilters: string[];
+  formatCurrency: (n: number) => string;
 }) {
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("All Stores");
@@ -294,7 +223,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
   const filtered = useMemo(() => {
     let result = transactions.filter((t) => {
       const matchSearch = !search || t.id.toLowerCase().includes(search.toLowerCase()) || t.customer.toLowerCase().includes(search.toLowerCase()) || t.rep.toLowerCase().includes(search.toLowerCase());
-      const matchStore = storeFilter === "All Stores" || t.store === storeFilter;
+      const matchStore = storeFilter === "All Stores" || t.storeName === storeFilter;
       const matchStatus = statusFilter === "All Status" || t.status === statusFilter;
       const matchMethod = methodFilter === "All Methods" || t.method === methodFilter;
       return matchSearch && matchStore && matchStatus && matchMethod;
@@ -303,7 +232,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
       let cmp = 0;
       if (sortKey === "total") cmp = a.total - b.total;
       else if (sortKey === "customer") cmp = a.customer.localeCompare(b.customer);
-      else cmp = a.time.localeCompare(b.time);
+      else cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
       return sortDir === "asc" ? cmp : -cmp;
     });
     return result;
@@ -324,8 +253,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
           <Input placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <button onClick={() => setShowFilters(!showFilters)} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted transition-colors">
-          <Filter className="w-4 h-4" />
-          Filters
+          <Filter className="w-4 h-4" />Filters
           {activeFilters > 0 && <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-full">{activeFilters}</span>}
         </button>
       </div>
@@ -342,9 +270,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
             {methods.map((m) => <option key={m}>{m}</option>)}
           </select>
           {activeFilters > 0 && (
-            <button onClick={() => { setStoreFilter("All Stores"); setStatusFilter("All Status"); setMethodFilter("All Methods"); }} className="text-xs text-primary hover:underline">
-              Clear all
-            </button>
+            <button onClick={() => { setStoreFilter("All Stores"); setStatusFilter("All Status"); setMethodFilter("All Methods"); }} className="text-xs text-primary hover:underline">Clear all</button>
           )}
         </div>
       )}
@@ -375,29 +301,20 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
                 const isExpanded = expandedTxn === txn.id;
                 return (
                   <>
-                    <tr
-                      key={txn.id}
-                      className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => setExpandedTxn(isExpanded ? null : txn.id)}
-                    >
+                    <tr key={txn.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpandedTxn(isExpanded ? null : txn.id)}>
                       <td className="px-4 py-3">
                         <p className="text-xs font-mono text-primary">{txn.id}</p>
-                        <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                          <Clock className="w-3 h-3" /> {txn.time}
-                        </p>
+                        <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5"><Clock className="w-3 h-3" /> {txn.time}</p>
                       </td>
                       <td className="px-4 py-3 hidden sm:table-cell">
                         <p className="text-sm font-medium text-foreground">{txn.customer}</p>
                         <p className="text-xs text-muted-foreground">{txn.items} item{txn.items !== 1 ? "s" : ""}</p>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <MethodIcon className="w-3.5 h-3.5" />
-                          {txn.method}
-                        </div>
+                        <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><MethodIcon className="w-3.5 h-3.5" />{txn.method}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{txn.store}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">${txn.total.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{txn.storeName}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(txn.total)}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
                       </td>
@@ -407,18 +324,14 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
                         <td colSpan={6} className="px-4 py-3">
                           <div className="flex flex-wrap items-center gap-3 animate-fade-in">
                             <span className="text-xs text-muted-foreground">Rep: <span className="text-foreground font-medium">{txn.rep}</span></span>
-                            <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.store}</span></span>
+                            <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
                             <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
                             <div className="ml-auto flex gap-2">
                               {txn.status === "pending" && (
-                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">
-                                  Complete
-                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Complete</button>
                               )}
                               {txn.status === "completed" && (
-                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">
-                                  Refund
-                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">Refund</button>
                               )}
                               <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20">
                                 <Trash2 className="w-3 h-3 inline mr-1" /> Delete
@@ -443,7 +356,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters 
 }
 
 // --- Analytics Tab ---
-function AnalyticsTab({ paymentBreakdown, transactions }: { paymentBreakdown: { name: string; value: number; color: string }[]; transactions: Transaction[] }) {
+function AnalyticsTab({ paymentBreakdown, transactions, formatCurrency }: { paymentBreakdown: { name: string; value: number; color: string }[]; transactions: Transaction[]; formatCurrency: (n: number) => string }) {
   const revenueByDay = useMemo(() => {
     if (transactions.length === 0) return [];
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -490,11 +403,8 @@ function AnalyticsTab({ paymentBreakdown, transactions }: { paymentBreakdown: { 
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                  <Tooltip
-                    contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }}
-                    formatter={(value: number) => [`$${value.toLocaleString()}`, "Revenue"]}
-                  />
+                  <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${formatCurrency(v)}`} />
+                  <Tooltip contentStyle={{ background: "hsl(222,22%,11%)", border: "1px solid hsl(220,18%,18%)", borderRadius: "8px", fontSize: "12px", color: "hsl(210,20%,92%)" }} formatter={(value: number) => [formatCurrency(value), "Revenue"]} />
                   <Area type="monotone" dataKey="revenue" stroke="hsl(172,66%,50%)" strokeWidth={2} fill="url(#revGrad)" />
                 </AreaChart>
               </ResponsiveContainer>
@@ -558,32 +468,19 @@ function RepsTab({ users, storeNames }: { users: { id: string; name: string; rol
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {activeReps.map((user) => (
-          <div key={user.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                {user.avatar}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {activeReps.map((rep) => (
+          <div key={rep.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                {rep.avatar ? <img src={rep.avatar} alt="" className="w-full h-full rounded-full object-cover" /> : rep.name.charAt(0)}
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-foreground">{user.name}</h3>
-                <p className="text-xs text-muted-foreground">{user.role}</p>
-                {user.store && <p className="text-[10px] text-muted-foreground">{user.store}</p>}
+                <p className="text-sm font-semibold text-foreground">{rep.name}</p>
+                <p className="text-xs text-muted-foreground">{rep.role} · {rep.store || "Unassigned"}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="text-center p-2 rounded-lg bg-muted/50">
-                <p className="text-sm font-bold text-foreground">{user.role}</p>
-                <p className="text-[10px] text-muted-foreground">Role</p>
-              </div>
-              <div className="text-center p-2 rounded-lg bg-muted/50">
-                <span className={`inline-flex items-center gap-1 text-xs ${user.status === "active" ? "text-success" : "text-muted-foreground"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`} />
-                  {user.status}
-                </span>
-                <p className="text-[10px] text-muted-foreground">Status</p>
-              </div>
-            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground"><div className="w-2 h-2 rounded-full bg-success" /><span>Active</span></div>
           </div>
         ))}
       </div>
