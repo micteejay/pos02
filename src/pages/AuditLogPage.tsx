@@ -67,7 +67,11 @@ const severityConfig = {
 
 export default function AuditLogPage() {
   const { getAuditLog } = useAudit();
-  const auditEntries = getAuditLog();
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+
+  useEffect(() => {
+    getAuditLog().then(setAuditEntries);
+  }, [getAuditLog]);
 
   const [search, setSearch] = useState("");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
