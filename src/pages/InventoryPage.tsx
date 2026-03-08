@@ -108,25 +108,47 @@ export default function InventoryPage() {
   const tabPermMap: Record<Tab, string> = { stock: "pages.inventory.stock", warehouses: "pages.inventory.warehouses", transfers: "pages.inventory.transfers", categories: "pages.inventory.categories" };
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
-  const addTransfer = (tr: Transfer) => {
-    setTransfers((prev) => [tr, ...prev]);
-    addApprovalItem({
-      title: `Transfer: ${tr.items}`,
-      type: "stock_transfer",
-      sourceId: tr.id,
-      requester: "You",
-      department: "Inventory",
-      amount: null,
-      description: `${tr.items} from ${tr.from} to ${tr.to}`,
-      priority: "medium",
-    });
-    addNotification({ type: "inventory", title: `Transfer ${tr.id} created`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
+  const addTransfer = async (tr: Transfer) => {
+    // Save to DB
+    const { data: tNum } = await supabase.rpc("generate_transfer_number");
+    const transferNumber = tNum || `TRF-${Date.now()}`;
+    const fromWh = orgWarehouses.find(w => w.name === tr.from);
+    const toWh = orgWarehouses.find(w => w.name === tr.to);
+
+    const { data: newTransfer, error } = await supabase.from("stock_transfers").insert({
+      transfer_number: transferNumber,
+      from_warehouse_id: fromWh?.id || null,
+      to_warehouse_id: toWh?.id || null,
+      status: "pending" as any,
+      requester: user?.id || null,
+      notes: tr.items,
+    }).select().single();
+
+    if (newTransfer && !error) {
+      setTransfers(prev => [{ ...tr, id: transferNumber, dbId: newTransfer.id }, ...prev]);
+      addApprovalItem({
+        title: `Transfer: ${tr.items}`,
+        type: "stock_transfer",
+        sourceId: newTransfer.id,
+        requester: user?.name || "You",
+        department: "Inventory",
+        amount: null,
+        description: `${tr.items} from ${tr.from} to ${tr.to}`,
+        priority: "medium",
+      });
+      addNotification({ type: "inventory", title: `Transfer ${transferNumber} created`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
+      toast.success("Transfer created");
+    }
   };
 
-  const updateTransferStatus = (id: string, status: Transfer["status"]) => {
-    setTransfers((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+  const updateTransferStatus = async (id: string, status: Transfer["status"]) => {
+    const tr = transfers.find(t => t.id === id);
+    if (!tr) return;
+    await supabase.from("stock_transfers").update({ status: status as any }).eq("id", tr.dbId);
+    setTransfers(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     if (status === "delivered") {
       addNotification({ type: "inventory", title: `Transfer ${id} delivered`, message: "Stock has been received at destination", link: "/inventory" });
+      toast.success("Transfer marked as delivered");
     }
   };
 
