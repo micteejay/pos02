@@ -1817,22 +1817,7 @@ CREATE POLICY "Admins can delete categories"
   ON public.categories FOR DELETE TO authenticated
   USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
 
--- Default seed categories
-INSERT INTO public.categories (name, type, status, created_at) VALUES
-  ('Components', 'inventory', 'approved', NOW()),
-  ('Electronics', 'inventory', 'approved', NOW()),
-  ('Machinery', 'inventory', 'approved', NOW()),
-  ('Networking', 'inventory', 'approved', NOW()),
-  ('Accessories', 'inventory', 'approved', NOW()),
-  ('Uncategorized', 'inventory', 'approved', NOW()),
-  ('Rent', 'expense', 'approved', NOW()),
-  ('Utilities', 'expense', 'approved', NOW()),
-  ('Salaries', 'expense', 'approved', NOW()),
-  ('Marketing', 'expense', 'approved', NOW()),
-  ('Maintenance', 'expense', 'approved', NOW()),
-  ('Logistics', 'expense', 'approved', NOW()),
-  ('Supplies', 'expense', 'approved', NOW()),
-  ('Other', 'expense', 'approved', NOW());
+-- No default seed categories — categories are created dynamically by approved users
 
 -- Audit trigger for category changes
 CREATE OR REPLACE FUNCTION public.audit_category_change()
