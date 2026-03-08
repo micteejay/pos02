@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
     );
 
-    const roleName = roleChecks.find((role): role is string => !!role) || "Viewer";
+    const roleName = (roleChecks.find((role) => role !== null) ?? "Viewer") as string;
 
     const authUser: AuthUser = {
       id: supaUser.id,
