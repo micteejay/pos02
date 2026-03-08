@@ -39,29 +39,44 @@ export default function ReportsPage() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "" });
 
-  // Derive revenue data from actual sales
+  // Total operational expenses
+  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+
+  const expensesByCategory = useMemo(() => {
+    const map: Record<string, number> = {};
+    expenses.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount; });
+    const colors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)", "hsl(280,60%,55%)", "hsl(0,72%,51%)", "hsl(45,90%,55%)", "hsl(190,70%,50%)"];
+    return Object.entries(map).map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }));
+  }, [expenses]);
+
+  // Derive revenue data from actual sales + operational expenses
   const monthlyRevenue = useMemo(() => {
-    if (sales.length === 0) return [];
-    const grouped: Record<string, { revenue: number; expenses: number }> = {};
+    if (sales.length === 0 && expenses.length === 0) return [];
+    const grouped: Record<string, { revenue: number; costOfGoods: number; opExpenses: number }> = {};
     sales.forEach(sale => {
       const d = new Date(sale.date);
       const key = d.toLocaleDateString("en-US", { month: "short" });
-      if (!grouped[key]) grouped[key] = { revenue: 0, expenses: 0 };
+      if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
       grouped[key].revenue += sale.total;
-      // Use cost price for expenses if available
       const costTotal = sale.items.reduce((s, item) => {
         const invItem = inventory.find(i => i.sku === item.sku);
         return s + (invItem?.costPrice || item.price * 0.6) * item.qty;
       }, 0);
-      grouped[key].expenses += costTotal;
+      grouped[key].costOfGoods += costTotal;
+    });
+    expenses.forEach(exp => {
+      const d = new Date(exp.date);
+      const key = d.toLocaleDateString("en-US", { month: "short" });
+      if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
+      grouped[key].opExpenses += exp.amount;
     });
     return Object.entries(grouped).map(([month, data]) => ({
       month,
       revenue: data.revenue,
-      expenses: data.expenses,
-      profit: data.revenue - data.expenses,
+      expenses: data.costOfGoods + data.opExpenses,
+      profit: data.revenue - data.costOfGoods - data.opExpenses,
     }));
-  }, [sales, inventory]);
+  }, [sales, inventory, expenses]);
 
   // Sales by store
   const salesByStore = useMemo(() => {
