@@ -49,6 +49,12 @@ interface SharedDataContextType {
   sales: SaleRecord[];
   addSale: (sale: Omit<SaleRecord, "id" | "date">) => void;
 
+  // Expenses
+  expenses: Expense[];
+  addExpense: (expense: Omit<Expense, "id">) => void;
+  updateExpense: (id: string, updates: Partial<Expense>) => void;
+  deleteExpense: (id: string) => void;
+
   // Documents
   documents: SharedDocument[];
   addDocument: (doc: Omit<SharedDocument, "id">) => void;
