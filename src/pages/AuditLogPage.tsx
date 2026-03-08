@@ -44,20 +44,7 @@ interface AuditEntry {
   ip: string;
 }
 
-const auditEntries: AuditEntry[] = [
-  { id: "AUD-10421", timestamp: "2026-02-15 14:32:18", user: "Sarah Chen", role: "SuperAdmin", action: "role.update", module: "Users", moduleIcon: Users, target: "Bob Tran", detail: "Changed role from Cashier to StoreManager", severity: "warning", ip: "192.168.1.45" },
-  { id: "AUD-10420", timestamp: "2026-02-15 14:28:05", user: "Alice Chen", role: "StoreManager", action: "sale.refund", module: "Sales", moduleIcon: DollarSign, target: "TXN-9198", detail: "Processed refund of $164.00 — reason: defective item", severity: "warning", ip: "192.168.1.22" },
-  { id: "AUD-10419", timestamp: "2026-02-15 13:55:41", user: "James Wilson", role: "RegionalManager", action: "workflow.approve", module: "Approvals", moduleIcon: CheckCircle2, target: "APR-2041", detail: "Approved Q1 Marketing Budget Increase ($24,500)", severity: "info", ip: "10.0.0.88" },
-  { id: "AUD-10418", timestamp: "2026-02-15 13:42:10", user: "Maria Garcia", role: "InventoryManager", action: "inventory.transfer", module: "Inventory", moduleIcon: Package, target: "TRF-4501", detail: "Initiated transfer: Widget Alpha ×200 from West DC to Main HQ", severity: "info", ip: "172.16.0.12" },
-  { id: "AUD-10417", timestamp: "2026-02-15 12:15:33", user: "System", role: "System", action: "security.alert", module: "Security", moduleIcon: Shield, target: "IP 45.33.92.11", detail: "Blocked login attempt — IP not in whitelist (5 attempts)", severity: "critical", ip: "45.33.92.11" },
-  { id: "AUD-10416", timestamp: "2026-02-15 11:50:22", user: "David Kim", role: "WarehouseManager", action: "inventory.adjust", module: "Inventory", moduleIcon: Package, target: "PCB-R3", detail: "Manual stock adjustment: 8 → 12 units (received late shipment)", severity: "info", ip: "192.168.2.10" },
-  { id: "AUD-10415", timestamp: "2026-02-15 11:30:00", user: "Frank Kim", role: "SalesRep", action: "auth.login", module: "Auth", moduleIcon: LogIn, target: "frank.kim@corp.com", detail: "Successful login from Main HQ terminal", severity: "info", ip: "192.168.1.22" },
-  { id: "AUD-10414", timestamp: "2026-02-15 10:45:19", user: "Diana Lee", role: "Finance", action: "workflow.reject", module: "Approvals", moduleIcon: AlertTriangle, target: "APR-2032", detail: "Rejected travel reimbursement — missing receipts", severity: "warning", ip: "10.0.0.55" },
-  { id: "AUD-10413", timestamp: "2026-02-15 10:20:08", user: "Lisa Park", role: "Marketing", action: "document.upload", module: "Documents", moduleIcon: FileText, target: "campaign-brief-q1.pdf", detail: "Uploaded document (2.4 MB) to Marketing folder", severity: "info", ip: "192.168.1.30" },
-  { id: "AUD-10412", timestamp: "2026-02-15 09:58:44", user: "Sarah Chen", role: "SuperAdmin", action: "permission.change", module: "Users", moduleIcon: Lock, target: "Role: Cashier", detail: "Removed 'sales.refund' permission from Cashier role", severity: "critical", ip: "192.168.1.45" },
-  { id: "AUD-10411", timestamp: "2026-02-15 09:30:11", user: "System", role: "System", action: "system.backup", module: "System", moduleIcon: Settings, target: "Database", detail: "Automated daily backup completed (14.2 GB)", severity: "info", ip: "10.0.0.1" },
-  { id: "AUD-10410", timestamp: "2026-02-14 17:45:00", user: "Grace Wu", role: "SalesRep", action: "auth.logout", module: "Auth", moduleIcon: LogOut, target: "grace.wu@corp.com", detail: "Session ended — South Hub terminal", severity: "info", ip: "172.16.0.8" },
-];
+const auditEntries: AuditEntry[] = [];
 
 const actionIcons: Record<string, React.ElementType> = {
   "role.update": Edit,
