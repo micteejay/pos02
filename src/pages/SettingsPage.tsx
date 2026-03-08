@@ -503,7 +503,7 @@ export default function SettingsPage() {
                   </select>
                 </div>
                 <div><label className="text-xs font-medium text-muted-foreground">Password Policy</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  <select value={settings.passwordPolicy} onChange={(e) => updateSettings({ passwordPolicy: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>Strong (12+ chars, mixed case, symbols)</option><option>Medium (8+ chars, mixed case)</option><option>Basic (6+ chars)</option>
                   </select>
                 </div>
