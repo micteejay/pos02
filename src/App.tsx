@@ -34,16 +34,14 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasCompanyProfile } = useAuth();
+  const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (!hasCompanyProfile) return <Navigate to="/setup-company" replace />;
   return <>{children}</>;
 }
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasCompanyProfile } = useAuth();
-  if (isAuthenticated && hasCompanyProfile) return <Navigate to="/" replace />;
-  if (isAuthenticated && !hasCompanyProfile) return <Navigate to="/setup-company" replace />;
+  const { isAuthenticated } = useAuth();
+  if (isAuthenticated) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

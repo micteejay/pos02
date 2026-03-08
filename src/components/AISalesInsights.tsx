@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const INSIGHTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-sales-insights`;
 
@@ -16,11 +17,13 @@ export default function AISalesInsights() {
     setHasGenerated(true);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
       const resp = await fetch(INSIGHTS_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({}),
       });

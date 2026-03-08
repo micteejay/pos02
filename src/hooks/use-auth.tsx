@@ -55,14 +55,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", supaUser.id)
       .single();
 
-    // Get role
-    const { data: userRoles } = await supabase
-      .from("user_roles")
-      .select("role_id, roles(name)")
-      .eq("user_id", supaUser.id)
-      .limit(1);
+    // Resolve role via secure role checks (works even when direct user_roles reads are restricted)
+    const rolePriority = [
+      { key: "super_admin", label: "Super Admin" },
+      { key: "admin", label: "Admin" },
+      { key: "manager", label: "Manager" },
+      { key: "sales_rep", label: "Sales Rep" },
+      { key: "warehouse_staff", label: "Warehouse Staff" },
+      { key: "viewer", label: "Viewer" },
+    ] as const;
 
-    const roleName = (userRoles as any)?.[0]?.roles?.name || "Viewer";
+    const roleChecks = await Promise.all(
+      rolePriority.map(async ({ key, label }) => {
+        const { data } = await supabase.rpc("has_role", { _user_id: supaUser.id, _role: key });
+        return data ? label : null;
+      })
+    );
+
+    const roleName = (roleChecks.find((role) => role !== null) ?? "Viewer") as string;
 
     const authUser: AuthUser = {
       id: supaUser.id,
