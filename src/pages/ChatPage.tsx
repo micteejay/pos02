@@ -29,7 +29,7 @@ export default function ChatPage() {
   const { addNotification } = useAppEvents();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeChannel, setActiveChannel] = useState<string>("");
+  const [activeChannel, setActiveChannelState] = useState<string>(() => localStorage.getItem("chat_active_channel") || "");
   const [inputText, setInputText] = useState("");
   const [searchText, setSearchText] = useState("");
   const [showSearch, setShowSearch] = useState(false);
