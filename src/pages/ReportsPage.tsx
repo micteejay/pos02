@@ -122,7 +122,7 @@ export default function ReportsPage() {
     return { approved, rejected, pending };
   }, [approvalItems]);
 
-  // Gain/Loss data — cost vs revenue per item
+  // Gain/Loss data — cost vs revenue per item + operational expenses
   const gainLossData = useMemo(() => {
     const map: Record<string, { name: string; revenue: number; cost: number; units: number }> = {};
     sales.forEach(s => s.items.forEach(item => {
@@ -135,6 +135,12 @@ export default function ReportsPage() {
     }));
     return Object.values(map).map(d => ({ ...d, profit: d.revenue - d.cost, margin: d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue * 100) : 0 }));
   }, [sales, inventory]);
+
+  // Net gain/loss including operational expenses
+  const netGainLoss = useMemo(() => {
+    const grossProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
+    return grossProfit - totalExpenses;
+  }, [gainLossData, totalExpenses]);
 
   // End of Day summary
   const eodData = useMemo(() => {
