@@ -34,7 +34,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 };
 
 export default function SupplyPage() {
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
