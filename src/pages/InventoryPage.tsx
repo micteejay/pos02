@@ -411,7 +411,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                       </tr>
                       {isExpanded && (
                         <tr key={`${item.sku}-actions`} className="bg-muted/20">
-                          <td colSpan={7} className="px-5 py-3">
+                          <td colSpan={8} className="px-5 py-3">
                             <div className="flex flex-wrap items-center gap-2 animate-fade-in">
                               <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
                               <div className="flex items-center gap-1 ml-2">
