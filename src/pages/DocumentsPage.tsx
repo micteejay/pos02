@@ -87,6 +87,27 @@ export default function DocumentsPage() {
 
   const breadcrumbs = currentFolder === "/" ? ["/"] : ["/", ...currentFolder.split("/").filter(Boolean)];
 
+  // Derive virtual folders from document folder_paths
+  const virtualFolders = useMemo(() => {
+    const folderSet = new Set<string>();
+    documents.forEach((d) => {
+      const p = d.folder;
+      if (p && p !== "/" && p !== currentFolder) {
+        // If the doc's folder starts with currentFolder, extract the next subfolder
+        const prefix = currentFolder === "/" ? "/" : currentFolder + "/";
+        if (p === prefix.slice(0, -1) || p.startsWith(prefix)) {
+          const rest = p.slice(prefix.length);
+          const nextFolder = rest.split("/")[0];
+          if (nextFolder) folderSet.add(nextFolder);
+        } else if (currentFolder === "/" && p.startsWith("/")) {
+          const nextFolder = p.slice(1).split("/")[0];
+          if (nextFolder) folderSet.add(nextFolder);
+        }
+      }
+    });
+    return [...folderSet];
+  }, [documents, currentFolder]);
+
   const currentDocs = useMemo(() => {
     let filtered = documents.filter((d) => d.folder === currentFolder);
     if (search) filtered = filtered.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
