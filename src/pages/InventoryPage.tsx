@@ -1,10 +1,10 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import {
   Package, Warehouse, ArrowRightLeft, Search, Filter, Plus, AlertTriangle,
   CheckCircle2, TrendingDown, TrendingUp, MoreHorizontal, MapPin, Box,
   ArrowRight, Clock, Eye, ArrowUpDown, ArrowUp, ArrowDown, X, Check, Trash2, Edit2,
-  Tag, ShieldCheck, XCircle,
+  Tag, ShieldCheck, XCircle, Loader2,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -13,6 +13,8 @@ import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
