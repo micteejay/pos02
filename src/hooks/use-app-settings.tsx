@@ -17,6 +17,14 @@ export interface AppSettings {
   language: string;
   timezone: string;
   logoUrl: string;
+  // Security settings
+  twoFactorEnabled: boolean;
+  sessionTimeout: string;
+  passwordPolicy: string;
+  // Notification preferences
+  notifyEmail: boolean;
+  notifyPush: boolean;
+  notifySms: boolean;
 }
 
 export type Permission =
@@ -130,6 +138,8 @@ const defaultSettings: AppSettings = {
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
+  twoFactorEnabled: false, sessionTimeout: "30 minutes", passwordPolicy: "Strong (12+ chars, mixed case, symbols)",
+  notifyEmail: true, notifyPush: true, notifySms: false,
 };
 
 const defaultIntegrations: IntegrationConfig[] = [
@@ -260,6 +270,24 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             showQRCode: r.showQRCode ?? prev.showQRCode,
           }));
         }
+        if (parsed.security) {
+          const s = parsed.security;
+          setSettings(prev => ({
+            ...prev,
+            twoFactorEnabled: s.twoFactorEnabled ?? prev.twoFactorEnabled,
+            sessionTimeout: s.sessionTimeout || prev.sessionTimeout,
+            passwordPolicy: s.passwordPolicy || prev.passwordPolicy,
+          }));
+        }
+        if (parsed.notifications) {
+          const n = parsed.notifications;
+          setSettings(prev => ({
+            ...prev,
+            notifyEmail: n.notifyEmail ?? prev.notifyEmail,
+            notifyPush: n.notifyPush ?? prev.notifyPush,
+            notifySms: n.notifySms ?? prev.notifySms,
+          }));
+        }
       }
 
       // Fetch integrations
@@ -300,8 +328,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       // Persist to Supabase
       const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl"];
       const receiptKeys = ["receiptStyle", "receiptHeader", "receiptFooter", "receiptReturnPolicy", "paperWidth", "fontSize", "showQRCode"];
+      const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy"];
+      const notificationKeys = ["notifyEmail", "notifyPush", "notifySms"];
       const hasGeneral = Object.keys(updates).some(k => generalKeys.includes(k));
       const hasReceipt = Object.keys(updates).some(k => receiptKeys.includes(k));
+      const hasSecurity = Object.keys(updates).some(k => securityKeys.includes(k));
+      const hasNotifications = Object.keys(updates).some(k => notificationKeys.includes(k));
       if (hasGeneral) {
         const generalValue: any = {};
         generalKeys.forEach(k => { generalValue[k] = (next as any)[k]; });
@@ -311,6 +343,16 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         const receiptValue: any = {};
         receiptKeys.forEach(k => { receiptValue[k] = (next as any)[k]; });
         supabase.from("app_settings").upsert({ key: "receipt", value: receiptValue, updated_by: authUser?.id || null }, { onConflict: "key" });
+      }
+      if (hasSecurity) {
+        const securityValue: any = {};
+        securityKeys.forEach(k => { securityValue[k] = (next as any)[k]; });
+        supabase.from("app_settings").upsert({ key: "security", value: securityValue, updated_by: authUser?.id || null }, { onConflict: "key" });
+      }
+      if (hasNotifications) {
+        const notifValue: any = {};
+        notificationKeys.forEach(k => { notifValue[k] = (next as any)[k]; });
+        supabase.from("app_settings").upsert({ key: "notifications", value: notifValue, updated_by: authUser?.id || null }, { onConflict: "key" });
       }
       return next;
     });

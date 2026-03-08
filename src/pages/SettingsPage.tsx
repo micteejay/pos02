@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
+import { useAudit } from "@/hooks/use-audit";
 import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2,
 } from "lucide-react";
@@ -105,11 +106,14 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration, hasPermission } = useAppSettings();
   const { companyProfile } = useAuth();
-  const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
-  const [twoFactor, setTwoFactor] = useState(false);
+  const { logAction } = useAudit();
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const handleSave = () => {
+    setSaved(true);
+    logAction("settings.update", "Settings", "all", "Settings saved");
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   const receiptStyles = [
     { id: "classic", name: "Classic", description: "Traditional receipt with clean lines" },
@@ -143,6 +147,7 @@ export default function SettingsPage() {
   const saveConfig = () => {
     if (configModal) {
       connectIntegration(configModal.name, configValues);
+      logAction("integration.connect", "Settings", configModal.name, `Connected integration: ${configModal.name}`);
       setConfigModal(null);
     }
   };
@@ -325,11 +330,11 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">Notification Preferences</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {([{ key: "email" as const, label: "Email", desc: "Receive updates via email" }, { key: "push" as const, label: "Push", desc: "Browser push notifications" }, { key: "sms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" }]).map((n) => (
+                {([{ key: "notifyEmail" as const, label: "Email", desc: "Receive updates via email" }, { key: "notifyPush" as const, label: "Push", desc: "Browser push notifications" }, { key: "notifySms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" }]).map((n) => (
                   <div key={n.key} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                     <div><p className="text-sm font-medium text-foreground">{n.label}</p><p className="text-xs text-muted-foreground">{n.desc}</p></div>
-                    <button onClick={() => setNotifications(prev => ({ ...prev, [n.key]: !prev[n.key] }))} className={`w-10 h-6 rounded-full transition-colors relative ${notifications[n.key] ? "bg-primary" : "bg-muted"}`}>
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${notifications[n.key] ? "translate-x-5" : "translate-x-1"}`} />
+                    <button onClick={() => updateSettings({ [n.key]: !settings[n.key] })} className={`w-10 h-6 rounded-full transition-colors relative ${settings[n.key] ? "bg-primary" : "bg-muted"}`}>
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings[n.key] ? "translate-x-5" : "translate-x-1"}`} />
                     </button>
                   </div>
                 ))}
@@ -489,17 +494,17 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div><p className="text-sm font-medium text-foreground">Two-Factor Authentication</p><p className="text-xs text-muted-foreground">Add an extra layer of security</p></div>
-                  <button onClick={() => setTwoFactor(!twoFactor)} className={`w-10 h-6 rounded-full transition-colors relative ${twoFactor ? "bg-primary" : "bg-muted"}`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${twoFactor ? "translate-x-5" : "translate-x-1"}`} />
+                  <button onClick={() => updateSettings({ twoFactorEnabled: !settings.twoFactorEnabled })} className={`w-10 h-6 rounded-full transition-colors relative ${settings.twoFactorEnabled ? "bg-primary" : "bg-muted"}`}>
+                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings.twoFactorEnabled ? "translate-x-5" : "translate-x-1"}`} />
                   </button>
                 </div>
                 <div><label className="text-xs font-medium text-muted-foreground">Session Timeout</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  <select value={settings.sessionTimeout} onChange={(e) => updateSettings({ sessionTimeout: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>8 hours</option>
                   </select>
                 </div>
                 <div><label className="text-xs font-medium text-muted-foreground">Password Policy</label>
-                  <select className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                  <select value={settings.passwordPolicy} onChange={(e) => updateSettings({ passwordPolicy: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>Strong (12+ chars, mixed case, symbols)</option><option>Medium (8+ chars, mixed case)</option><option>Basic (6+ chars)</option>
                   </select>
                 </div>
