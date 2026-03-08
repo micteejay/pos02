@@ -93,7 +93,7 @@ export default function SalesPage() {
       { label: "Today's Revenue", value: `$${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, change: transactions.length > 0 ? `${transactions.length} sales` : "", trend: "up" as const, icon: DollarSign },
       { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
       { label: "Avg. Ticket", value: `$${avgTicket.toFixed(2)}`, change: "", trend: "up" as const, icon: Receipt },
-      { label: "Active Reps", value: salesReps.length.toString(), change: "", trend: "up" as const, icon: Users },
+      { label: "Active Reps", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
   }, [transactions]);
 
