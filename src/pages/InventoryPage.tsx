@@ -231,8 +231,8 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
 }
 
 function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void; onCancel: () => void }) {
-  const { warehouseNames } = useSharedData();
-  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
+  const { warehouseNames, inventoryCategories } = useSharedData();
+  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState(inventoryCategories[0] || "Uncategorized");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
 
   return (
