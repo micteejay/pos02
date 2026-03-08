@@ -113,7 +113,7 @@ export default function ChatPage() {
         });
       }
 
-      if (chData) {
+      if (chData && chData.length > 0) {
         const mapped: Channel[] = chData.map((ch: any) => {
           let displayName = ch.name;
           // For DMs, show the other person's name
