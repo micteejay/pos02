@@ -72,12 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(authUser);
 
-    // Fetch company profile
-    const { data: company } = await supabase
+    // Fetch latest company profile for this owner (handles legacy duplicate rows safely)
+    const { data: companyRows } = await supabase
       .from("company_profiles")
       .select("*")
       .eq("owner_id", supaUser.id)
-      .maybeSingle();
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    const company = companyRows?.[0] ?? null;
 
     if (company) {
       setCompanyProfile({
@@ -194,8 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rc_number: profile.rcNumber || null,
     };
 
-    if (profile.id) {
-      await supabase.from("company_profiles").update(payload).eq("id", profile.id);
+    const { data: existingRows } = await supabase
+      .from("company_profiles")
+      .select("id")
+      .eq("owner_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    const existingCompanyId = profile.id || existingRows?.[0]?.id;
+
+    if (existingCompanyId) {
+      await supabase.from("company_profiles").update(payload).eq("id", existingCompanyId);
+      profile.id = existingCompanyId;
     } else {
       const { data } = await supabase.from("company_profiles").insert(payload).select("id").single();
       if (data) profile.id = data.id;
