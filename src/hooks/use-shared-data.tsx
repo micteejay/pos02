@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 
 export interface InventoryItem {
   sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
