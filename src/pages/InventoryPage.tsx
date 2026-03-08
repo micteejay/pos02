@@ -572,3 +572,128 @@ function TransferTab({ transfers, onUpdateStatus, onAdd }: { transfers: Transfer
     </div>
   );
 }
+
+function CategoriesTab({ categories, onAdd, onApprove, onReject, onDelete, userRole }: {
+  categories: import("@/hooks/use-shared-data").Category[];
+  onAdd: (name: string, type: CategoryType, desc: string) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onDelete: (id: string) => void;
+  userRole: string;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<CategoryType>("inventory");
+  const [newDesc, setNewDesc] = useState("");
+  const [filterType, setFilterType] = useState<"all" | CategoryType>("all");
+
+  const isAdmin = userRole === "Super Admin" || userRole === "Admin";
+  const filtered = categories.filter(c => filterType === "all" || c.type === filterType);
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    onAdd(newName.trim(), newType, newDesc.trim());
+    setNewName(""); setNewDesc(""); setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+            <option value="all">All Types</option>
+            <option value="inventory">Inventory</option>
+            <option value="expense">Expense</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          <Plus className="w-4 h-4" />New Category
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="glass-card rounded-xl p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-foreground">Create Category</h4>
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          {!isAdmin && (
+            <div className="text-xs text-info bg-info/10 px-3 py-2 rounded-lg">
+              Categories created by non-admin users require approval before they can be used.
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input placeholder="Category name" value={newName} onChange={e => setNewName(e.target.value)} />
+            <select value={newType} onChange={e => setNewType(e.target.value as CategoryType)} className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+              <option value="inventory">Inventory</option>
+              <option value="expense">Expense</option>
+              <option value="general">General</option>
+            </select>
+            <Input placeholder="Description (optional)" value={newDesc} onChange={e => setNewDesc(e.target.value)} />
+          </div>
+          <button onClick={handleAdd} disabled={!newName.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+            {isAdmin ? "Create & Approve" : "Submit for Approval"}
+          </button>
+        </div>
+      )}
+
+      <div className="glass-card rounded-xl p-5">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Type</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Description</th>
+                <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2">Status</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">Created By</th>
+                {isAdmin && <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(cat => (
+                <tr key={cat.id} className="border-b border-border/50">
+                  <td className="px-3 py-2 text-sm font-medium text-foreground">{cat.name}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cat.type === "inventory" ? "bg-primary/10 text-primary" : cat.type === "expense" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>
+                      {cat.type}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{cat.description || "—"}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cat.status === "approved" ? "bg-success/10 text-success" : cat.status === "pending" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}>
+                      {cat.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{cat.createdBy}{cat.approvedBy && cat.status === "approved" ? ` · ✓ ${cat.approvedBy}` : ""}</td>
+                  {isAdmin && (
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-center gap-1">
+                        {cat.status === "pending" && (
+                          <>
+                            <button onClick={() => onApprove(cat.id)} className="p-1 rounded hover:bg-success/10 text-success transition-colors" title="Approve">
+                              <ShieldCheck className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => onReject(cat.id)} className="p-1 rounded hover:bg-destructive/10 text-destructive transition-colors" title="Reject">
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {cat.createdBy !== "System" && (
+                          <button onClick={() => onDelete(cat.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
