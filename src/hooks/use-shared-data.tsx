@@ -71,6 +71,15 @@ interface SharedDataContextType {
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
 
+  // Categories
+  categories: Category[];
+  addCategory: (cat: Omit<Category, "id" | "createdAt">) => void;
+  approveCategory: (id: string, approvedBy: string) => void;
+  rejectCategory: (id: string) => void;
+  deleteCategory: (id: string) => void;
+  inventoryCategories: string[];
+  expenseCategories: string[];
+
   // Documents
   documents: SharedDocument[];
   addDocument: (doc: Omit<SharedDocument, "id">) => void;
