@@ -78,7 +78,7 @@ const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay
 
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
-  const { users } = useAppSettings();
+  const { users, hasPermission } = useAppSettings();
   const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>(initialTransactions);
