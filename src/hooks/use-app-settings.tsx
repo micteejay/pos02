@@ -193,19 +193,28 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      // Fetch users (profiles + roles + department + store)
-      const { data: profilesData } = await supabase
-        .from("profiles")
-        .select("*, user_roles(role_id, roles(name)), departments(name), stores(name), user_store_assignments(store_id, stores(name))")
-        .order("name");
+      // Fetch users: profiles with departments & stores (FK exists), then user_roles separately
+      const [profilesRes, userRolesRes] = await Promise.all([
+        supabase.from("profiles").select("*, departments(name), stores(name)").order("name"),
+        supabase.from("user_roles").select("user_id, roles(name)"),
+      ]);
+      const profilesData = profilesRes.data;
+      const userRolesData = userRolesRes.data as any[] | null;
       if (profilesData) {
+        // Build a map of user_id -> role name
+        const roleMap: Record<string, string> = {};
+        if (userRolesData) {
+          userRolesData.forEach((ur: any) => {
+            if (ur.roles?.name) roleMap[ur.user_id] = ur.roles.name;
+          });
+        }
         setUsers(profilesData.map((p: any) => {
-          const storeName = p.stores?.name || p.user_store_assignments?.[0]?.stores?.name || "";
+          const storeName = p.stores?.name || "";
           const deptName = p.departments?.name || "";
           return {
             id: p.id, name: p.name || "Unknown", email: p.email || "",
             avatar: p.avatar || (p.name || "U").charAt(0).toUpperCase(),
-            role: p.user_roles?.[0]?.roles?.name || "Viewer",
+            role: roleMap[p.id] || "Viewer",
             status: p.status as AppUser["status"],
             lastActive: p.last_active || "",
             department: deptName, store: storeName,
