@@ -114,8 +114,19 @@ export default function SettingsPage() {
   const handleSave = () => {
     setSaved(true);
     logAction("settings.update", "Settings", "all", "Settings saved");
+    toast.success("Settings saved successfully");
     setTimeout(() => setSaved(false), 2000);
   };
+
+  // Real active sessions
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  useEffect(() => {
+    if (activeTab !== "security") return;
+    const { user } = companyProfile ? { user: { id: "" } } : { user: null };
+    supabase.from("user_sessions").select("*").order("started_at", { ascending: false }).limit(20).then(({ data }) => {
+      if (data) setActiveSessions(data);
+    });
+  }, [activeTab]);
 
   const receiptStyles = [
     { id: "classic", name: "Classic", description: "Traditional receipt with clean lines" },
