@@ -1356,3 +1356,268 @@ CREATE POLICY "auth_read" ON storage.objects FOR SELECT TO authenticated USING (
 CREATE POLICY "auth_insert" ON storage.objects FOR INSERT TO authenticated WITH CHECK (TRUE);
 CREATE POLICY "auth_update" ON storage.objects FOR UPDATE TO authenticated USING (TRUE);
 CREATE POLICY "auth_delete" ON storage.objects FOR DELETE TO authenticated USING (TRUE);
+
+-- =====================================================
+-- 38. USER STORE ASSIGNMENTS
+-- =====================================================
+
+CREATE TABLE public.user_store_assignments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  store_id UUID REFERENCES public.stores(id) ON DELETE CASCADE NOT NULL,
+  assigned_by UUID REFERENCES auth.users(id),
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, store_id)
+);
+
+CREATE TABLE public.user_warehouse_assignments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  warehouse_id UUID REFERENCES public.warehouses(id) ON DELETE CASCADE NOT NULL,
+  assigned_by UUID REFERENCES auth.users(id),
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, warehouse_id)
+);
+
+ALTER TABLE public.user_store_assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_warehouse_assignments ENABLE ROW LEVEL SECURITY;
+
+-- Users can see their own assignments
+CREATE POLICY "own_read" ON public.user_store_assignments FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+CREATE POLICY "own_read" ON public.user_warehouse_assignments FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+-- Admins can manage all assignments
+CREATE POLICY "admin_all" ON public.user_store_assignments FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
+CREATE POLICY "admin_all" ON public.user_warehouse_assignments FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
+
+-- Managers can assign users to their own store
+CREATE POLICY "manager_insert" ON public.user_store_assignments FOR INSERT TO authenticated
+  WITH CHECK (
+    public.has_role(auth.uid(), 'manager')
+    AND store_id IN (SELECT store_id FROM public.user_store_assignments WHERE user_id = auth.uid())
+  );
+
+CREATE INDEX idx_user_store_assignments_user ON public.user_store_assignments(user_id);
+CREATE INDEX idx_user_store_assignments_store ON public.user_store_assignments(store_id);
+CREATE INDEX idx_user_warehouse_assignments_user ON public.user_warehouse_assignments(user_id);
+CREATE INDEX idx_user_warehouse_assignments_warehouse ON public.user_warehouse_assignments(warehouse_id);
+
+-- =====================================================
+-- 39. FUNCTION: GET USER ACCESSIBLE STORES
+-- =====================================================
+
+CREATE OR REPLACE FUNCTION public.get_user_stores(_user_id UUID)
+RETURNS SETOF public.stores
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  -- Admins see all stores
+  SELECT s.* FROM public.stores s
+  WHERE public.has_any_role(_user_id, ARRAY['super_admin', 'admin']::app_role[])
+  UNION
+  -- Others see only assigned stores
+  SELECT s.* FROM public.stores s
+  JOIN public.user_store_assignments usa ON usa.store_id = s.id
+  WHERE usa.user_id = _user_id
+    AND NOT public.has_any_role(_user_id, ARRAY['super_admin', 'admin']::app_role[])
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_user_warehouses(_user_id UUID)
+RETURNS SETOF public.warehouses
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT w.* FROM public.warehouses w
+  WHERE public.has_any_role(_user_id, ARRAY['super_admin', 'admin']::app_role[])
+  UNION
+  SELECT w.* FROM public.warehouses w
+  JOIN public.user_warehouse_assignments uwa ON uwa.warehouse_id = w.id
+  WHERE uwa.user_id = _user_id
+    AND NOT public.has_any_role(_user_id, ARRAY['super_admin', 'admin']::app_role[])
+$$;
+
+-- =====================================================
+-- 40. ENHANCED AUDIT LOG — AUTO-LOG TRIGGERS
+-- =====================================================
+
+-- Auto-log store changes
+CREATE OR REPLACE FUNCTION public.audit_store_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.log_audit('store.create', 'Organization', NEW.name, 'Store created: ' || NEW.name);
+  ELSIF TG_OP = 'UPDATE' THEN
+    PERFORM public.log_audit('store.update', 'Organization', NEW.name, 'Store updated: ' || NEW.name);
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM public.log_audit('store.delete', 'Organization', OLD.name, 'Store deleted: ' || OLD.name, 'warning');
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER tr_audit_stores
+  AFTER INSERT OR UPDATE OR DELETE ON public.stores
+  FOR EACH ROW EXECUTE FUNCTION public.audit_store_changes();
+
+-- Auto-log user role changes
+CREATE OR REPLACE FUNCTION public.audit_user_role_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _user_name TEXT;
+  _role_name TEXT;
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    SELECT name INTO _user_name FROM public.profiles WHERE id = NEW.user_id;
+    SELECT name INTO _role_name FROM public.roles WHERE id = NEW.role_id;
+    PERFORM public.log_audit('role.assign', 'Users', _user_name, 'Role ' || _role_name || ' assigned to ' || _user_name);
+  ELSIF TG_OP = 'DELETE' THEN
+    SELECT name INTO _user_name FROM public.profiles WHERE id = OLD.user_id;
+    SELECT name INTO _role_name FROM public.roles WHERE id = OLD.role_id;
+    PERFORM public.log_audit('role.revoke', 'Users', _user_name, 'Role ' || _role_name || ' revoked from ' || _user_name, 'warning');
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER tr_audit_user_roles
+  AFTER INSERT OR DELETE ON public.user_roles
+  FOR EACH ROW EXECUTE FUNCTION public.audit_user_role_changes();
+
+-- Auto-log sales transactions
+CREATE OR REPLACE FUNCTION public.audit_sale_created()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  PERFORM public.log_audit('sale.create', 'Sales', NEW.transaction_number,
+    'Sale ' || NEW.transaction_number || ' for ' || NEW.total || ' by ' || COALESCE(
+      (SELECT name FROM public.profiles WHERE id = NEW.cashier_id), 'Unknown'
+    )
+  );
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER tr_audit_sales
+  AFTER INSERT ON public.sales_transactions
+  FOR EACH ROW EXECUTE FUNCTION public.audit_sale_created();
+
+-- Auto-log inventory changes
+CREATE OR REPLACE FUNCTION public.audit_inventory_changes()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM public.log_audit('inventory.create', 'Inventory', NEW.name, 'Item created: ' || NEW.name || ' (SKU: ' || NEW.sku || ')');
+  ELSIF TG_OP = 'UPDATE' AND NEW.qty != OLD.qty THEN
+    PERFORM public.log_audit('inventory.adjust', 'Inventory', NEW.name,
+      'Stock changed from ' || OLD.qty || ' to ' || NEW.qty || ' for ' || NEW.name,
+      CASE WHEN NEW.qty <= NEW.reorder_point THEN 'warning'::audit_severity ELSE 'info'::audit_severity END
+    );
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM public.log_audit('inventory.delete', 'Inventory', OLD.name, 'Item deleted: ' || OLD.name, 'warning');
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER tr_audit_inventory
+  AFTER INSERT OR UPDATE OR DELETE ON public.inventory_items
+  FOR EACH ROW EXECUTE FUNCTION public.audit_inventory_changes();
+
+-- =====================================================
+-- 41. ROLE-BASED NOTIFICATION TARGETING
+-- =====================================================
+
+-- Add target_roles column to notifications for role-based filtering
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS target_roles TEXT[] DEFAULT '{}';
+ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS created_by_name TEXT;
+
+-- Update notification RLS to include role-based access
+DROP POLICY IF EXISTS "own_read" ON public.notifications;
+
+CREATE POLICY "role_based_read" ON public.notifications FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR target_roles = '{}'
+    OR (
+      SELECT r.name FROM public.user_roles ur
+      JOIN public.roles r ON ur.role_id = r.id
+      WHERE ur.user_id = auth.uid()
+      LIMIT 1
+    ) = ANY(target_roles)
+  );
+
+-- Function to send role-targeted notifications
+CREATE OR REPLACE FUNCTION public.send_role_notification(
+  _target_roles TEXT[],
+  _type notification_type,
+  _title TEXT,
+  _message TEXT DEFAULT NULL,
+  _link TEXT DEFAULT NULL,
+  _created_by TEXT DEFAULT NULL
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Send to all users with matching roles
+  INSERT INTO public.notifications (user_id, type, title, message, link, target_roles, created_by_name)
+  SELECT DISTINCT ur.user_id, _type, _title, _message, _link, _target_roles, _created_by
+  FROM public.user_roles ur
+  JOIN public.roles r ON ur.role_id = r.id
+  WHERE r.name = ANY(_target_roles);
+END;
+$$;
+
+-- =====================================================
+-- 42. STORE-SCOPED RLS POLICIES (enhanced)
+-- =====================================================
+
+-- Update stores read policy to respect store assignments
+DROP POLICY IF EXISTS "auth_read" ON public.stores;
+CREATE POLICY "store_access_read" ON public.stores FOR SELECT TO authenticated
+  USING (
+    public.has_any_role(auth.uid(), ARRAY['super_admin', 'admin']::app_role[])
+    OR id IN (SELECT store_id FROM public.user_store_assignments WHERE user_id = auth.uid())
+  );
+
+-- Update warehouses read policy
+DROP POLICY IF EXISTS "auth_read" ON public.warehouses;
+CREATE POLICY "warehouse_access_read" ON public.warehouses FOR SELECT TO authenticated
+  USING (
+    public.has_any_role(auth.uid(), ARRAY['super_admin', 'admin']::app_role[])
+    OR id IN (SELECT warehouse_id FROM public.user_warehouse_assignments WHERE user_id = auth.uid())
+  );
+
+-- Sales transactions scoped to user's store
+DROP POLICY IF EXISTS "auth_read" ON public.sales_transactions;
+CREATE POLICY "store_scoped_sales_read" ON public.sales_transactions FOR SELECT TO authenticated
+  USING (
+    public.has_any_role(auth.uid(), ARRAY['super_admin', 'admin']::app_role[])
+    OR store_id IN (SELECT store_id FROM public.user_store_assignments WHERE user_id = auth.uid())
+    OR cashier_id = auth.uid()
+  );
