@@ -69,6 +69,38 @@ CREATE TABLE public.departments (
 );
 
 -- =====================================================
+-- 2b. COMPANY PROFILES TABLE
+-- =====================================================
+
+CREATE TABLE public.company_profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  address TEXT,
+  city TEXT,
+  state TEXT,
+  country TEXT DEFAULT 'Nigeria',
+  phone TEXT,
+  email TEXT,
+  website TEXT,
+  tax_id TEXT,
+  industry TEXT DEFAULT 'Retail',
+  currency TEXT DEFAULT 'NGN',
+  tax_rate NUMERIC(5,2) DEFAULT 7.5,
+  business_type TEXT DEFAULT 'Limited Company',
+  logo_url TEXT,
+  rc_number TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.company_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own company profile"
+  ON public.company_profiles FOR ALL TO authenticated
+  USING (owner_id = auth.uid());
+
+-- =====================================================
 -- 3. USER & ROLES TABLES
 -- =====================================================
 
