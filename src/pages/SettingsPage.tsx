@@ -147,6 +147,7 @@ export default function SettingsPage() {
   const saveConfig = () => {
     if (configModal) {
       connectIntegration(configModal.name, configValues);
+      logAction("integration.connect", "Settings", configModal.name, `Connected integration: ${configModal.name}`);
       setConfigModal(null);
     }
   };
