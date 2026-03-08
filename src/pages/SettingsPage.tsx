@@ -103,7 +103,7 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const { theme, setTheme } = useTheme();
-  const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration } = useAppSettings();
+  const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration, hasPermission } = useAppSettings();
   const { companyProfile } = useAuth();
   const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
   const [twoFactor, setTwoFactor] = useState(false);
