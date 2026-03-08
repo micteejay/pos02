@@ -32,6 +32,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
   { title: "Communication", items: [
     { label: "Chat", icon: MessageSquare, path: "/chat", badgeKey: "chat" },
     { label: "Documents", icon: FileText, path: "/documents" },
+    { label: "Invoices", icon: Receipt, path: "/invoices" },
   ]},
   { title: "Analytics", items: [
     { label: "Reports", icon: PieChart, path: "/reports" },
