@@ -37,7 +37,7 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "" });
+  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "", recurring: false, recurringInterval: "monthly" as "daily" | "weekly" | "monthly" | "yearly" });
 
   // Total operational expenses
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
@@ -196,10 +196,11 @@ export default function ReportsPage() {
       store: expenseForm.store || stores[0]?.name || "Main",
       createdBy: user?.name || "System",
       createdByRole: user?.role || "Admin",
-      recurring: false,
+      recurring: expenseForm.recurring,
+      recurringInterval: expenseForm.recurring ? expenseForm.recurringInterval : undefined,
     });
-    logAction("expense.add", "Expenses", expenseForm.category, `Added expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
-    setExpenseForm({ category: "Rent", description: "", amount: "", store: "" });
+    logAction("expense.add", "Expenses", expenseForm.category, `Added ${expenseForm.recurring ? `recurring (${expenseForm.recurringInterval})` : ""} expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
+    setExpenseForm({ category: "Rent", description: "", amount: "", store: "", recurring: false, recurringInterval: "monthly" });
     setShowAddExpense(false);
   };
 
@@ -684,7 +685,23 @@ export default function ReportsPage() {
                       {stores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   </div>
-                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Save Expense</button>
+                  <div className="flex items-center gap-4 mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={expenseForm.recurring} onChange={e => setExpenseForm(f => ({ ...f, recurring: e.target.checked }))} className="rounded border-border" />
+                      <span className="text-sm text-foreground">Recurring</span>
+                    </label>
+                    {expenseForm.recurring && (
+                      <select value={expenseForm.recurringInterval} onChange={e => setExpenseForm(f => ({ ...f, recurringInterval: e.target.value as any }))} className="h-8 rounded-lg border border-border bg-background px-3 text-xs text-foreground">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    )}
+                  </div>
+                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    {expenseForm.recurring ? "Save Recurring Expense" : "Save Expense"}
+                  </button>
                 </div>
               )}
 
@@ -697,8 +714,9 @@ export default function ReportsPage() {
                         <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Category</th>
                         <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Description</th>
                         <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Amount</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Store</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">By</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Type</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">Store</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden lg:table-cell">By</th>
                         <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-10"></th>
                       </tr>
                     </thead>
@@ -709,8 +727,20 @@ export default function ReportsPage() {
                           <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium">{exp.category}</span></td>
                           <td className="px-3 py-2 text-sm text-foreground">{exp.description}</td>
                           <td className="px-3 py-2 text-sm text-right font-semibold text-foreground">{formatCurrency(exp.amount)}</td>
-                          <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{exp.store}</td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{exp.createdBy}</td>
+                          <td className="px-3 py-2 hidden sm:table-cell">
+                            {exp.recurring ? (
+                              <div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium capitalize">{exp.recurringInterval}</span>
+                                {exp.nextDueDate && <p className="text-[10px] text-muted-foreground mt-0.5">Next: {new Date(exp.nextDueDate).toLocaleDateString()}</p>}
+                              </div>
+                            ) : exp.parentId ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">Auto-generated</span>
+                            ) : (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">One-time</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-muted-foreground hidden md:table-cell">{exp.store}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground hidden lg:table-cell">{exp.createdBy}</td>
                           <td className="px-3 py-2 text-center">
                             <button onClick={() => { deleteExpense(exp.id); logAction("expense.delete", "Expenses", exp.category, `Deleted expense: ${exp.description}`); }} className="text-muted-foreground hover:text-destructive transition-colors">
                               <Trash2 className="w-3.5 h-3.5" />
