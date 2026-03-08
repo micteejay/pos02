@@ -439,12 +439,7 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">API Keys</h3>
               </div>
               <div className="space-y-3">
-                {[{ name: "Production Key", created: "Jan 15, 2026", lastUsed: "2 hours ago" }, { name: "Staging Key", created: "Feb 1, 2026", lastUsed: "3 days ago" }, { name: "Development Key", created: "Feb 20, 2026", lastUsed: "1 hour ago" }].map((key) => (
-                  <div key={key.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div><p className="text-sm font-medium text-foreground">{key.name}</p><p className="text-[10px] text-muted-foreground">Created {key.created} · Last used {key.lastUsed}</p></div>
-                    <button className="text-xs text-destructive font-medium hover:underline">Revoke</button>
-                  </div>
-                ))}
+                <p className="text-sm text-muted-foreground text-center py-4">No API keys generated yet.</p>
                 <button className="w-full py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors">+ Generate New Key</button>
               </div>
             </div>
