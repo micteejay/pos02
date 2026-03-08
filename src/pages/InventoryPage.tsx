@@ -383,6 +383,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground" onClick={() => handleSort("qty")}>
                     <div className="flex items-center gap-1 justify-end">Qty <SortIcon col="qty" /></div>
                   </th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 hidden lg:table-cell">Cost</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground hidden sm:table-cell" onClick={() => handleSort("price")}>
                     <div className="flex items-center gap-1 justify-end">Price <SortIcon col="price" /></div>
                   </th>
