@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
 export interface AuditEntry {
@@ -15,50 +16,35 @@ export interface AuditEntry {
   ip: string;
 }
 
-const STORAGE_KEY = "audit-log-entries";
-
-function getEntries(): AuditEntry[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveEntries(entries: AuditEntry[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(0, 500))); // keep last 500
-}
-
 export function useAudit() {
   const { user } = useAuth();
 
-  const logAction = useCallback((
+  const logAction = useCallback(async (
     action: string,
     module: string,
     target: string,
     detail: string,
     severity: "info" | "warning" | "critical" = "info"
   ) => {
-    const entry: AuditEntry = {
-      id: `AUD-${Date.now()}`,
-      timestamp: new Date().toLocaleString(),
-      user: user?.name || "System",
-      userId: user?.id || "",
-      role: user?.role || "",
-      action,
-      module,
-      target,
-      detail: `${detail} — by ${user?.name || "System"} (${user?.role || "N/A"})`,
-      severity,
-      ip: "127.0.0.1",
-    };
-    const entries = [entry, ...getEntries()];
-    saveEntries(entries);
-    return entry;
+    await supabase.rpc("log_audit", {
+      _action: action,
+      _module: module,
+      _target: target,
+      _detail: `${detail} — by ${user?.name || "System"} (${user?.role || "N/A"})`,
+      _severity: severity as any,
+    });
   }, [user]);
 
-  const getAuditLog = useCallback((): AuditEntry[] => {
-    return getEntries();
+  const getAuditLog = useCallback(async (): Promise<AuditEntry[]> => {
+    const { data } = await supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(500);
+    if (!data) return [];
+    return data.map(e => ({
+      id: e.id, timestamp: e.created_at, user: e.user_name || "System",
+      userId: e.user_id || "", role: e.user_role || "",
+      action: e.action, module: e.module, target: e.target || "",
+      detail: e.detail || "", severity: e.severity as AuditEntry["severity"],
+      ip: e.ip_address || "",
+    }));
   }, []);
 
   return { logAction, getAuditLog };

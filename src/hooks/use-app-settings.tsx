@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export interface AppSettings {
   appName: string;
@@ -122,56 +124,13 @@ const allPermissions: Permission[] = [
   "pages.users.users","pages.users.roles","pages.users.permissions",
 ];
 
-const defaultRoles: AppRole[] = [
-  { id: "r1", name: "Super Admin", description: "Full system access with all permissions", permissions: [...allPermissions], isSystem: true, color: "bg-destructive/10 text-destructive" },
-  { id: "r2", name: "Admin", description: "Administrative access excluding system settings", permissions: allPermissions.filter(p => !p.startsWith("roles.")), isSystem: true, color: "bg-primary/10 text-primary" },
-  { id: "r3", name: "Manager", description: "Manage operations, sales, and inventory", permissions: [
-    "users.view","inventory.view","inventory.create","inventory.edit",
-    "inventory.stock","inventory.warehouses","inventory.transfers","inventory.categories",
-    "sales.view","sales.create","sales.edit","sales.transactions","sales.analytics","sales.reps",
-    "pos.view","pos.create",
-    "supply.view","supply.create","supply.edit","supply.approve","supply.orders","supply.suppliers",
-    "workflows.view","workflows.create","workflows.approve",
-    "approvals.view","approvals.approve","approvals.reject","approvals.pending","approvals.history",
-    "reports.view","reports.export","reports.overview","reports.sales","reports.inventory","reports.gainloss","reports.eod","reports.expenses","reports.operations",
-    "organization.view","organization.stores","organization.warehouses","organization.departments",
-    "documents.view","documents.create","documents.edit",
-    "settings.view","settings.general","settings.receipt",
-    "chat.view","chat.create","audit.view","notifications.view","dashboard.view",
-    "pages.dashboard","pages.inventory","pages.sales","pages.pos","pages.supply","pages.workflows","pages.approvals","pages.reports","pages.organization","pages.documents","pages.chat","pages.settings","pages.audit","pages.notifications",
-    "pages.inventory.stock","pages.inventory.warehouses","pages.inventory.transfers","pages.inventory.categories",
-    "pages.sales.transactions","pages.sales.analytics","pages.sales.reps",
-    "pages.supply.orders","pages.supply.suppliers",
-    "pages.approvals.pending","pages.approvals.history",
-    "pages.reports.overview","pages.reports.sales","pages.reports.inventory","pages.reports.gainloss","pages.reports.eod","pages.reports.expenses","pages.reports.operations",
-    "pages.organization.stores","pages.organization.warehouses","pages.organization.departments",
-    "pages.settings.general","pages.settings.receipt",
-  ], isSystem: false, color: "bg-info/10 text-info" },
-  { id: "r4", name: "Sales Rep", description: "Point of sale and sales management", permissions: [
-    "sales.view","sales.create","sales.transactions","sales.analytics",
-    "pos.view","pos.create","inventory.view","inventory.stock",
-    "reports.view","reports.sales","reports.eod",
-    "chat.view","chat.create","documents.view","notifications.view","dashboard.view",
-    "pages.dashboard","pages.sales","pages.pos","pages.inventory","pages.reports","pages.documents","pages.chat","pages.notifications",
-    "pages.sales.transactions","pages.sales.analytics",
-    "pages.inventory.stock",
-    "pages.reports.sales","pages.reports.eod",
-  ], isSystem: false, color: "bg-success/10 text-success" },
-  { id: "r5", name: "Warehouse Staff", description: "Inventory and supply chain operations", permissions: [
-    "inventory.view","inventory.create","inventory.edit","inventory.stock","inventory.warehouses","inventory.transfers",
-    "supply.view","supply.create","supply.orders",
-    "workflows.view","documents.view","chat.view","chat.create","notifications.view","dashboard.view",
-    "pages.dashboard","pages.inventory","pages.supply","pages.workflows","pages.documents","pages.chat","pages.notifications",
-    "pages.inventory.stock","pages.inventory.warehouses","pages.inventory.transfers",
-    "pages.supply.orders",
-    "workflows.view","documents.view","chat.view","chat.create","notifications.view","dashboard.view",
-  ], isSystem: false, color: "bg-warning/10 text-warning" },
-  { id: "r6", name: "Viewer", description: "Read-only access to all modules", permissions: allPermissions.filter(p => p.endsWith(".view")), isSystem: false, color: "bg-muted text-muted-foreground" },
-];
-
-const defaultUsers: AppUser[] = [
-  { id: "u1", name: "Admin", email: "admin@app.com", avatar: "A", role: "Super Admin", status: "active", lastActive: "Now", department: "", store: "" },
-];
+const defaultSettings: AppSettings = {
+  appName: "Enterprise Hub", currency: "USD", currencySymbol: "$", taxRate: 8,
+  receiptStyle: "modern", receiptHeader: "", receiptFooter: "Thank you for your purchase!",
+  receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
+  paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
+  timezone: "UTC-05:00 Eastern", logoUrl: "",
+};
 
 const defaultIntegrations: IntegrationConfig[] = [
   { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳", category: "payment", configFields: ["API Key", "Secret Key", "Webhook Secret"], configValues: {} },
@@ -202,7 +161,6 @@ interface AppSettingsContextType {
   hasPermission: (permission: Permission) => boolean;
   allPermissions: Permission[];
   formatCurrency: (amount: number) => string;
-  // Integrations
   integrations: IntegrationConfig[];
   connectIntegration: (name: string, configValues: Record<string, string>) => void;
   disconnectIntegration: (name: string) => void;
@@ -213,124 +171,204 @@ interface AppSettingsContextType {
 const AppSettingsContext = createContext<AppSettingsContextType>(null!);
 
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const stored = localStorage.getItem("app-settings");
-    return stored ? JSON.parse(stored) : {
-      appName: "Enterprise Hub",
-      currency: "USD",
-      currencySymbol: "$",
-      taxRate: 8,
-      receiptStyle: "modern",
-      receiptHeader: "",
-      receiptFooter: "Thank you for your purchase!",
-      receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
-      paperWidth: "80mm",
-      fontSize: "Medium",
-      showQRCode: true,
-      language: "en",
-      timezone: "UTC-05:00 Eastern",
-      logoUrl: "",
+  const { user: authUser } = useAuth();
+  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [roles, setRoles] = useState<AppRole[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationConfig[]>(defaultIntegrations);
+  const [currentUserPermissions, setCurrentUserPermissions] = useState<Permission[]>([]);
+
+  // Fetch roles, users, settings, integrations from Supabase
+  useEffect(() => {
+    if (!authUser) return;
+
+    const fetchData = async () => {
+      // Fetch roles
+      const { data: rolesData } = await supabase.from("roles").select("*").order("name");
+      if (rolesData) {
+        setRoles(rolesData.map(r => ({
+          id: r.id, name: r.name, description: r.description || "",
+          permissions: (r.permissions || []) as Permission[],
+          isSystem: r.is_system, color: r.color || "bg-muted text-muted-foreground",
+        })));
+      }
+
+      // Fetch users (profiles + roles)
+      const { data: profilesData } = await supabase.from("profiles").select("*, user_roles(role_id, roles(name))").order("name");
+      if (profilesData) {
+        setUsers(profilesData.map((p: any) => ({
+          id: p.id, name: p.name || "Unknown", email: p.email || "",
+          avatar: p.avatar || (p.name || "U").charAt(0).toUpperCase(),
+          role: p.user_roles?.[0]?.roles?.name || "Viewer",
+          status: p.status as AppUser["status"],
+          lastActive: p.last_active || "",
+          department: "", store: "",
+        })));
+      }
+
+      // Fetch current user permissions
+      const { data: perms } = await supabase.rpc("get_user_permissions", { _user_id: authUser.id });
+      if (perms) setCurrentUserPermissions(perms as Permission[]);
+
+      // Fetch app settings
+      const { data: settingsData } = await supabase.from("app_settings").select("*");
+      if (settingsData) {
+        const parsed: any = {};
+        settingsData.forEach((s: any) => {
+          try { parsed[s.key] = typeof s.value === "string" ? JSON.parse(s.value) : s.value; }
+          catch { parsed[s.key] = s.value; }
+        });
+        if (parsed.general) {
+          const g = parsed.general;
+          setSettings(prev => ({
+            ...prev,
+            appName: g.appName || prev.appName,
+            currency: g.currency || prev.currency,
+            currencySymbol: g.currencySymbol || prev.currencySymbol,
+            taxRate: g.taxRate ?? prev.taxRate,
+            language: g.language || prev.language,
+            timezone: g.timezone || prev.timezone,
+            logoUrl: g.logoUrl || prev.logoUrl,
+          }));
+        }
+        if (parsed.receipt) {
+          const r = parsed.receipt;
+          setSettings(prev => ({
+            ...prev,
+            receiptStyle: r.receiptStyle || prev.receiptStyle,
+            receiptHeader: r.receiptHeader ?? prev.receiptHeader,
+            receiptFooter: r.receiptFooter ?? prev.receiptFooter,
+            receiptReturnPolicy: r.receiptReturnPolicy ?? prev.receiptReturnPolicy,
+            paperWidth: r.paperWidth || prev.paperWidth,
+            fontSize: r.fontSize || prev.fontSize,
+            showQRCode: r.showQRCode ?? prev.showQRCode,
+          }));
+        }
+      }
+
+      // Fetch integrations
+      const { data: intData } = await supabase.from("integration_configs").select("*");
+      if (intData && intData.length > 0) {
+        setIntegrations(intData.map(i => ({
+          name: i.name, description: i.description || "",
+          connected: i.connected, icon: i.icon || "⚙️",
+          category: i.category as IntegrationConfig["category"],
+          configFields: i.config_fields || [],
+          configValues: (i.config_values as Record<string, string>) || {},
+        })));
+      }
     };
-  });
 
-  const [roles, setRoles] = useState<AppRole[]>(() => {
-    const stored = localStorage.getItem("app-roles");
-    return stored ? JSON.parse(stored) : defaultRoles;
-  });
+    fetchData();
+  }, [authUser]);
 
-  const [users, setUsers] = useState<AppUser[]>(() => {
-    const stored = localStorage.getItem("app-users");
-    return stored ? JSON.parse(stored) : defaultUsers;
-  });
+  const currentUser: AppUser = users.find(u => u.id === authUser?.id) || {
+    id: authUser?.id || "", name: authUser?.name || "User", email: authUser?.email || "",
+    avatar: (authUser?.name || "U").charAt(0).toUpperCase(),
+    role: authUser?.role || "Viewer", status: "active", lastActive: "Now",
+    department: "", store: "",
+  };
 
-  const [integrations, setIntegrations] = useState<IntegrationConfig[]>(() => {
-    const stored = localStorage.getItem("app-integrations");
-    return stored ? JSON.parse(stored) : defaultIntegrations;
-  });
-
-  const currentUser = users[0];
   const currentRole = roles.find(r => r.name === currentUser.role);
 
   const hasPermission = useCallback((permission: Permission) => {
+    // Check from DB permissions first, fall back to role permissions
+    if (currentUserPermissions.length > 0) return currentUserPermissions.includes(permission);
     if (!currentRole) return false;
     return currentRole.permissions.includes(permission);
-  }, [currentRole]);
+  }, [currentRole, currentUserPermissions]);
 
-  const updateSettings = useCallback((updates: Partial<AppSettings>) => {
+  const updateSettings = useCallback(async (updates: Partial<AppSettings>) => {
     setSettings(prev => {
       const next = { ...prev, ...updates };
-      localStorage.setItem("app-settings", JSON.stringify(next));
+      // Persist to Supabase
+      const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl"];
+      const receiptKeys = ["receiptStyle", "receiptHeader", "receiptFooter", "receiptReturnPolicy", "paperWidth", "fontSize", "showQRCode"];
+      const hasGeneral = Object.keys(updates).some(k => generalKeys.includes(k));
+      const hasReceipt = Object.keys(updates).some(k => receiptKeys.includes(k));
+      if (hasGeneral) {
+        const generalValue: any = {};
+        generalKeys.forEach(k => { generalValue[k] = (next as any)[k]; });
+        supabase.from("app_settings").upsert({ key: "general", value: generalValue, updated_by: authUser?.id || null }, { onConflict: "key" });
+      }
+      if (hasReceipt) {
+        const receiptValue: any = {};
+        receiptKeys.forEach(k => { receiptValue[k] = (next as any)[k]; });
+        supabase.from("app_settings").upsert({ key: "receipt", value: receiptValue, updated_by: authUser?.id || null }, { onConflict: "key" });
+      }
       return next;
     });
+  }, [authUser]);
+
+  const addRole = useCallback(async (role: Omit<AppRole, "id">) => {
+    const { data, error } = await supabase.from("roles").insert({
+      name: role.name, description: role.description,
+      permissions: role.permissions, is_system: role.isSystem, color: role.color,
+    }).select().single();
+    if (data && !error) {
+      setRoles(prev => [...prev, { ...role, id: data.id }]);
+    }
   }, []);
 
-  const addRole = useCallback((role: Omit<AppRole, "id">) => {
-    setRoles(prev => {
-      const next = [...prev, { ...role, id: `r${Date.now()}` }];
-      localStorage.setItem("app-roles", JSON.stringify(next));
-      return next;
-    });
+  const updateRole = useCallback(async (id: string, updates: Partial<AppRole>) => {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.description !== undefined) payload.description = updates.description;
+    if (updates.permissions !== undefined) payload.permissions = updates.permissions;
+    if (updates.color !== undefined) payload.color = updates.color;
+    await supabase.from("roles").update(payload).eq("id", id);
+    setRoles(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
   }, []);
 
-  const updateRole = useCallback((id: string, updates: Partial<AppRole>) => {
-    setRoles(prev => {
-      const next = prev.map(r => r.id === id ? { ...r, ...updates } : r);
-      localStorage.setItem("app-roles", JSON.stringify(next));
-      return next;
-    });
+  const deleteRole = useCallback(async (id: string) => {
+    await supabase.from("roles").delete().eq("id", id);
+    setRoles(prev => prev.filter(r => r.id !== id));
   }, []);
 
-  const deleteRole = useCallback((id: string) => {
-    setRoles(prev => {
-      const next = prev.filter(r => r.id !== id);
-      localStorage.setItem("app-roles", JSON.stringify(next));
-      return next;
-    });
+  const addUser = useCallback(async (user: Omit<AppUser, "id">) => {
+    // Note: actual user creation happens through auth signup. This updates the profile/role.
+    // For admin-created users, we'd need an edge function. For now, just update local state.
+    setUsers(prev => [...prev, { ...user, id: `temp-${Date.now()}` }]);
   }, []);
 
-  const addUser = useCallback((user: Omit<AppUser, "id">) => {
-    setUsers(prev => {
-      const next = [...prev, { ...user, id: `u${Date.now()}` }];
-      localStorage.setItem("app-users", JSON.stringify(next));
-      return next;
-    });
-  }, []);
+  const updateUser = useCallback(async (id: string, updates: Partial<AppUser>) => {
+    const payload: any = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.email !== undefined) payload.email = updates.email;
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.avatar !== undefined) payload.avatar = updates.avatar;
+    await supabase.from("profiles").update(payload).eq("id", id);
 
-  const updateUser = useCallback((id: string, updates: Partial<AppUser>) => {
-    setUsers(prev => {
-      const next = prev.map(u => u.id === id ? { ...u, ...updates } : u);
-      localStorage.setItem("app-users", JSON.stringify(next));
-      return next;
-    });
-  }, []);
+    // If role changed, update user_roles
+    if (updates.role) {
+      const role = roles.find(r => r.name === updates.role);
+      if (role) {
+        await supabase.from("user_roles").delete().eq("user_id", id);
+        await supabase.from("user_roles").insert({ user_id: id, role_id: role.id });
+      }
+    }
 
-  const deleteUser = useCallback((id: string) => {
-    setUsers(prev => {
-      const next = prev.filter(u => u.id !== id);
-      localStorage.setItem("app-users", JSON.stringify(next));
-      return next;
-    });
+    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  }, [roles]);
+
+  const deleteUser = useCallback(async (id: string) => {
+    // Can't delete auth.users from client, but can deactivate
+    await supabase.from("profiles").update({ status: "inactive" as any }).eq("id", id);
+    setUsers(prev => prev.filter(u => u.id !== id));
   }, []);
 
   const formatCurrency = useCallback((amount: number) => {
     return `${settings.currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, [settings.currencySymbol]);
 
-  // Integration methods
-  const connectIntegration = useCallback((name: string, configValues: Record<string, string>) => {
-    setIntegrations(prev => {
-      const next = prev.map(i => i.name === name ? { ...i, connected: true, configValues } : i);
-      localStorage.setItem("app-integrations", JSON.stringify(next));
-      return next;
-    });
+  const connectIntegration = useCallback(async (name: string, configValues: Record<string, string>) => {
+    await supabase.from("integration_configs").update({ connected: true, config_values: configValues }).eq("name", name);
+    setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: true, configValues } : i));
   }, []);
 
-  const disconnectIntegration = useCallback((name: string) => {
-    setIntegrations(prev => {
-      const next = prev.map(i => i.name === name ? { ...i, connected: false, configValues: {} } : i);
-      localStorage.setItem("app-integrations", JSON.stringify(next));
-      return next;
-    });
+  const disconnectIntegration = useCallback(async (name: string) => {
+    await supabase.from("integration_configs").update({ connected: false, config_values: {} }).eq("name", name);
+    setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: false, configValues: {} } : i));
   }, []);
 
   const isIntegrationConnected = useCallback((name: string) => {
