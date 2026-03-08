@@ -149,21 +149,58 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeChannel) return;
     const fetchMessages = async () => {
-      const { data } = await supabase.from("chat_messages").select("*, profiles:sender_id(name, avatar)")
-        .eq("channel_id", activeChannel).eq("deleted", false).order("created_at", { ascending: true }).limit(200);
-      if (data) {
-        setMessages(data.map((m: any) => ({
-          id: m.id, sender_id: m.sender_id,
-          sender_name: m.profiles?.name || "Unknown",
-          avatar: (m.profiles?.name || "?").split(" ").map((n: string) => n[0]).join("").slice(0, 2),
-          time: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
-          text: m.content, channel_id: m.channel_id,
-          reactions: m.reactions ? Object.entries(m.reactions as Record<string, any>).map(([emoji, data]: [string, any]) => ({
-            emoji, count: data.count || 0, reacted: data.users?.includes(userId) || false,
-          })) : [],
-          pinned: m.is_pinned, edited: m.edited, replyTo: m.reply_to,
-        })));
+      const { data: rawMessages, error: msgError } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("channel_id", activeChannel)
+        .eq("deleted", false)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (msgError) {
+        console.error("Failed to load chat messages:", msgError);
+        setMessages([]);
+        return;
       }
+
+      const senderIds = [...new Set((rawMessages || []).map((m: any) => m.sender_id).filter(Boolean))];
+      const profileMap = new Map<string, { name: string | null; avatar: string | null }>();
+
+      if (senderIds.length > 0) {
+        const { data: senderProfiles } = await supabase
+          .from("profiles")
+          .select("id, name, avatar")
+          .in("id", senderIds);
+
+        (senderProfiles || []).forEach((p: any) => {
+          profileMap.set(p.id, { name: p.name, avatar: p.avatar });
+        });
+      }
+
+      setMessages((rawMessages || []).map((m: any) => {
+        const senderProfile = profileMap.get(m.sender_id);
+        const senderName = senderProfile?.name || "Unknown";
+
+        return {
+          id: m.id,
+          sender_id: m.sender_id,
+          sender_name: senderName,
+          avatar: senderName.split(" ").map((n: string) => n[0]).join("").slice(0, 2),
+          time: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+          text: m.content,
+          channel_id: m.channel_id,
+          reactions: m.reactions
+            ? Object.entries(m.reactions as Record<string, any>).map(([emoji, data]: [string, any]) => ({
+                emoji,
+                count: data.count || 0,
+                reacted: data.users?.includes(userId) || false,
+              }))
+            : [],
+          pinned: m.is_pinned,
+          edited: m.edited,
+          replyTo: m.reply_to,
+        };
+      }));
     };
     fetchMessages();
   }, [activeChannel, userId]);
