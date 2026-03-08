@@ -187,7 +187,7 @@ export default function InventoryPage() {
 }
 
 function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave: (updates: Partial<InventoryItem>) => void; onCancel: () => void }) {
-  const { warehouseNames } = useSharedData();
+  const { warehouseNames, inventoryCategories } = useSharedData();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState(item.category);
   const [warehouse, setWarehouse] = useState(item.warehouse);
