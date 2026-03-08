@@ -42,6 +42,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     { label: "Organization", icon: Building2, path: "/organization" },
     { label: "Audit Log", icon: Shield, path: "/audit" },
     { label: "Settings", icon: Settings, path: "/settings" },
+    { label: "My Profile", icon: UserCircle, path: "/profile" },
   ]},
 ];
 
