@@ -129,7 +129,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
 
-  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
+    let email = identifier;
+    // If not an email, look up the email by username in profiles
+    if (!identifier.includes("@")) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("email")
+        .ilike("name", identifier)
+        .limit(1)
+        .single();
+      if (!data?.email) return false;
+      email = data.email;
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return !error;
   }, []);
