@@ -22,7 +22,7 @@ export interface OrgStore {
 }
 
 export interface OrgWarehouse {
-  id: string; name: string; location: string; capacity: number; sqft: string; manager: string; zones: number; activePicks: number;
+  id: string; name: string; location: string; capacity: number; sqft: string; manager: string; managerId?: string | null; zones: number; activePicks: number;
 }
 
 export interface OrgDepartment {
