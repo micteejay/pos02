@@ -196,10 +196,11 @@ export default function ReportsPage() {
       store: expenseForm.store || stores[0]?.name || "Main",
       createdBy: user?.name || "System",
       createdByRole: user?.role || "Admin",
-      recurring: false,
+      recurring: expenseForm.recurring,
+      recurringInterval: expenseForm.recurring ? expenseForm.recurringInterval : undefined,
     });
-    logAction("expense.add", "Expenses", expenseForm.category, `Added expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
-    setExpenseForm({ category: "Rent", description: "", amount: "", store: "" });
+    logAction("expense.add", "Expenses", expenseForm.category, `Added ${expenseForm.recurring ? `recurring (${expenseForm.recurringInterval})` : ""} expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
+    setExpenseForm({ category: "Rent", description: "", amount: "", store: "", recurring: false, recurringInterval: "monthly" });
     setShowAddExpense(false);
   };
 
