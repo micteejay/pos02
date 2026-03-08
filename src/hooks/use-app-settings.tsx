@@ -377,6 +377,33 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     if (updates.email !== undefined) payload.email = updates.email;
     if (updates.status !== undefined) payload.status = updates.status;
     if (updates.avatar !== undefined) payload.avatar = updates.avatar;
+
+    // If department changed, resolve department_id
+    if (updates.department !== undefined) {
+      if (updates.department) {
+        const { data: dept } = await supabase.from("departments").select("id").eq("name", updates.department).single();
+        if (dept) payload.department_id = dept.id;
+      } else {
+        payload.department_id = null;
+      }
+    }
+
+    // If store changed, resolve store_id and update user_store_assignments
+    if (updates.store !== undefined) {
+      if (updates.store) {
+        const { data: storeRow } = await supabase.from("stores").select("id").eq("name", updates.store).single();
+        if (storeRow) {
+          payload.store_id = storeRow.id;
+          // Update store assignment
+          await supabase.from("user_store_assignments").delete().eq("user_id", id);
+          await supabase.from("user_store_assignments").insert({ user_id: id, store_id: storeRow.id, assigned_by: authUser?.id || null });
+        }
+      } else {
+        payload.store_id = null;
+        await supabase.from("user_store_assignments").delete().eq("user_id", id);
+      }
+    }
+
     await supabase.from("profiles").update(payload).eq("id", id);
 
     // If role changed, update user_roles
@@ -389,12 +416,28 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     }
 
     setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
-  }, [roles]);
+  }, [roles, authUser]);
 
   const deleteUser = useCallback(async (id: string) => {
-    // Can't delete auth.users from client, but can deactivate
-    await supabase.from("profiles").update({ status: "inactive" as any }).eq("id", id);
-    setUsers(prev => prev.filter(u => u.id !== id));
+    try {
+      const res = await supabase.functions.invoke("delete-user", {
+        body: { user_id: id },
+      });
+      if (res.error) {
+        let msg = "Failed to delete user";
+        try {
+          if (res.error.context) {
+            const body = await res.error.context.json();
+            if (body?.error) msg = body.error;
+          }
+        } catch {}
+        console.error(msg);
+        return;
+      }
+      setUsers(prev => prev.filter(u => u.id !== id));
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+    }
   }, []);
 
   const formatCurrency = useCallback((amount: number) => {
