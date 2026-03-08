@@ -329,11 +329,11 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">Notification Preferences</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {([{ key: "email" as const, label: "Email", desc: "Receive updates via email" }, { key: "push" as const, label: "Push", desc: "Browser push notifications" }, { key: "sms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" }]).map((n) => (
+                {([{ key: "notifyEmail" as const, label: "Email", desc: "Receive updates via email" }, { key: "notifyPush" as const, label: "Push", desc: "Browser push notifications" }, { key: "notifySms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" }]).map((n) => (
                   <div key={n.key} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                     <div><p className="text-sm font-medium text-foreground">{n.label}</p><p className="text-xs text-muted-foreground">{n.desc}</p></div>
-                    <button onClick={() => setNotifications(prev => ({ ...prev, [n.key]: !prev[n.key] }))} className={`w-10 h-6 rounded-full transition-colors relative ${notifications[n.key] ? "bg-primary" : "bg-muted"}`}>
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${notifications[n.key] ? "translate-x-5" : "translate-x-1"}`} />
+                    <button onClick={() => updateSettings({ [n.key]: !settings[n.key] })} className={`w-10 h-6 rounded-full transition-colors relative ${settings[n.key] ? "bg-primary" : "bg-muted"}`}>
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings[n.key] ? "translate-x-5" : "translate-x-1"}`} />
                     </button>
                   </div>
                 ))}
