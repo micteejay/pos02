@@ -87,6 +87,27 @@ export default function DocumentsPage() {
 
   const breadcrumbs = currentFolder === "/" ? ["/"] : ["/", ...currentFolder.split("/").filter(Boolean)];
 
+  // Derive virtual folders from document folder_paths
+  const virtualFolders = useMemo(() => {
+    const folderSet = new Set<string>();
+    documents.forEach((d) => {
+      const p = d.folder;
+      if (p && p !== "/" && p !== currentFolder) {
+        // If the doc's folder starts with currentFolder, extract the next subfolder
+        const prefix = currentFolder === "/" ? "/" : currentFolder + "/";
+        if (p === prefix.slice(0, -1) || p.startsWith(prefix)) {
+          const rest = p.slice(prefix.length);
+          const nextFolder = rest.split("/")[0];
+          if (nextFolder) folderSet.add(nextFolder);
+        } else if (currentFolder === "/" && p.startsWith("/")) {
+          const nextFolder = p.slice(1).split("/")[0];
+          if (nextFolder) folderSet.add(nextFolder);
+        }
+      }
+    });
+    return [...folderSet];
+  }, [documents, currentFolder]);
+
   const currentDocs = useMemo(() => {
     let filtered = documents.filter((d) => d.folder === currentFolder);
     if (search) filtered = filtered.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
@@ -218,7 +239,8 @@ export default function DocumentsPage() {
     sortKey === k ? (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />) : null;
 
   const totalFiles = documents.filter((d) => d.type !== "folder").length;
-  const totalFolders = documents.filter((d) => d.type === "folder").length;
+  const allFolderPaths = new Set(documents.map(d => d.folder).filter(f => f && f !== "/"));
+  const totalFolders = allFolderPaths.size + documents.filter((d) => d.type === "folder").length;
   const stats = [
     { label: "Total Files", value: totalFiles },
     { label: "Folders", value: totalFolders },
@@ -330,6 +352,24 @@ export default function DocumentsPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {virtualFolders.map((folderName) => (
+                      <tr key={`vf-${folderName}`} className="border-b border-border/50 hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => handleFolderClick(folderName)}>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                              <Folder className="w-4 h-4 text-warning" />
+                            </div>
+                            <span className="text-sm font-medium text-foreground truncate">{folderName}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden sm:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden lg:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden lg:table-cell">—</td>
+                        <td className="px-5 py-3 text-right"></td>
+                      </tr>
+                    ))}
                     {currentDocs.map((doc) => {
                       const Icon = iconMap[doc.type] || File;
                       return (
@@ -363,7 +403,7 @@ export default function DocumentsPage() {
                         </tr>
                       );
                     })}
-                    {currentDocs.length === 0 && (
+                    {currentDocs.length === 0 && virtualFolders.length === 0 && (
                       <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-muted-foreground">{search ? "No files match your search." : "This folder is empty."}</td></tr>
                     )}
                   </tbody>
@@ -372,6 +412,16 @@ export default function DocumentsPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+              {virtualFolders.map((folderName) => (
+                <div key={`vf-${folderName}`} className="glass-card rounded-xl p-4 cursor-pointer hover:border-primary/30 transition-colors group"
+                  onClick={() => handleFolderClick(folderName)}>
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3">
+                    <Folder className="w-6 h-6 text-warning" />
+                  </div>
+                  <p className="text-xs font-medium text-foreground text-center truncate">{folderName}</p>
+                  <p className="text-[10px] text-muted-foreground text-center mt-0.5">Folder</p>
+                </div>
+              ))}
               {currentDocs.map((doc) => {
                 const Icon = iconMap[doc.type] || File;
                 return (
