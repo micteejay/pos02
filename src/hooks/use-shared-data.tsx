@@ -155,6 +155,19 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     }, ...prev]);
   }, []);
 
+  // Expenses
+  const addExpense = useCallback((expense: Omit<Expense, "id">) => {
+    setExpenses(prev => [{ ...expense, id: `EXP-${Date.now()}` }, ...prev]);
+  }, []);
+
+  const updateExpense = useCallback((id: string, updates: Partial<Expense>) => {
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  }, []);
+
+  const deleteExpense = useCallback((id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+  }, []);
+
   // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
     setDocuments(prev => [...prev, { ...doc, id: `doc-${Date.now()}` }]);
