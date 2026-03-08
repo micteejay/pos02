@@ -93,6 +93,17 @@ function calcStatus(qty: number, reorder: number): InventoryItem["status"] {
   return "ok";
 }
 
+function calcNextDueDate(from: Date, interval: "daily" | "weekly" | "monthly" | "yearly"): Date {
+  const d = new Date(from);
+  switch (interval) {
+    case "daily": d.setDate(d.getDate() + 1); break;
+    case "weekly": d.setDate(d.getDate() + 7); break;
+    case "monthly": d.setMonth(d.getMonth() + 1); break;
+    case "yearly": d.setFullYear(d.getFullYear() + 1); break;
+  }
+  return d;
+}
+
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
