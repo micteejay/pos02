@@ -541,62 +541,48 @@ function AnalyticsTab({ paymentBreakdown, transactions }: { paymentBreakdown: { 
 }
 
 // --- Reps Tab ---
-function RepsTab() {
+function RepsTab({ users, storeNames }: { users: { id: string; name: string; role: string; status: string; store: string; avatar: string }[]; storeNames: string[] }) {
+  const activeReps = users.filter(u => u.status === "active");
+
+  if (activeReps.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-10 text-center animate-fade-in">
+        <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">No active users. Add users in the Users & Roles page.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {salesReps.map((rep) => {
-          const progress = Math.round((rep.revenue / rep.target) * 100);
-          const progressColor = progress >= 90 ? "bg-success" : progress >= 70 ? "bg-warning" : "bg-destructive";
-          return (
-            <div key={rep.name} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                    {rep.name.split(" ").map((n) => n[0]).join("")}
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{rep.name}</h3>
-                    <p className="text-xs text-muted-foreground">{rep.store}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-xs">
-                  <Star className="w-3.5 h-3.5 text-warning fill-warning" />
-                  <span className="font-semibold text-foreground">{rep.rating}</span>
-                </div>
+        {activeReps.map((user) => (
+          <div key={user.id} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
+                {user.avatar}
               </div>
-              <div className="mb-4">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="text-muted-foreground flex items-center gap-1"><Target className="w-3 h-3" /> Target Progress</span>
-                  <span className="font-semibold text-foreground">{progress}%</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className={`h-full rounded-full ${progressColor} transition-all duration-500`} style={{ width: `${Math.min(progress, 100)}%` }} />
-                </div>
-                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-                  <span>${rep.revenue.toLocaleString()}</span>
-                  <span>${rep.target.toLocaleString()}</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <p className="text-sm font-bold text-foreground">{rep.sales}</p>
-                  <p className="text-[10px] text-muted-foreground">Sales</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <p className="text-sm font-bold text-foreground">${rep.avgTicket.toFixed(0)}</p>
-                  <p className="text-[10px] text-muted-foreground">Avg Ticket</p>
-                </div>
-                <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <div className={`flex items-center justify-center gap-0.5 text-sm font-bold ${rep.trend === "up" ? "text-success" : "text-destructive"}`}>
-                    {rep.trend === "up" ? <ArrowUpRight className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground">Trend</p>
-                </div>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">{user.name}</h3>
+                <p className="text-xs text-muted-foreground">{user.role}</p>
+                {user.store && <p className="text-[10px] text-muted-foreground">{user.store}</p>}
               </div>
             </div>
-          );
-        })}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="text-center p-2 rounded-lg bg-muted/50">
+                <p className="text-sm font-bold text-foreground">{user.role}</p>
+                <p className="text-[10px] text-muted-foreground">Role</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-muted/50">
+                <span className={`inline-flex items-center gap-1 text-xs ${user.status === "active" ? "text-success" : "text-muted-foreground"}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${user.status === "active" ? "bg-success" : "bg-muted-foreground/40"}`} />
+                  {user.status}
+                </span>
+                <p className="text-[10px] text-muted-foreground">Status</p>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

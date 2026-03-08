@@ -368,12 +368,16 @@ function EditUserForm({ user, roles, storeNames, departmentNames, onSave, onCanc
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Department</label>
           <select value={department} onChange={(e) => setDepartment(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Operations","Sales","Finance","Technology","Marketing","HR","Inventory","Legal"].map(d => <option key={d}>{d}</option>)}
+            {departmentNames.length === 0 && <option value="">No departments configured</option>}
+            {departmentNames.map(d => <option key={d}>{d}</option>)}
+            {department && !departmentNames.includes(department) && <option value={department}>{department}</option>}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Store</label>
           <select value={store} onChange={(e) => setStore(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            {["Main HQ","West Store","East Store","South Hub"].map(s => <option key={s}>{s}</option>)}
+            {storeNames.length === 0 && <option value="">No stores configured</option>}
+            {storeNames.map(s => <option key={s}>{s}</option>)}
+            {store && !storeNames.includes(store) && <option value={store}>{store}</option>}
           </select>
         </div>
       </div>

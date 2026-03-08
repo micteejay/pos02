@@ -342,7 +342,8 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
       </div>
       <div><label className="text-xs font-medium text-muted-foreground">Destination</label>
         <select value={warehouse} onChange={(e) => setWarehouse(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-          <option>Main HQ</option><option>West DC</option><option>East DC</option><option>South Hub</option>
+          {warehouseNames.length === 0 && <option value="">No warehouses configured</option>}
+          {warehouseNames.map(w => <option key={w} value={w}>{w}</option>)}
         </select>
       </div>
       <div>
