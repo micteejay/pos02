@@ -127,6 +127,24 @@ export default function InventoryPage() {
         {tab === "stock" && <StockTab items={inventory} onDelete={deleteInventoryItem} onAdjustQty={adjustInventoryQty} onEdit={setEditingItem} formatCurrency={formatCurrency} />}
         {tab === "warehouses" && <WarehouseTab warehouses={orgWarehouses} />}
         {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
+        {tab === "categories" && (
+          <CategoriesTab
+            categories={categories}
+            onAdd={(name, type, desc) => {
+              const isAdmin = user?.role === "Super Admin" || user?.role === "Admin";
+              addCategory({ name, type, description: desc, status: isAdmin ? "approved" : "pending", createdBy: user?.name || "System" });
+              if (!isAdmin) {
+                addApprovalItem({ title: `New Category: ${name}`, type: "workflow", sourceId: `CAT-${Date.now()}`, requester: user?.name || "You", department: "Inventory", amount: null, description: `Request to add "${name}" as ${type} category`, priority: "medium" });
+                addNotification({ type: "approval", title: "Category pending approval", message: `"${name}" needs admin approval`, link: "/inventory", targetRoles: ["Admin", "Super Admin"] });
+              }
+              logAction("category.add", "Categories", name, `Added ${type} category: ${name} (${isAdmin ? "auto-approved" : "pending"})`);
+            }}
+            onApprove={(id) => { approveCategory(id, user?.name || "Admin"); logAction("category.approve", "Categories", id, "Approved category"); }}
+            onReject={(id) => { rejectCategory(id); logAction("category.reject", "Categories", id, "Rejected category"); }}
+            onDelete={(id) => { deleteCategory(id); logAction("category.delete", "Categories", id, "Deleted category"); }}
+            userRole={user?.role || "Viewer"}
+          />
+        )}
       </div>
 
       {showAddModal && tab === "stock" && (
