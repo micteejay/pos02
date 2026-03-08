@@ -181,6 +181,7 @@ export default function ChatPage() {
         const senderProfile = profileMap.get(m.sender_id);
         const senderName = senderProfile?.name || "Unknown";
 
+        const att = Array.isArray(m.attachments) && m.attachments.length > 0 ? m.attachments[0] : null;
         return {
           id: m.id,
           sender_id: m.sender_id,
@@ -199,6 +200,7 @@ export default function ChatPage() {
           pinned: m.is_pinned,
           edited: m.edited,
           replyTo: m.reply_to,
+          attachment: att ? { name: att.name, size: att.size, type: att.type, storagePath: att.storagePath, storageBucket: att.storageBucket } : undefined,
         };
       }));
     };
