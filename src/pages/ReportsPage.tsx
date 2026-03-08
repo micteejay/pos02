@@ -37,7 +37,7 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "" });
+  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "", recurring: false, recurringInterval: "monthly" as "daily" | "weekly" | "monthly" | "yearly" });
 
   // Total operational expenses
   const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
