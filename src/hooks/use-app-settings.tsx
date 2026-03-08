@@ -44,7 +44,15 @@ export type Permission =
   | "pages.dashboard" | "pages.inventory" | "pages.sales" | "pages.pos" | "pages.supply"
   | "pages.workflows" | "pages.approvals" | "pages.reports" | "pages.organization"
   | "pages.documents" | "pages.chat" | "pages.users" | "pages.settings" | "pages.audit"
-  | "pages.notifications";
+  | "pages.notifications"
+  | "pages.inventory.stock" | "pages.inventory.warehouses" | "pages.inventory.transfers" | "pages.inventory.categories"
+  | "pages.sales.transactions" | "pages.sales.analytics" | "pages.sales.reps"
+  | "pages.supply.orders" | "pages.supply.suppliers"
+  | "pages.approvals.pending" | "pages.approvals.history"
+  | "pages.reports.overview" | "pages.reports.sales" | "pages.reports.inventory" | "pages.reports.gainloss" | "pages.reports.eod" | "pages.reports.expenses" | "pages.reports.operations"
+  | "pages.organization.stores" | "pages.organization.warehouses" | "pages.organization.departments" | "pages.organization.hierarchy"
+  | "pages.settings.general" | "pages.settings.receipt" | "pages.settings.integrations" | "pages.settings.security"
+  | "pages.users.users" | "pages.users.roles" | "pages.users.permissions";
 
 export interface AppRole {
   id: string;
