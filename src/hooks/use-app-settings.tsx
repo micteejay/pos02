@@ -325,9 +325,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setRoles(prev => prev.filter(r => r.id !== id));
   }, []);
 
-  const addUser = useCallback(async (user: Omit<AppUser, "id"> & { password?: string; username?: string }) => {
+  const addUser = useCallback(async (user: Omit<AppUser, "id"> & { password?: string; username?: string }): Promise<{ success: boolean; error?: string }> => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke("create-user", {
         body: {
           username: user.username || user.email,
@@ -338,13 +337,19 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           store: user.store,
         },
       });
-      if (res.error) throw new Error(res.error.message);
+      if (res.error) {
+        const msg = typeof res.error === "object" && "message" in res.error ? res.error.message : String(res.error);
+        return { success: false, error: msg };
+      }
+      if (res.data?.error) {
+        return { success: false, error: res.data.error };
+      }
       const created = res.data;
       setUsers(prev => [...prev, { ...user, id: created.id, email: created.email }]);
-      return true;
-    } catch (err) {
+      return { success: true };
+    } catch (err: any) {
       console.error("Failed to create user:", err);
-      return false;
+      return { success: false, error: err?.message || "Failed to create user" };
     }
   }, []);
 
