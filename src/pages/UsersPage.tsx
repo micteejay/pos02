@@ -3,6 +3,9 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings, Permission, AppRole, AppUser } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { useStoreAccess } from "@/hooks/use-store-access";
+import { useAudit } from "@/hooks/use-audit";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Users, Shield, Plus, Search, MoreHorizontal, Mail, X, Check, Trash2, Edit2,
   ChevronRight, ChevronDown, Lock, Eye, EyeOff, UserPlus, Settings, AlertTriangle,
@@ -33,6 +36,9 @@ const permissionGroups: { module: string; perms: Permission[] }[] = [
 export default function UsersPage() {
   const { users, roles, addUser, updateUser, deleteUser, addRole, updateRole, deleteRole, hasPermission } = useAppSettings();
   const { storeNames, departmentNames } = useSharedData();
+  const { canCreateUsersForStore, getStoreOptionsForUserCreation, isAdminOrSuper } = useStoreAccess();
+  const { logAction } = useAudit();
+  const { user: authUser } = useAuth();
   const [tab, setTab] = useState<Tab>("users");
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
@@ -63,7 +69,7 @@ export default function UsersPage() {
             <p className="text-sm text-muted-foreground mt-1">Manage user accounts, roles, and permissions</p>
           </div>
           <div className="flex gap-2">
-            {tab === "users" && hasPermission("users.create") && (
+            {tab === "users" && hasPermission("users.create") && canCreateUsersForStore && (
               <button onClick={() => setShowAddUser(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
                 <UserPlus className="w-4 h-4" />Add User
               </button>
@@ -246,7 +252,7 @@ export default function UsersPage() {
       {/* Add User Modal */}
       {showAddUser && (
         <Modal title="Add User" onClose={() => setShowAddUser(false)}>
-          <AddUserForm roles={roles} storeNames={storeNames} departmentNames={departmentNames} onAdd={(data) => { addUser(data); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
+          <AddUserForm roles={roles} storeNames={getStoreOptionsForUserCreation} departmentNames={departmentNames} onAdd={(data) => { addUser(data); logAction("user.create", "Users", data.name, `Created user ${data.name} (${data.role}) for store ${data.store}`); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
         </Modal>
       )}
 

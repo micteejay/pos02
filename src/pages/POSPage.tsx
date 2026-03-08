@@ -3,6 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
   Trash2, Receipt, User, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
@@ -22,6 +23,7 @@ const paymentMethods = [
 export default function POSPage() {
   const { formatCurrency, settings } = useAppSettings();
   const { inventory, adjustInventoryQty, addSale, storeNames } = useSharedData();
+  const { user } = useAuth();
   const activeStore = storeNames[0] || "Default Store";
   const categories = useMemo(() => {
     const cats = [...new Set(inventory.map(i => i.category))];
@@ -96,6 +98,7 @@ export default function POSPage() {
     addSale({
       items: cart.map(i => ({ name: i.name, sku: i.sku, qty: i.qty, price: i.price })),
       total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
+      createdBy: user?.name || "System", createdByRole: user?.role || "",
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;

@@ -13,6 +13,10 @@ export interface AppNotification {
   read: boolean;
   link?: string;
   actionLabel?: string;
+  // Role-based visibility
+  targetRoles?: string[]; // if set, only these roles see the notification
+  targetUserId?: string;  // if set, only this user sees it
+  createdBy?: string;     // who triggered this notification
 }
 
 export interface ApprovalItem {
@@ -38,6 +42,7 @@ interface AppEventsContextType {
   markAllRead: () => void;
   deleteNotification: (id: string) => void;
   unreadCount: number;
+  getNotificationsForRole: (role: string, userId?: string) => AppNotification[];
 
   // Cross-module approval items
   approvalItems: ApprovalItem[];
@@ -52,12 +57,9 @@ interface AppEventsContextType {
 
 const AppEventsContext = createContext<AppEventsContextType>(null!);
 
-const defaultNotifications: AppNotification[] = [];
-const defaultApprovals: ApprovalItem[] = [];
-
 export function AppEventsProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<AppNotification[]>(defaultNotifications);
-  const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>(defaultApprovals);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>([]);
   const [approvalHandlers, setApprovalHandlers] = useState<((id: string, type: string, sourceId: string, approved: boolean) => void)[]>([]);
 
   const addNotification = useCallback((n: Omit<AppNotification, "id" | "time" | "read">) => {
@@ -84,6 +86,23 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // Filter notifications by role / userId
+  const getNotificationsForRole = useCallback((role: string, userId?: string) => {
+    return notifications.filter(n => {
+      // If notification has targetRoles, user must match
+      if (n.targetRoles && n.targetRoles.length > 0) {
+        if (!n.targetRoles.includes(role) && !(n.targetUserId && n.targetUserId === userId)) {
+          return false;
+        }
+      }
+      // If notification is targeted to a specific user
+      if (n.targetUserId && n.targetUserId !== userId) {
+        return false;
+      }
+      return true;
+    });
+  }, [notifications]);
+
   const addApprovalItem = useCallback((item: Omit<ApprovalItem, "id" | "submitted" | "status" | "currentStep" | "steps">) => {
     const newItem: ApprovalItem = {
       ...item,
@@ -102,6 +121,8 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       title: `New approval request: ${item.title}`,
       message: `${item.requester} submitted a ${item.type.replace(/_/g, " ")} for review`,
       link: "/approvals",
+      targetRoles: ["Super Admin", "Admin", "Manager"],
+      createdBy: item.requester,
     });
   }, [addNotification]);
 
@@ -116,13 +137,13 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       const newStatus = isComplete ? "approved" as const : "pending" as const;
 
       if (isComplete) {
-        // Fire approval handlers
         approvalHandlers.forEach(h => h(item.id, item.type, item.sourceId, true));
         addNotification({
           type: "approval",
           title: `${item.title} — Approved`,
           message: `All approval steps completed successfully`,
           link: "/approvals",
+          targetRoles: ["Super Admin", "Admin", "Manager"],
         });
       }
 
@@ -143,6 +164,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
         title: `${item.title} — Rejected`,
         message: comment || "Request has been rejected",
         link: "/approvals",
+        targetRoles: ["Super Admin", "Admin", "Manager"],
       });
 
       return { ...item, steps: newSteps, status: "rejected" };
@@ -160,6 +182,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
   return (
     <AppEventsContext.Provider value={{
       notifications, addNotification, markRead, markAllRead, deleteNotification, unreadCount,
+      getNotificationsForRole,
       approvalItems, addApprovalItem, approveItem, rejectItem,
       onApprovalComplete, registerApprovalHandler,
     }}>

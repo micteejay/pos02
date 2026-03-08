@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppEvents, NotificationType } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Bell, CheckCircle2, AlertTriangle, MessageSquare, FileText, Package, Clock,
   Trash2, X, Filter, ExternalLink, ShoppingCart, Shield, TrendingUp, Truck,
@@ -20,14 +21,23 @@ const typeConfig: Record<NotificationType, { icon: React.ElementType; color: str
 };
 
 export default function NotificationsPage() {
-  const { notifications, markRead, markAllRead, deleteNotification, unreadCount } = useAppEvents();
+  const { notifications, markRead, markAllRead, deleteNotification, getNotificationsForRole } = useAppEvents();
+  const { user } = useAuth();
   const [filter, setFilter] = useState<string>("all");
 
+  // Role-based notification filtering
+  const roleFilteredNotifications = useMemo(() => {
+    if (!user) return [];
+    return getNotificationsForRole(user.role, user.id);
+  }, [getNotificationsForRole, user]);
+
+  const unreadCount = roleFilteredNotifications.filter(n => !n.read).length;
+
   const filtered = useMemo(() =>
-    filter === "all" ? notifications :
-    filter === "unread" ? notifications.filter(n => !n.read) :
-    notifications.filter(n => n.type === filter),
-  [notifications, filter]);
+    filter === "all" ? roleFilteredNotifications :
+    filter === "unread" ? roleFilteredNotifications.filter(n => !n.read) :
+    roleFilteredNotifications.filter(n => n.type === filter),
+  [roleFilteredNotifications, filter]);
 
   const filters = [
     { key: "all", label: "All" },
@@ -46,7 +56,10 @@ export default function NotificationsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
-            <p className="text-sm text-muted-foreground mt-1">{unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
+              {user && <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary">{user.role}</span>}
+            </p>
           </div>
           <button onClick={markAllRead} className="text-xs text-primary hover:underline font-medium">Mark all as read</button>
         </div>
@@ -63,7 +76,8 @@ export default function NotificationsPage() {
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             <Bell className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No notifications</p>
+            <p>No notifications for your role</p>
+            <p className="text-xs mt-1">Notifications are filtered based on your permissions</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -86,6 +100,12 @@ export default function NotificationsPage() {
                       <Clock className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">{notif.time}</span>
                       <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{notif.type}</span>
+                      {notif.createdBy && <span className="text-[10px] text-muted-foreground">by {notif.createdBy}</span>}
+                      {notif.targetRoles && (
+                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                          {notif.targetRoles.join(", ")}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

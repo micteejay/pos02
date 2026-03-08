@@ -3,9 +3,12 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { useStoreAccess } from "@/hooks/use-store-access";
+import { useAudit } from "@/hooks/use-audit";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Building2, Warehouse, Users, Network, Search, MapPin, Phone, Mail,
-  ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2,
+  ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2, Lock,
 } from "lucide-react";
 
 interface OrgNode { name: string; role: string; children?: OrgNode[]; }
@@ -34,6 +37,9 @@ export default function OrganizationPage() {
     warehouses, addWarehouse, deleteWarehouse,
     departments, addDepartment, updateDepartment, deleteDepartment,
   } = useSharedData();
+  const { isAdminOrSuper, assignedStores, assignedWarehouses, canManageAllStores } = useStoreAccess();
+  const { logAction } = useAudit();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>("stores");
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,14 +54,14 @@ export default function OrganizationPage() {
   ];
 
   const stats = [
-    { label: "Total Stores", value: stores.length.toString(), icon: Building2, color: "text-primary" },
-    { label: "Warehouses", value: warehouses.length.toString(), icon: Warehouse, color: "text-info" },
+    { label: "Total Stores", value: assignedStores.length.toString(), icon: Building2, color: "text-primary" },
+    { label: "Warehouses", value: assignedWarehouses.length.toString(), icon: Warehouse, color: "text-info" },
     { label: "Departments", value: departments.length.toString(), icon: Boxes, color: "text-accent" },
     { label: "Total Headcount", value: departments.reduce((s, d) => s + d.headcount, 0).toString(), icon: Users, color: "text-success" },
   ];
 
-  const filteredStores = stores.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
-  const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredStores = assignedStores.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredWarehouses = assignedWarehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
   const filteredDepts = departments.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
 
   // Build org tree from departments
@@ -75,10 +81,15 @@ export default function OrganizationPage() {
             <h1 className="text-2xl font-bold text-foreground">Organization</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage stores, warehouses, departments, and structure</p>
           </div>
-          {activeTab !== "hierarchy" && (
+          {activeTab !== "hierarchy" && (activeTab !== "stores" || canManageAllStores) && (
             <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
               <Plus className="w-4 h-4" />Add {activeTab === "stores" ? "Store" : activeTab === "warehouses" ? "Warehouse" : "Department"}
             </button>
+          )}
+          {activeTab === "stores" && !canManageAllStores && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning/10 text-warning text-xs font-medium">
+              <Lock className="w-3.5 h-3.5" /> You can only view your assigned store
+            </div>
           )}
         </div>
 
@@ -228,7 +239,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Store</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <StoreForm onSave={(data) => { addStore(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <StoreForm onSave={(data) => { addStore({ ...data, createdBy: user?.name || "System" }); logAction("store.create", "Organization", data.name, `Created store: ${data.name}`); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
