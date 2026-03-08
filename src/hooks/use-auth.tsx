@@ -192,20 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.from("company_profiles").insert(payload).select("id").single();
       if (data) profile.id = data.id;
 
-      // Assign Super Admin role to the user who completed onboarding
-      const { data: superAdminRole } = await supabase
-        .from("roles")
-        .select("id")
-        .eq("name", "Super Admin")
-        .single();
-
-      if (superAdminRole) {
-        // Remove existing roles first, then assign Super Admin
-        await supabase.from("user_roles").delete().eq("user_id", user.id);
-        await supabase.from("user_roles").insert({ user_id: user.id, role_id: superAdminRole.id });
-        // Update local user state with new role
-        setUser(prev => prev ? { ...prev, role: "Super Admin" } : prev);
-      }
+      // Promote to Super Admin via secure server-side function
+      await supabase.rpc("promote_to_super_admin", { _user_id: user.id });
+      setUser(prev => prev ? { ...prev, role: "Super Admin" } : prev);
     }
 
     setCompanyProfile(profile);
