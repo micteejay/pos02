@@ -3,9 +3,12 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
+import { useStoreAccess } from "@/hooks/use-store-access";
+import { useAudit } from "@/hooks/use-audit";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Building2, Warehouse, Users, Network, Search, MapPin, Phone, Mail,
-  ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2,
+  ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2, Lock,
 } from "lucide-react";
 
 interface OrgNode { name: string; role: string; children?: OrgNode[]; }
