@@ -1,13 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2,
 } from "lucide-react";
 
-type WFStatus = "pending" | "approved" | "rejected";
+type WFStatus = "active" | "completed" | "paused" | "cancelled";
 
 interface WorkflowStep {
   name: string;
@@ -17,6 +20,7 @@ interface WorkflowStep {
 
 interface Workflow {
   id: string;
+  dbId: string;
   title: string;
   type: string;
   status: WFStatus;
@@ -27,21 +31,63 @@ interface Workflow {
   amount: string;
 }
 
-const initialWorkflows: Workflow[] = [];
-
 const statusConfig = {
-  pending: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Pending" },
-  approved: { icon: CheckCircle2, color: "text-success", bg: "bg-success/10", label: "Approved" },
-  rejected: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Rejected" },
+  active: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Active" },
+  completed: { icon: CheckCircle2, color: "text-success", bg: "bg-success/10", label: "Completed" },
+  paused: { icon: AlertTriangle, color: "text-muted-foreground", bg: "bg-muted", label: "Paused" },
+  cancelled: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Cancelled" },
 };
 
 export default function WorkflowsPage() {
   const { addNotification, addApprovalItem } = useAppEvents();
-  const [workflows, setWorkflows] = useState(initialWorkflows);
+  const { user } = useAuth();
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewWF, setShowNewWF] = useState(false);
+
+  useEffect(() => {
+    const fetchWorkflows = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("workflows")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (data && !error) {
+        const profilesRes = await supabase.from("profiles").select("id, name");
+        const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+
+        setWorkflows(data.map((wf: any) => {
+          const steps: WorkflowStep[] = Array.isArray(wf.steps) ? (wf.steps as any[]).map(s => ({
+            name: s.name || "Step",
+            status: s.status || "pending",
+            assignee: s.assignee || "Auto-assigned",
+          })) : [
+            { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
+            { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
+          ];
+
+          return {
+            id: `WF-${wf.id.substring(0, 6).toUpperCase()}`,
+            dbId: wf.id,
+            title: wf.title,
+            type: wf.type || "General",
+            status: wf.status as WFStatus,
+            currentStep: wf.current_step || 0,
+            steps,
+            requester: wf.created_by ? (profileMap.get(wf.created_by) || "Unknown") : "System",
+            created: new Date(wf.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            amount: wf.description || "",
+          };
+        }));
+      }
+      setLoading(false);
+    };
+    fetchWorkflows();
+  }, []);
 
   const filtered = workflows.filter((wf) => {
     const matchSearch = !search || wf.title.toLowerCase().includes(search.toLowerCase()) || wf.id.toLowerCase().includes(search.toLowerCase());
@@ -49,58 +95,120 @@ export default function WorkflowsPage() {
     return matchSearch && matchStatus;
   });
 
-  const advanceStep = useCallback((id: string) => {
-    setWorkflows((prev) =>
-      prev.map((wf) => {
-        if (wf.id !== id || wf.status !== "pending") return wf;
-        const newSteps = [...wf.steps];
-        newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed" };
-        const nextStep = wf.currentStep + 1;
-        const isComplete = nextStep >= newSteps.length;
-        if (isComplete) {
-          addNotification({ type: "workflow", title: `Workflow ${wf.id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
-        }
-        return { ...wf, steps: newSteps, currentStep: nextStep, status: isComplete ? "approved" : "pending" };
-      })
-    );
-  }, [addNotification]);
+  const advanceStep = useCallback(async (id: string) => {
+    const wf = workflows.find(w => w.id === id);
+    if (!wf || wf.status !== "active") return;
 
-  const rejectWorkflow = useCallback((id: string) => {
-    setWorkflows((prev) =>
-      prev.map((wf) => {
-        if (wf.id !== id) return wf;
-        const newSteps = [...wf.steps];
-        newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
-        addNotification({ type: "workflow", title: `Workflow ${wf.id} rejected`, message: `${wf.title} was rejected at step: ${wf.steps[wf.currentStep].name}`, link: "/workflows" });
-        return { ...wf, steps: newSteps, status: "rejected" };
-      })
-    );
-  }, [addNotification]);
+    const newSteps = [...wf.steps];
+    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed" };
+    const nextStep = wf.currentStep + 1;
+    const isComplete = nextStep >= newSteps.length;
 
-  const deleteWorkflow = useCallback((id: string) => {
-    setWorkflows((prev) => prev.filter((wf) => wf.id !== id));
-  }, []);
+    await supabase.from("workflows").update({
+      steps: newSteps as any,
+      current_step: nextStep,
+      status: isComplete ? "completed" : "active",
+      completed_at: isComplete ? new Date().toISOString() : null,
+    }).eq("id", wf.dbId);
 
-  const addWorkflow = (data: { title: string; type: string; amount: string }) => {
-    const newWf: Workflow = {
-      id: `WF-${4530 + workflows.length}`,
-      ...data,
-      status: "pending",
-      currentStep: 0,
-      steps: [
-        { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
-        { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
-      ],
-      requester: "You",
-      created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-    };
-    setWorkflows((prev) => [newWf, ...prev]);
-    setShowNewWF(false);
-    addApprovalItem({ title: newWf.title, type: "workflow", sourceId: newWf.id, requester: "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
-    addNotification({ type: "workflow", title: `Workflow ${newWf.id} created`, message: `${data.title} submitted for approval`, link: "/approvals" });
+    // Log step history
+    await supabase.from("workflow_step_history").insert({
+      workflow_id: wf.dbId,
+      step_index: wf.currentStep,
+      step_name: wf.steps[wf.currentStep]?.name || "Step",
+      action: "approved",
+      acted_by: user?.id || null,
+    });
+
+    setWorkflows(prev => prev.map(w => {
+      if (w.id !== id) return w;
+      return { ...w, steps: newSteps, currentStep: nextStep, status: isComplete ? "completed" as WFStatus : "active" as WFStatus };
+    }));
+
+    if (isComplete) {
+      addNotification({ type: "workflow", title: `Workflow ${id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
+      toast.success("Workflow completed");
+    } else {
+      toast.success("Step approved");
+    }
+  }, [workflows, user, addNotification]);
+
+  const rejectWorkflow = useCallback(async (id: string) => {
+    const wf = workflows.find(w => w.id === id);
+    if (!wf) return;
+
+    const newSteps = [...wf.steps];
+    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
+
+    await supabase.from("workflows").update({
+      steps: newSteps as any,
+      status: "cancelled",
+    }).eq("id", wf.dbId);
+
+    await supabase.from("workflow_step_history").insert({
+      workflow_id: wf.dbId,
+      step_index: wf.currentStep,
+      step_name: wf.steps[wf.currentStep]?.name || "Step",
+      action: "rejected",
+      acted_by: user?.id || null,
+    });
+
+    setWorkflows(prev => prev.map(w => {
+      if (w.id !== id) return w;
+      return { ...w, steps: newSteps, status: "cancelled" as WFStatus };
+    }));
+
+    addNotification({ type: "workflow", title: `Workflow ${id} rejected`, message: `${wf.title} was rejected at step: ${wf.steps[wf.currentStep].name}`, link: "/workflows" });
+    toast.success("Workflow rejected");
+  }, [workflows, user, addNotification]);
+
+  const deleteWorkflow = useCallback(async (id: string) => {
+    const wf = workflows.find(w => w.id === id);
+    if (!wf) return;
+    await supabase.from("workflow_step_history").delete().eq("workflow_id", wf.dbId);
+    await supabase.from("workflows").delete().eq("id", wf.dbId);
+    setWorkflows(prev => prev.filter(w => w.id !== id));
+    toast.success("Workflow deleted");
+  }, [workflows]);
+
+  const addWorkflow = async (data: { title: string; type: string; amount: string }) => {
+    const steps = [
+      { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
+      { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
+    ];
+
+    const { data: newWf, error } = await supabase.from("workflows").insert({
+      title: data.title,
+      type: data.type,
+      description: data.amount,
+      status: "active",
+      current_step: 0,
+      steps: steps as any,
+      created_by: user?.id || null,
+    }).select().single();
+
+    if (newWf && !error) {
+      setWorkflows(prev => [{
+        id: `WF-${newWf.id.substring(0, 6).toUpperCase()}`,
+        dbId: newWf.id,
+        title: data.title,
+        type: data.type,
+        status: "active",
+        currentStep: 0,
+        steps,
+        requester: user?.name || "You",
+        created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        amount: data.amount,
+      }, ...prev]);
+
+      setShowNewWF(false);
+      addApprovalItem({ title: data.title, type: "workflow", sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
+      addNotification({ type: "workflow", title: `Workflow created`, message: `${data.title} submitted for approval`, link: "/approvals" });
+      toast.success("Workflow created");
+    }
   };
 
-  const counts = { pending: workflows.filter((w) => w.status === "pending").length, approved: workflows.filter((w) => w.status === "approved").length, rejected: workflows.filter((w) => w.status === "rejected").length };
+  const counts = { active: workflows.filter((w) => w.status === "active").length, completed: workflows.filter((w) => w.status === "completed").length, cancelled: workflows.filter((w) => w.status === "cancelled").length };
 
   return (
     <AppLayout>
@@ -116,7 +224,7 @@ export default function WorkflowsPage() {
         </div>
 
         <div className="grid grid-cols-3 gap-4">
-          {([["Pending", counts.pending, "warning"], ["Approved", counts.approved, "success"], ["Rejected", counts.rejected, "destructive"]] as const).map(([label, count, color]) => (
+          {([["Active", counts.active, "warning"], ["Completed", counts.completed, "success"], ["Cancelled", counts.cancelled, "destructive"]] as const).map(([label, count, color]) => (
             <div key={label} className="glass-card rounded-xl p-4 text-center">
               <p className={`text-2xl font-bold text-${color}`}>{count}</p>
               <p className="text-xs text-muted-foreground mt-1">{label}</p>
@@ -130,80 +238,84 @@ export default function WorkflowsPage() {
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search workflows..." className="pl-9" />
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option value="all">All Status</option><option value="pending">Pending</option><option value="approved">Approved</option><option value="rejected">Rejected</option>
+            <option value="all">All Status</option><option value="active">Active</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="paused">Paused</option>
           </select>
         </div>
 
-        <div className="space-y-3">
-          {filtered.length === 0 ? (
-            <div className="text-center py-12 text-sm text-muted-foreground">No workflows match your search.</div>
-          ) : filtered.map((wf) => {
-            const config = statusConfig[wf.status];
-            const isExpanded = expandedId === wf.id;
-            return (
-              <div key={wf.id} className="glass-card rounded-xl overflow-hidden transition-all duration-300">
-                <button onClick={() => setExpandedId(isExpanded ? null : wf.id)} className="w-full flex items-start gap-4 p-5 text-left hover:bg-muted/20 transition-colors">
-                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0"><GitBranch className="w-5 h-5 text-primary" /></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-primary">{wf.id}</span>
-                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.color} font-medium`}>
-                        <config.icon className="w-3 h-3" />{config.label}
-                      </span>
+        {loading ? (
+          <div className="flex items-center justify-center py-20"><Loader2 className="w-6 h-6 text-primary animate-spin" /></div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.length === 0 ? (
+              <div className="text-center py-12 text-sm text-muted-foreground">No workflows match your search.</div>
+            ) : filtered.map((wf) => {
+              const config = statusConfig[wf.status] || statusConfig.active;
+              const isExpanded = expandedId === wf.id;
+              return (
+                <div key={wf.id} className="glass-card rounded-xl overflow-hidden transition-all duration-300">
+                  <button onClick={() => setExpandedId(isExpanded ? null : wf.id)} className="w-full flex items-start gap-4 p-5 text-left hover:bg-muted/20 transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0"><GitBranch className="w-5 h-5 text-primary" /></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-primary">{wf.id}</span>
+                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${config.bg} ${config.color} font-medium`}>
+                          <config.icon className="w-3 h-3" />{config.label}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-semibold text-foreground mt-1">{wf.title}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{wf.type} · {wf.requester} · {wf.amount}</p>
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground mt-1">{wf.title}</h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">{wf.type} · {wf.requester} · {wf.amount}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs text-muted-foreground">{wf.created}</p>
-                    <div className="flex items-center gap-1 mt-2">
-                      {wf.steps.map((step, i) => (
-                        <div key={i} className={`h-1.5 flex-1 rounded-full ${step.status === "completed" ? "bg-primary" : step.status === "rejected" ? "bg-destructive" : i === wf.currentStep && wf.status === "pending" ? "bg-warning animate-pulse" : "bg-muted"}`} />
-                      ))}
+                    <div className="text-right shrink-0">
+                      <p className="text-xs text-muted-foreground">{wf.created}</p>
+                      <div className="flex items-center gap-1 mt-2">
+                        {wf.steps.map((step, i) => (
+                          <div key={i} className={`h-1.5 flex-1 rounded-full ${step.status === "completed" ? "bg-primary" : step.status === "rejected" ? "bg-destructive" : i === wf.currentStep && wf.status === "active" ? "bg-warning animate-pulse" : "bg-muted"}`} />
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Step {Math.min(wf.currentStep + 1, wf.steps.length)}/{wf.steps.length}{wf.status === "active" && wf.currentStep < wf.steps.length ? `: ${wf.steps[wf.currentStep]?.name}` : ""}
+                      </p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Step {Math.min(wf.currentStep + 1, wf.steps.length)}/{wf.steps.length}{wf.status === "pending" ? `: ${wf.steps[wf.currentStep]?.name}` : ""}
-                    </p>
-                  </div>
-                  <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
-                </button>
+                    <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                  </button>
 
-                {isExpanded && (
-                  <div className="px-5 pb-5 animate-fade-in">
-                    <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
-                      {wf.steps.map((step, i) => {
-                        const isActive = i === wf.currentStep && wf.status === "pending";
-                        return (
-                          <div key={i} className="relative">
-                            <div className={`absolute -left-[calc(1.5rem+5px)] w-3 h-3 rounded-full border-2 border-card ${step.status === "completed" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : isActive ? "bg-warning" : "bg-muted-foreground/30"}`} />
-                            <div className={`p-3 rounded-lg ${isActive ? "bg-warning/5 border border-warning/20" : "bg-muted/30"}`}>
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-semibold text-foreground">{step.name}</span>
-                                <span className={`text-[10px] font-medium ${step.status === "completed" ? "text-success" : step.status === "rejected" ? "text-destructive" : "text-muted-foreground"}`}>
-                                  {step.status === "completed" ? "✓ Done" : step.status === "rejected" ? "✗ Rejected" : isActive ? "Awaiting..." : "Pending"}
-                                </span>
+                  {isExpanded && (
+                    <div className="px-5 pb-5 animate-fade-in">
+                      <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
+                        {wf.steps.map((step, i) => {
+                          const isActive = i === wf.currentStep && wf.status === "active";
+                          return (
+                            <div key={i} className="relative">
+                              <div className={`absolute -left-[calc(1.5rem+5px)] w-3 h-3 rounded-full border-2 border-card ${step.status === "completed" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : isActive ? "bg-warning" : "bg-muted-foreground/30"}`} />
+                              <div className={`p-3 rounded-lg ${isActive ? "bg-warning/5 border border-warning/20" : "bg-muted/30"}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-foreground">{step.name}</span>
+                                  <span className={`text-[10px] font-medium ${step.status === "completed" ? "text-success" : step.status === "rejected" ? "text-destructive" : "text-muted-foreground"}`}>
+                                    {step.status === "completed" ? "✓ Done" : step.status === "rejected" ? "✗ Rejected" : isActive ? "Awaiting..." : "Pending"}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">Assignee: {step.assignee}</p>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-0.5">Assignee: {step.assignee}</p>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center gap-2 pt-3 border-t border-border">
+                        {wf.status === "active" && wf.currentStep < wf.steps.length && (
+                          <>
+                            <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
+                            <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
+                          </>
+                        )}
+                        <button onClick={() => deleteWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 pt-3 border-t border-border">
-                      {wf.status === "pending" && (
-                        <>
-                          <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
-                          <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
-                        </>
-                      )}
-                      <button onClick={() => deleteWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {showNewWF && (
