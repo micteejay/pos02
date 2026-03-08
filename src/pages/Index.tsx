@@ -11,6 +11,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
+import AISalesInsights from "@/components/AISalesInsights";
 
 export default function Dashboard() {
   const { formatCurrency, settings, users } = useAppSettings();
