@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAudit, AuditEntry } from "@/hooks/use-audit";
 import {
@@ -67,7 +67,11 @@ const severityConfig = {
 
 export default function AuditLogPage() {
   const { getAuditLog } = useAudit();
-  const auditEntries = getAuditLog();
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+
+  useEffect(() => {
+    getAuditLog().then(setAuditEntries);
+  }, [getAuditLog]);
 
   const [search, setSearch] = useState("");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
@@ -78,8 +82,8 @@ export default function AuditLogPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const modules = [...new Set(auditEntries.map((e) => e.module))];
-  const users = [...new Set(auditEntries.map((e) => e.user))];
+  const modules: string[] = [...new Set(auditEntries.map((e) => e.module))];
+  const users: string[] = [...new Set(auditEntries.map((e) => e.user))];
   const activeFilterCount = [filterSeverity, filterModule, filterUser].filter((f) => f !== "all").length;
 
   const stats = [

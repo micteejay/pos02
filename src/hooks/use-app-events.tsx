@@ -1,6 +1,6 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
-
-// Global event/notification system that links all modules together
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 
 export type NotificationType = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
 
@@ -13,10 +13,9 @@ export interface AppNotification {
   read: boolean;
   link?: string;
   actionLabel?: string;
-  // Role-based visibility
-  targetRoles?: string[]; // if set, only these roles see the notification
-  targetUserId?: string;  // if set, only this user sees it
-  createdBy?: string;     // who triggered this notification
+  targetRoles?: string[];
+  targetUserId?: string;
+  createdBy?: string;
 }
 
 export interface ApprovalItem {
@@ -43,14 +42,10 @@ interface AppEventsContextType {
   deleteNotification: (id: string) => void;
   unreadCount: number;
   getNotificationsForRole: (role: string, userId?: string) => AppNotification[];
-
-  // Cross-module approval items
   approvalItems: ApprovalItem[];
   addApprovalItem: (item: Omit<ApprovalItem, "id" | "submitted" | "status" | "currentStep" | "steps">) => void;
   approveItem: (id: string, comment?: string) => void;
   rejectItem: (id: string, comment?: string) => void;
-
-  // Event handlers that other modules register
   onApprovalComplete: (id: string, type: string, approved: boolean) => void;
   registerApprovalHandler: (handler: (id: string, type: string, sourceId: string, approved: boolean) => void) => void;
 }
@@ -58,123 +53,174 @@ interface AppEventsContextType {
 const AppEventsContext = createContext<AppEventsContextType>(null!);
 
 export function AppEventsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>([]);
   const [approvalHandlers, setApprovalHandlers] = useState<((id: string, type: string, sourceId: string, approved: boolean) => void)[]>([]);
 
-  const addNotification = useCallback((n: Omit<AppNotification, "id" | "time" | "read">) => {
-    const newNotif: AppNotification = {
-      ...n,
-      id: `n-${Date.now()}`,
-      time: "Just now",
-      read: false,
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-  }, []);
+  // Fetch notifications and approvals from Supabase
+  useEffect(() => {
+    if (!user) return;
 
-  const markRead = useCallback((id: string) => {
+    const fetchNotifications = async () => {
+      const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(100);
+      if (data) {
+        setNotifications(data.map(n => ({
+          id: n.id, type: n.type as NotificationType, title: n.title,
+          message: n.message || "", time: new Date(n.created_at).toLocaleString(),
+          read: n.read || false, link: n.link || undefined,
+          targetRoles: n.target_roles || undefined,
+          createdBy: n.created_by_name || undefined,
+        })));
+      }
+    };
+
+    const fetchApprovals = async () => {
+      const { data } = await supabase.from("approvals").select("*").order("created_at", { ascending: false });
+      if (data) {
+        setApprovalItems(data.map(a => ({
+          id: a.id, title: a.title, type: a.type as ApprovalItem["type"],
+          sourceId: a.source_id || "", requester: a.requester || "",
+          department: a.department || "", amount: a.amount ? Number(a.amount) : null,
+          description: a.description || "",
+          submitted: new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          priority: a.priority as ApprovalItem["priority"],
+          status: a.status as ApprovalItem["status"],
+          steps: [
+            { role: "Manager Review", approver: null, status: a.status as any, date: null, comment: a.review_notes || null },
+          ],
+          currentStep: a.status === "pending" ? 0 : 1,
+        })));
+      }
+    };
+
+    fetchNotifications();
+    fetchApprovals();
+
+    // Subscribe to realtime notifications
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
+        const n = payload.new as any;
+        setNotifications(prev => [{
+          id: n.id, type: n.type, title: n.title, message: n.message || "",
+          time: "Just now", read: false, link: n.link || undefined,
+          targetRoles: n.target_roles || undefined,
+        }, ...prev]);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const addNotification = useCallback(async (n: Omit<AppNotification, "id" | "time" | "read">) => {
+    if (!user) return;
+    // If targeted to roles, use the RPC
+    if (n.targetRoles && n.targetRoles.length > 0) {
+      await supabase.rpc("send_role_notification", {
+        _target_roles: n.targetRoles,
+        _type: n.type as any,
+        _title: n.title,
+        _message: n.message || null,
+        _link: n.link || null,
+        _created_by: n.createdBy || user.name,
+      });
+    } else {
+      await supabase.rpc("send_notification", {
+        _user_id: user.id,
+        _type: n.type as any,
+        _title: n.title,
+        _message: n.message || null,
+        _link: n.link || null,
+      });
+    }
+    // Local state will be updated via realtime subscription
+  }, [user]);
+
+  const markRead = useCallback(async (id: string) => {
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   }, []);
 
-  const markAllRead = useCallback(() => {
+  const markAllRead = useCallback(async () => {
+    if (!user) return;
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-  }, []);
+  }, [user]);
 
-  const deleteNotification = useCallback((id: string) => {
+  const deleteNotification = useCallback(async (id: string) => {
+    await supabase.from("notifications").delete().eq("id", id);
     setNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Filter notifications by role / userId
   const getNotificationsForRole = useCallback((role: string, userId?: string) => {
-    return notifications.filter(n => {
-      // If notification has targetRoles, user must match
-      if (n.targetRoles && n.targetRoles.length > 0) {
-        if (!n.targetRoles.includes(role) && !(n.targetUserId && n.targetUserId === userId)) {
-          return false;
-        }
-      }
-      // If notification is targeted to a specific user
-      if (n.targetUserId && n.targetUserId !== userId) {
-        return false;
-      }
-      return true;
-    });
+    return notifications; // Already filtered by user_id from DB
   }, [notifications]);
 
-  const addApprovalItem = useCallback((item: Omit<ApprovalItem, "id" | "submitted" | "status" | "currentStep" | "steps">) => {
-    const newItem: ApprovalItem = {
-      ...item,
-      id: `APR-${3100 + Math.floor(Math.random() * 900)}`,
-      submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-      status: "pending",
-      currentStep: 0,
-      steps: [
-        { role: "Manager Review", approver: null, status: "pending", date: null, comment: null },
-        { role: "Director Approval", approver: null, status: "pending", date: null, comment: null },
-      ],
-    };
-    setApprovalItems(prev => [newItem, ...prev]);
-    addNotification({
-      type: "approval",
-      title: `New approval request: ${item.title}`,
-      message: `${item.requester} submitted a ${item.type.replace(/_/g, " ")} for review`,
-      link: "/approvals",
-      targetRoles: ["Super Admin", "Admin", "Manager"],
-      createdBy: item.requester,
-    });
-  }, [addNotification]);
+  const addApprovalItem = useCallback(async (item: Omit<ApprovalItem, "id" | "submitted" | "status" | "currentStep" | "steps">) => {
+    const { data, error } = await supabase.from("approvals").insert({
+      title: item.title, type: item.type, source_id: item.sourceId,
+      requester: user?.id || null, department: item.department,
+      amount: item.amount, description: item.description,
+      priority: item.priority as any, status: "pending" as any,
+    }).select().single();
 
-  const approveItem = useCallback((id: string, comment?: string) => {
-    setApprovalItems(prev => prev.map(item => {
-      if (item.id !== id || item.status !== "pending") return item;
-      const newSteps = [...item.steps];
-      const now = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      newSteps[item.currentStep] = { ...newSteps[item.currentStep], status: "approved", approver: "You", date: now, comment: comment || null };
-      const nextStep = item.currentStep + 1;
-      const isComplete = nextStep >= newSteps.length;
-      const newStatus = isComplete ? "approved" as const : "pending" as const;
+    if (data && !error) {
+      setApprovalItems(prev => [{
+        ...item, id: data.id,
+        submitted: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        status: "pending", currentStep: 0,
+        steps: [{ role: "Manager Review", approver: null, status: "pending", date: null, comment: null }],
+      }, ...prev]);
 
-      if (isComplete) {
-        approvalHandlers.forEach(h => h(item.id, item.type, item.sourceId, true));
-        addNotification({
-          type: "approval",
-          title: `${item.title} — Approved`,
-          message: `All approval steps completed successfully`,
-          link: "/approvals",
-          targetRoles: ["Super Admin", "Admin", "Manager"],
-        });
-      }
-
-      return { ...item, steps: newSteps, currentStep: nextStep, status: newStatus };
-    }));
-  }, [approvalHandlers, addNotification]);
-
-  const rejectItem = useCallback((id: string, comment?: string) => {
-    setApprovalItems(prev => prev.map(item => {
-      if (item.id !== id || item.status !== "pending") return item;
-      const newSteps = [...item.steps];
-      const now = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      newSteps[item.currentStep] = { ...newSteps[item.currentStep], status: "rejected", approver: "You", date: now, comment: comment || "Rejected" };
-
-      approvalHandlers.forEach(h => h(item.id, item.type, item.sourceId, false));
       addNotification({
         type: "approval",
-        title: `${item.title} — Rejected`,
-        message: comment || "Request has been rejected",
+        title: `New approval request: ${item.title}`,
+        message: `${item.requester} submitted a ${item.type.replace(/_/g, " ")} for review`,
         link: "/approvals",
         targetRoles: ["Super Admin", "Admin", "Manager"],
+        createdBy: item.requester,
       });
+    }
+  }, [user, addNotification]);
 
-      return { ...item, steps: newSteps, status: "rejected" };
+  const approveItem = useCallback(async (id: string, comment?: string) => {
+    await supabase.from("approvals").update({
+      status: "approved" as any, reviewed_by: user?.id || null,
+      review_notes: comment || null,
+    }).eq("id", id);
+
+    setApprovalItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const newSteps = [...item.steps];
+      newSteps[0] = { ...newSteps[0], status: "approved", approver: user?.name || "Admin", date: new Date().toLocaleDateString(), comment: comment || null };
+      approvalHandlers.forEach(h => h(item.id, item.type, item.sourceId, true));
+      return { ...item, steps: newSteps, status: "approved" as const, currentStep: 1 };
     }));
-  }, [approvalHandlers, addNotification]);
 
-  const onApprovalComplete = useCallback((id: string, type: string, approved: boolean) => {
-    // This is called by the approval system
-  }, []);
+    addNotification({ type: "approval", title: "Approval granted", message: comment || "Request has been approved", link: "/approvals" });
+  }, [user, approvalHandlers, addNotification]);
 
+  const rejectItem = useCallback(async (id: string, comment?: string) => {
+    await supabase.from("approvals").update({
+      status: "rejected" as any, reviewed_by: user?.id || null,
+      review_notes: comment || "Rejected",
+    }).eq("id", id);
+
+    setApprovalItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const newSteps = [...item.steps];
+      newSteps[0] = { ...newSteps[0], status: "rejected", approver: user?.name || "Admin", date: new Date().toLocaleDateString(), comment: comment || "Rejected" };
+      approvalHandlers.forEach(h => h(item.id, item.type, item.sourceId, false));
+      return { ...item, steps: newSteps, status: "rejected" as const };
+    }));
+
+    addNotification({ type: "approval", title: "Approval rejected", message: comment || "Request has been rejected", link: "/approvals" });
+  }, [user, approvalHandlers, addNotification]);
+
+  const onApprovalComplete = useCallback(() => {}, []);
   const registerApprovalHandler = useCallback((handler: (id: string, type: string, sourceId: string, approved: boolean) => void) => {
     setApprovalHandlers(prev => [...prev, handler]);
   }, []);
