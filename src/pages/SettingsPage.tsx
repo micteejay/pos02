@@ -106,11 +106,14 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration, hasPermission } = useAppSettings();
   const { companyProfile } = useAuth();
-  const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
-  const [twoFactor, setTwoFactor] = useState(false);
+  const { logAction } = useAudit();
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const handleSave = () => {
+    setSaved(true);
+    logAction("settings.update", "Settings", "all", "Settings saved");
+    setTimeout(() => setSaved(false), 2000);
+  };
 
   const receiptStyles = [
     { id: "classic", name: "Classic", description: "Traditional receipt with clean lines" },
