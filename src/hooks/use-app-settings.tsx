@@ -138,6 +138,8 @@ const defaultSettings: AppSettings = {
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
+  twoFactorEnabled: false, sessionTimeout: "30 minutes", passwordPolicy: "Strong (12+ chars, mixed case, symbols)",
+  notifyEmail: true, notifyPush: true, notifySms: false,
 };
 
 const defaultIntegrations: IntegrationConfig[] = [
