@@ -288,9 +288,9 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function AddUserForm({ roles, onAdd, onCancel }: { roles: AppRole[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
+function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: Omit<AppUser, "id">) => void; onCancel: () => void }) {
   const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState("Operations"); const [store, setStore] = useState("Main HQ");
+  const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState(departmentNames[0] || ""); const [store, setStore] = useState(storeNames[0] || "");
   const passwordError = confirmPassword && password !== confirmPassword ? "Passwords do not match" : password && password.length < 8 ? "Min 8 characters" : "";
   const canSubmit = name && email && password && password.length >= 8 && password === confirmPassword;
 
