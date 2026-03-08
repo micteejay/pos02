@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
