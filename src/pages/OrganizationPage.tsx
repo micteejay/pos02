@@ -81,10 +81,15 @@ export default function OrganizationPage() {
             <h1 className="text-2xl font-bold text-foreground">Organization</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage stores, warehouses, departments, and structure</p>
           </div>
-          {activeTab !== "hierarchy" && (
+          {activeTab !== "hierarchy" && (activeTab !== "stores" || canManageAllStores) && (
             <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
               <Plus className="w-4 h-4" />Add {activeTab === "stores" ? "Store" : activeTab === "warehouses" ? "Warehouse" : "Department"}
             </button>
+          )}
+          {activeTab === "stores" && !canManageAllStores && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-warning/10 text-warning text-xs font-medium">
+              <Lock className="w-3.5 h-3.5" /> You can only view your assigned store
+            </div>
           )}
         </div>
 
