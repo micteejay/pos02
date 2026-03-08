@@ -36,7 +36,9 @@ const permissionGroups: { module: string; perms: Permission[] }[] = [
 export default function UsersPage() {
   const { users, roles, addUser, updateUser, deleteUser, addRole, updateRole, deleteRole, hasPermission } = useAppSettings();
   const { storeNames, departmentNames } = useSharedData();
-  const [tab, setTab] = useState<Tab>("users");
+  const { canCreateUsersForStore, getStoreOptionsForUserCreation, isAdminOrSuper } = useStoreAccess();
+  const { logAction } = useAudit();
+  const { user: authUser } = useAuth();
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddRole, setShowAddRole] = useState(false);
