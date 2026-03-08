@@ -1108,9 +1108,39 @@ CREATE INDEX idx_user_roles_user ON public.user_roles(user_id);
 CREATE INDEX idx_user_roles_role ON public.user_roles(role_id);
 CREATE INDEX idx_sessions_user ON public.user_sessions(user_id, is_active);
 CREATE INDEX idx_saved_reports_user ON public.saved_reports(created_by);
+CREATE INDEX idx_integrations_category ON public.integration_configs(category);
+CREATE INDEX idx_invoices_company ON public.invoices(company_id);
+CREATE INDEX idx_invoice_items_invoice ON public.invoice_items(invoice_id);
 
 -- =====================================================
--- 32. TRIGGERS FOR updated_at
+-- 32. INTEGRATION CONFIGS TABLE
+-- =====================================================
+
+CREATE TYPE public.integration_category AS ENUM ('payment', 'communication', 'accounting', 'other');
+
+CREATE TABLE public.integration_configs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES public.company_profiles(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  category integration_category NOT NULL DEFAULT 'other',
+  icon TEXT,
+  connected BOOLEAN NOT NULL DEFAULT FALSE,
+  config_fields TEXT[] DEFAULT '{}',
+  config_values JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(company_id, name)
+);
+
+ALTER TABLE public.integration_configs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage their company integrations"
+  ON public.integration_configs FOR ALL TO authenticated
+  USING (company_id IN (SELECT id FROM public.company_profiles WHERE owner_id = auth.uid()));
+
+-- =====================================================
+-- 33. TRIGGERS FOR updated_at
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION public.update_updated_at()
