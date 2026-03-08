@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     if (store) {
       const { data: storeRow } = await adminClient.from("stores").select("id").eq("name", store).single();
       if (storeRow) {
-        await adminClient.from("user_store_assignments").insert({ user_id: userId, store_id: storeRow.id, assigned_by: caller.id });
+        await adminClient.from("user_store_assignments").insert({ user_id: userId, store_id: storeRow.id, assigned_by: callerId });
         await adminClient.from("profiles").update({ store_id: storeRow.id }).eq("id", userId);
       }
     }
