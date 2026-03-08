@@ -1714,6 +1714,82 @@ CREATE TRIGGER tr_chat_attachment_to_doc
   FOR EACH ROW EXECUTE FUNCTION public.handle_chat_attachment();
 
 -- =====================================================
+-- CATEGORIES TABLE
+-- =====================================================
+
+CREATE TYPE public.category_type AS ENUM ('inventory', 'expense', 'general');
+CREATE TYPE public.category_status AS ENUM ('approved', 'pending', 'rejected');
+
+CREATE TABLE public.categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  type category_type NOT NULL,
+  description TEXT,
+  status category_status NOT NULL DEFAULT 'pending',
+  created_by UUID REFERENCES auth.users(id),
+  approved_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(name, type)
+);
+
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "All authenticated users can view approved categories"
+  ON public.categories FOR SELECT TO authenticated
+  USING (status = 'approved' OR created_by = auth.uid() OR public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
+
+CREATE POLICY "Authenticated users can request categories"
+  ON public.categories FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Admins can update categories (approve/reject)"
+  ON public.categories FOR UPDATE TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
+
+CREATE POLICY "Admins can delete categories"
+  ON public.categories FOR DELETE TO authenticated
+  USING (public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin'));
+
+-- Default seed categories
+INSERT INTO public.categories (name, type, status, created_at) VALUES
+  ('Components', 'inventory', 'approved', NOW()),
+  ('Electronics', 'inventory', 'approved', NOW()),
+  ('Machinery', 'inventory', 'approved', NOW()),
+  ('Networking', 'inventory', 'approved', NOW()),
+  ('Accessories', 'inventory', 'approved', NOW()),
+  ('Uncategorized', 'inventory', 'approved', NOW()),
+  ('Rent', 'expense', 'approved', NOW()),
+  ('Utilities', 'expense', 'approved', NOW()),
+  ('Salaries', 'expense', 'approved', NOW()),
+  ('Marketing', 'expense', 'approved', NOW()),
+  ('Maintenance', 'expense', 'approved', NOW()),
+  ('Logistics', 'expense', 'approved', NOW()),
+  ('Supplies', 'expense', 'approved', NOW()),
+  ('Other', 'expense', 'approved', NOW());
+
+-- Audit trigger for category changes
+CREATE OR REPLACE FUNCTION public.audit_category_change()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  VALUES (
+    COALESCE(NEW.created_by, OLD.created_by),
+    TG_OP,
+    'category',
+    COALESCE(NEW.id, OLD.id)::TEXT,
+    jsonb_build_object('name', COALESCE(NEW.name, OLD.name), 'type', COALESCE(NEW.type, OLD.type)::TEXT, 'status', COALESCE(NEW.status, OLD.status)::TEXT),
+    CASE WHEN TG_OP = 'DELETE' THEN 'warning' ELSE 'info' END
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER tr_audit_category
+  AFTER INSERT OR UPDATE OR DELETE ON public.categories
+  FOR EACH ROW EXECUTE FUNCTION public.audit_category_change();
+
+-- =====================================================
 -- EXPENSES TABLE
 -- =====================================================
 

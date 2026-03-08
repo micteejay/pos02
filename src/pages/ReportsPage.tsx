@@ -18,7 +18,7 @@ import {
 
 type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "expenses" | "operations";
 
-const EXPENSE_CATEGORIES = ["Rent", "Utilities", "Salaries", "Marketing", "Maintenance", "Logistics", "Supplies", "Other"];
+// Expense categories are now dynamic from shared data
 
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
@@ -30,7 +30,7 @@ const tooltipStyle = {
 
 export default function ReportsPage() {
   const { settings, formatCurrency, users } = useAppSettings();
-  const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense } = useSharedData();
+  const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense, expenseCategories } = useSharedData();
   const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
   const { user } = useAuth();
   const { logAction } = useAudit();
@@ -676,7 +676,7 @@ export default function ReportsPage() {
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <select value={expenseForm.category} onChange={e => setExpenseForm(f => ({ ...f, category: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
-                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <input placeholder="Description" value={expenseForm.description} onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />
                     <input type="number" placeholder="Amount" value={expenseForm.amount} onChange={e => setExpenseForm(f => ({ ...f, amount: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />

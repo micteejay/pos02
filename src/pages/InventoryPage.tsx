@@ -4,15 +4,18 @@ import {
   Package, Warehouse, ArrowRightLeft, Search, Filter, Plus, AlertTriangle,
   CheckCircle2, TrendingDown, TrendingUp, MoreHorizontal, MapPin, Box,
   ArrowRight, Clock, Eye, ArrowUpDown, ArrowUp, ArrowDown, X, Check, Trash2, Edit2,
+  Tag, ShieldCheck, XCircle,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { useSharedData, InventoryItem } from "@/hooks/use-shared-data";
+import { useSharedData, InventoryItem, CategoryType } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAuth } from "@/hooks/use-auth";
+import { useAudit } from "@/hooks/use-audit";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
-type Tab = "stock" | "warehouses" | "transfers";
+type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 interface Transfer {
   id: string; items: string; from: string; to: string; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
@@ -32,9 +35,11 @@ const statusConfig = {
 const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
 
 export default function InventoryPage() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames } = useSharedData();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames, categories, addCategory, approveCategory, rejectCategory, deleteCategory, inventoryCategories, expenseCategories } = useSharedData();
   const { addNotification, addApprovalItem } = useAppEvents();
   const { formatCurrency } = useAppSettings();
+  const { user } = useAuth();
+  const { logAction } = useAudit();
   const [tab, setTab] = useState<Tab>("stock");
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -57,6 +62,7 @@ export default function InventoryPage() {
     { key: "stock", label: "Stock Levels", icon: Package },
     { key: "warehouses", label: "Warehouses", icon: Warehouse },
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
+    { key: "categories", label: "Categories", icon: Tag },
   ];
 
   const addTransfer = (tr: Transfer) => {
@@ -121,6 +127,24 @@ export default function InventoryPage() {
         {tab === "stock" && <StockTab items={inventory} onDelete={deleteInventoryItem} onAdjustQty={adjustInventoryQty} onEdit={setEditingItem} formatCurrency={formatCurrency} />}
         {tab === "warehouses" && <WarehouseTab warehouses={orgWarehouses} />}
         {tab === "transfers" && <TransferTab transfers={transfers} onUpdateStatus={updateTransferStatus} onAdd={addTransfer} />}
+        {tab === "categories" && (
+          <CategoriesTab
+            categories={categories}
+            onAdd={(name, type, desc) => {
+              const isAdmin = user?.role === "Super Admin" || user?.role === "Admin";
+              addCategory({ name, type, description: desc, status: isAdmin ? "approved" : "pending", createdBy: user?.name || "System" });
+              if (!isAdmin) {
+                addApprovalItem({ title: `New Category: ${name}`, type: "workflow", sourceId: `CAT-${Date.now()}`, requester: user?.name || "You", department: "Inventory", amount: null, description: `Request to add "${name}" as ${type} category`, priority: "medium" });
+                addNotification({ type: "approval", title: "Category pending approval", message: `"${name}" needs admin approval`, link: "/inventory", targetRoles: ["Admin", "Super Admin"] });
+              }
+              logAction("category.add", "Categories", name, `Added ${type} category: ${name} (${isAdmin ? "auto-approved" : "pending"})`);
+            }}
+            onApprove={(id) => { approveCategory(id, user?.name || "Admin"); logAction("category.approve", "Categories", id, "Approved category"); }}
+            onReject={(id) => { rejectCategory(id); logAction("category.reject", "Categories", id, "Rejected category"); }}
+            onDelete={(id) => { deleteCategory(id); logAction("category.delete", "Categories", id, "Deleted category"); }}
+            userRole={user?.role || "Viewer"}
+          />
+        )}
       </div>
 
       {showAddModal && tab === "stock" && (
@@ -163,7 +187,7 @@ export default function InventoryPage() {
 }
 
 function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave: (updates: Partial<InventoryItem>) => void; onCancel: () => void }) {
-  const { warehouseNames } = useSharedData();
+  const { warehouseNames, inventoryCategories } = useSharedData();
   const [name, setName] = useState(item.name);
   const [category, setCategory] = useState(item.category);
   const [warehouse, setWarehouse] = useState(item.warehouse);
@@ -181,7 +205,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option><option>Accessories</option><option>Uncategorized</option>
+            {inventoryCategories.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
@@ -207,8 +231,8 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
 }
 
 function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void; onCancel: () => void }) {
-  const { warehouseNames } = useSharedData();
-  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
+  const { warehouseNames, inventoryCategories } = useSharedData();
+  const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState(inventoryCategories[0] || "Uncategorized");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
 
   return (
@@ -220,7 +244,7 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-            <option>Components</option><option>Electronics</option><option>Machinery</option><option>Networking</option><option>Accessories</option>
+            {inventoryCategories.map(c => <option key={c}>{c}</option>)}
           </select>
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Warehouse</label>
@@ -544,6 +568,131 @@ function TransferTab({ transfers, onUpdateStatus, onAdd }: { transfers: Transfer
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function CategoriesTab({ categories, onAdd, onApprove, onReject, onDelete, userRole }: {
+  categories: import("@/hooks/use-shared-data").Category[];
+  onAdd: (name: string, type: CategoryType, desc: string) => void;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  onDelete: (id: string) => void;
+  userRole: string;
+}) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<CategoryType>("inventory");
+  const [newDesc, setNewDesc] = useState("");
+  const [filterType, setFilterType] = useState<"all" | CategoryType>("all");
+
+  const isAdmin = userRole === "Super Admin" || userRole === "Admin";
+  const filtered = categories.filter(c => filterType === "all" || c.type === filterType);
+
+  const handleAdd = () => {
+    if (!newName.trim()) return;
+    onAdd(newName.trim(), newType, newDesc.trim());
+    setNewName(""); setNewDesc(""); setShowAdd(false);
+  };
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+            <option value="all">All Types</option>
+            <option value="inventory">Inventory</option>
+            <option value="expense">Expense</option>
+            <option value="general">General</option>
+          </select>
+        </div>
+        <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+          <Plus className="w-4 h-4" />New Category
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="glass-card rounded-xl p-4 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-foreground">Create Category</h4>
+            <button onClick={() => setShowAdd(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          {!isAdmin && (
+            <div className="text-xs text-info bg-info/10 px-3 py-2 rounded-lg">
+              Categories created by non-admin users require approval before they can be used.
+            </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Input placeholder="Category name" value={newName} onChange={e => setNewName(e.target.value)} />
+            <select value={newType} onChange={e => setNewType(e.target.value as CategoryType)} className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+              <option value="inventory">Inventory</option>
+              <option value="expense">Expense</option>
+              <option value="general">General</option>
+            </select>
+            <Input placeholder="Description (optional)" value={newDesc} onChange={e => setNewDesc(e.target.value)} />
+          </div>
+          <button onClick={handleAdd} disabled={!newName.trim()} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+            {isAdmin ? "Create & Approve" : "Submit for Approval"}
+          </button>
+        </div>
+      )}
+
+      <div className="glass-card rounded-xl p-5">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Type</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Description</th>
+                <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2">Status</th>
+                <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">Created By</th>
+                {isAdmin && <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2">Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(cat => (
+                <tr key={cat.id} className="border-b border-border/50">
+                  <td className="px-3 py-2 text-sm font-medium text-foreground">{cat.name}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cat.type === "inventory" ? "bg-primary/10 text-primary" : cat.type === "expense" ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>
+                      {cat.type}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{cat.description || "—"}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cat.status === "approved" ? "bg-success/10 text-success" : cat.status === "pending" ? "bg-warning/10 text-warning" : "bg-destructive/10 text-destructive"}`}>
+                      {cat.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{cat.createdBy}{cat.approvedBy && cat.status === "approved" ? ` · ✓ ${cat.approvedBy}` : ""}</td>
+                  {isAdmin && (
+                    <td className="px-3 py-2">
+                      <div className="flex items-center justify-center gap-1">
+                        {cat.status === "pending" && (
+                          <>
+                            <button onClick={() => onApprove(cat.id)} className="p-1 rounded hover:bg-success/10 text-success transition-colors" title="Approve">
+                              <ShieldCheck className="w-4 h-4" />
+                            </button>
+                            <button onClick={() => onReject(cat.id)} className="p-1 rounded hover:bg-destructive/10 text-destructive transition-colors" title="Reject">
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                        {cat.createdBy !== "System" && (
+                          <button onClick={() => onDelete(cat.id)} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors" title="Delete">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

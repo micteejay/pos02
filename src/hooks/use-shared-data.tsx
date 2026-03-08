@@ -36,7 +36,20 @@ export interface Expense {
   recurring: boolean;
   recurringInterval?: "daily" | "weekly" | "monthly" | "yearly";
   nextDueDate?: string;
-  parentId?: string; // links generated entries back to the recurring template
+  parentId?: string;
+}
+
+export type CategoryType = "inventory" | "expense" | "general";
+
+export interface Category {
+  id: string;
+  name: string;
+  type: CategoryType;
+  description?: string;
+  status: "approved" | "pending" | "rejected";
+  createdBy: string;
+  createdAt: string;
+  approvedBy?: string;
 }
 
 interface SharedDataContextType {
@@ -57,6 +70,15 @@ interface SharedDataContextType {
   addExpense: (expense: Omit<Expense, "id">) => void;
   updateExpense: (id: string, updates: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
+
+  // Categories
+  categories: Category[];
+  addCategory: (cat: Omit<Category, "id" | "createdAt">) => void;
+  approveCategory: (id: string, approvedBy: string) => void;
+  rejectCategory: (id: string) => void;
+  deleteCategory: (id: string) => void;
+  inventoryCategories: string[];
+  expenseCategories: string[];
 
   // Documents
   documents: SharedDocument[];
@@ -108,6 +130,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [categories, setCategories] = useState<Category[]>([
+    // Default approved categories
+    { id: "cat-inv-1", name: "Components", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-2", name: "Electronics", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-3", name: "Machinery", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-4", name: "Networking", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-5", name: "Accessories", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-6", name: "Uncategorized", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-1", name: "Rent", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-2", name: "Utilities", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-3", name: "Salaries", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-4", name: "Marketing", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-5", name: "Maintenance", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-6", name: "Logistics", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-7", name: "Supplies", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-8", name: "Other", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+  ]);
   const [documents, setDocuments] = useState<SharedDocument[]>([]);
   const [stores, setStores] = useState<OrgStore[]>([]);
   const [warehouses, setWarehouses] = useState<OrgWarehouse[]>([]);
@@ -224,6 +263,26 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [processRecurringExpenses]);
 
+  // Categories
+  const addCategory = useCallback((cat: Omit<Category, "id" | "createdAt">) => {
+    setCategories(prev => [...prev, { ...cat, id: `cat-${Date.now()}`, createdAt: new Date().toISOString() }]);
+  }, []);
+
+  const approveCategory = useCallback((id: string, approvedBy: string) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, status: "approved" as const, approvedBy } : c));
+  }, []);
+
+  const rejectCategory = useCallback((id: string) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, status: "rejected" as const } : c));
+  }, []);
+
+  const deleteCategory = useCallback((id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+  }, []);
+
+  const inventoryCategories = categories.filter(c => c.type === "inventory" && c.status === "approved").map(c => c.name);
+  const expenseCategories = categories.filter(c => c.type === "expense" && c.status === "approved").map(c => c.name);
+
   // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
     setDocuments(prev => [...prev, { ...doc, id: `doc-${Date.now()}` }]);
@@ -281,6 +340,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     <SharedDataContext.Provider value={{
       inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, addStockFromPO,
       sales, addSale,
+      categories, addCategory, approveCategory, rejectCategory, deleteCategory, inventoryCategories, expenseCategories,
       expenses, addExpense, updateExpense, deleteExpense,
       documents, addDocument, deleteDocument,
       stores, addStore, updateStore, deleteStore,
