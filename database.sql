@@ -1891,16 +1891,18 @@ CREATE POLICY "Admins can delete expenses"
 
 -- Trigger to auto-audit expense changes
 CREATE OR REPLACE FUNCTION public.audit_expense_change()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  INSERT INTO public.audit_log (user_id, user_name, user_role, action, module, target, detail, severity)
   VALUES (
     COALESCE(NEW.created_by, OLD.created_by),
-    TG_OP,
-    'expense',
-    COALESCE(NEW.id, OLD.id)::TEXT,
-    jsonb_build_object('category', COALESCE(NEW.category, OLD.category), 'amount', COALESCE(NEW.amount, OLD.amount), 'description', COALESCE(NEW.description, OLD.description)),
-    'info'
+    COALESCE((SELECT name FROM public.profiles WHERE id = COALESCE(NEW.created_by, OLD.created_by)), 'System'),
+    COALESCE((SELECT r.name FROM public.user_roles ur JOIN public.roles r ON ur.role_id = r.id WHERE ur.user_id = COALESCE(NEW.created_by, OLD.created_by) LIMIT 1), 'System'),
+    'expense.' || LOWER(TG_OP),
+    'Expenses',
+    COALESCE(NEW.category, OLD.category),
+    TG_OP || ': ' || COALESCE(NEW.description, OLD.description) || ' — ' || COALESCE(NEW.amount, OLD.amount)::TEXT,
+    'info'::audit_severity
   );
   RETURN COALESCE(NEW, OLD);
 END;
