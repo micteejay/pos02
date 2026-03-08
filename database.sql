@@ -1294,7 +1294,55 @@ INSERT INTO public.chat_channels (name, type, description)
 VALUES ('general', 'channel', 'Company-wide announcements and discussions');
 
 -- =====================================================
--- 36. STORAGE BUCKETS
+-- 36. INVOICES & QUOTES TABLE
+-- =====================================================
+
+CREATE TYPE public.invoice_type AS ENUM ('quote', 'invoice');
+CREATE TYPE public.invoice_status AS ENUM ('draft', 'sent', 'paid', 'cancelled');
+
+CREATE TABLE public.invoices (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  company_id UUID REFERENCES public.company_profiles(id) ON DELETE CASCADE,
+  type invoice_type NOT NULL DEFAULT 'quote',
+  number TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  customer_name TEXT NOT NULL,
+  customer_address TEXT,
+  service_charge_percent NUMERIC(5,2) DEFAULT 0,
+  notes TEXT,
+  status invoice_status NOT NULL DEFAULT 'draft',
+  sale_id UUID REFERENCES public.sales_transactions(id),
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE public.invoice_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  invoice_id UUID REFERENCES public.invoices(id) ON DELETE CASCADE NOT NULL,
+  description TEXT NOT NULL,
+  qty NUMERIC(10,2) NOT NULL DEFAULT 1,
+  rate NUMERIC(14,2) NOT NULL DEFAULT 0,
+  inventory_item_id UUID REFERENCES public.inventory_items(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage invoices"
+  ON public.invoices FOR ALL TO authenticated USING (TRUE);
+CREATE POLICY "Users can manage invoice items"
+  ON public.invoice_items FOR ALL TO authenticated USING (TRUE);
+
+-- Invoice number sequence
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START WITH 1000;
+CREATE SEQUENCE IF NOT EXISTS quote_number_seq START WITH 1000;
+
+CREATE TRIGGER tr_invoices_updated BEFORE UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+-- =====================================================
+-- 37. STORAGE BUCKETS
 -- =====================================================
 
 INSERT INTO storage.buckets (id, name, public) VALUES
