@@ -169,6 +169,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [warehouse, setWarehouse] = useState(item.warehouse);
   const [qty, setQty] = useState(item.qty.toString());
   const [reorder, setReorder] = useState(item.reorder.toString());
+  const [costPrice, setCostPrice] = useState((item.costPrice || 0).toString());
   const [price, setPrice] = useState(item.price.toString());
 
   return (
