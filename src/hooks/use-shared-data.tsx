@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 
 export interface InventoryItem {
-  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; price: number; status: "critical" | "low" | "ok";
+  sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
 }
 
 export interface SaleRecord {
@@ -118,7 +118,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           const sku = `NEW-${Date.now().toString(36).toUpperCase().slice(-4)}`;
           updated.push({
             sku, name: poItem.name, category: "Uncategorized", warehouse,
-            qty: poItem.qty, reorder: Math.ceil(poItem.qty * 0.3), price: poItem.unitPrice,
+            qty: poItem.qty, reorder: Math.ceil(poItem.qty * 0.3), costPrice: poItem.unitPrice, price: poItem.unitPrice,
             status: "ok",
           });
         }

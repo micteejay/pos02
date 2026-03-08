@@ -169,6 +169,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [warehouse, setWarehouse] = useState(item.warehouse);
   const [qty, setQty] = useState(item.qty.toString());
   const [reorder, setReorder] = useState(item.reorder.toString());
+  const [costPrice, setCostPrice] = useState((item.costPrice || 0).toString());
   const [price, setPrice] = useState(item.price.toString());
 
   return (
@@ -189,14 +190,17 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Qty</label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Reorder Point</label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} className="mt-1" /></div>
-        <div><label className="text-xs font-medium text-muted-foreground">Price ($)</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), price: parseFloat(price) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
@@ -205,7 +209,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
 function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void; onCancel: () => void }) {
   const { warehouseNames } = useSharedData();
   const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState("Components");
-  const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [price, setPrice] = useState("");
+  const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
 
   return (
     <div className="space-y-3">
@@ -225,10 +229,13 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
           </select>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Qty</label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Reorder Point</label><Input type="number" value={reorder} onChange={(e) => setReorder(e.target.value)} className="mt-1" /></div>
-        <div><label className="text-xs font-medium text-muted-foreground">Price ($)</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
+        <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
@@ -236,7 +243,7 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, price: parseFloat(price), status });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>
@@ -376,6 +383,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground" onClick={() => handleSort("qty")}>
                     <div className="flex items-center gap-1 justify-end">Qty <SortIcon col="qty" /></div>
                   </th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 hidden lg:table-cell">Cost</th>
                   <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 cursor-pointer hover:text-foreground hidden sm:table-cell" onClick={() => handleSort("price")}>
                     <div className="flex items-center gap-1 justify-end">Price <SortIcon col="price" /></div>
                   </th>
@@ -385,7 +393,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
               </thead>
               <tbody>
                 {filtered.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No items match filters.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-sm text-muted-foreground">No items match filters.</td></tr>
                 ) : filtered.map((item) => {
                   const sc = statusConfig[item.status];
                   const isExpanded = expandedSku === item.sku;
@@ -396,13 +404,14 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                         <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
                         <td className="px-5 py-3 text-right"><span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>{item.qty}</span></td>
+                        <td className="px-5 py-3 text-right text-sm text-muted-foreground hidden lg:table-cell">{formatCurrency(item.costPrice || 0)}</td>
                         <td className="px-5 py-3 text-right text-sm text-foreground hidden sm:table-cell">{formatCurrency(item.price)}</td>
                         <td className="px-5 py-3 text-center"><span className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{item.status === "critical" && <AlertTriangle className="w-3 h-3" />}{sc.label}</span></td>
                         <td className="px-3 py-3 text-right"><MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" /></td>
                       </tr>
                       {isExpanded && (
                         <tr key={`${item.sku}-actions`} className="bg-muted/20">
-                          <td colSpan={7} className="px-5 py-3">
+                          <td colSpan={8} className="px-5 py-3">
                             <div className="flex flex-wrap items-center gap-2 animate-fade-in">
                               <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
                               <div className="flex items-center gap-1 ml-2">

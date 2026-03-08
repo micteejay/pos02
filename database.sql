@@ -1621,3 +1621,94 @@ CREATE POLICY "store_scoped_sales_read" ON public.sales_transactions FOR SELECT 
     OR store_id IN (SELECT store_id FROM public.user_store_assignments WHERE user_id = auth.uid())
     OR cashier_id = auth.uid()
   );
+
+-- =====================================================
+-- 43. GENERATED REPORTS TABLE
+-- =====================================================
+
+CREATE TYPE public.report_type AS ENUM ('overview', 'sales', 'inventory', 'gainloss', 'eod', 'operations');
+
+CREATE TABLE public.generated_reports (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  type report_type NOT NULL,
+  filters JSONB DEFAULT '{}',
+  data_snapshot JSONB DEFAULT '{}',
+  generated_by UUID REFERENCES auth.users(id),
+  generated_by_name TEXT,
+  approval_status approval_status DEFAULT 'pending',
+  approved_by UUID REFERENCES auth.users(id),
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.generated_reports ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "auth_all" ON public.generated_reports FOR ALL TO authenticated USING (TRUE);
+CREATE INDEX idx_reports_type ON public.generated_reports(type);
+CREATE INDEX idx_reports_generated_by ON public.generated_reports(generated_by);
+
+-- =====================================================
+-- 44. WORKFLOW TEMPLATE: REPORT APPROVAL
+-- =====================================================
+
+INSERT INTO public.workflow_templates (name, description, type, steps, auto_trigger, is_active) VALUES
+  ('Report Sign-Off', 'Manager approval workflow for generated reports', 'general',
+   '[{"name": "Manager Review", "role": "Manager", "action": "approve"}, {"name": "Admin Sign-Off", "role": "Admin", "action": "approve"}]',
+   FALSE, TRUE),
+  ('End of Day Close', 'EOD report review and cash reconciliation', 'general',
+   '[{"name": "Manager EOD Review", "role": "Manager", "action": "approve"}]',
+   FALSE, TRUE);
+
+-- =====================================================
+-- 45. CHAT-DOCUMENT CROSS-REFERENCE TABLE
+-- =====================================================
+
+CREATE TABLE public.chat_document_links (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  message_id UUID REFERENCES public.chat_messages(id) ON DELETE CASCADE NOT NULL,
+  document_id UUID REFERENCES public.documents(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (message_id, document_id)
+);
+
+ALTER TABLE public.chat_document_links ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "auth_all" ON public.chat_document_links FOR ALL TO authenticated USING (TRUE);
+CREATE INDEX idx_chat_doc_links_msg ON public.chat_document_links(message_id);
+CREATE INDEX idx_chat_doc_links_doc ON public.chat_document_links(document_id);
+
+-- Auto-link chat file attachments to documents table
+CREATE OR REPLACE FUNCTION public.handle_chat_attachment()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _doc_id UUID;
+  _attachments JSONB;
+BEGIN
+  _attachments := COALESCE(NEW.attachments, '[]'::JSONB);
+  IF jsonb_array_length(_attachments) > 0 THEN
+    FOR i IN 0..jsonb_array_length(_attachments) - 1 LOOP
+      INSERT INTO public.documents (name, type, size_display, folder_path, author, source)
+      VALUES (
+        _attachments->i->>'name',
+        COALESCE((_attachments->i->>'type')::document_type, 'txt'),
+        _attachments->i->>'size',
+        '/Chat Attachments',
+        NEW.sender_id,
+        'Chat: ' || (SELECT name FROM public.chat_channels WHERE id = NEW.channel_id)
+      )
+      RETURNING id INTO _doc_id;
+
+      INSERT INTO public.chat_document_links (message_id, document_id) VALUES (NEW.id, _doc_id);
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER tr_chat_attachment_to_doc
+  AFTER INSERT ON public.chat_messages
+  FOR EACH ROW EXECUTE FUNCTION public.handle_chat_attachment();
