@@ -18,7 +18,7 @@ import {
 
 type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "expenses" | "operations";
 
-const EXPENSE_CATEGORIES = ["Rent", "Utilities", "Salaries", "Marketing", "Maintenance", "Logistics", "Supplies", "Other"];
+// Expense categories are now dynamic from shared data
 
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
