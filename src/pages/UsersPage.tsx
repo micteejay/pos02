@@ -171,8 +171,8 @@ export default function UsersPage() {
                         {hasPermission("users.edit") && (
                           <button onClick={() => setEditingUser(user)} className="p-1.5 rounded-md hover:bg-muted transition-colors"><Edit2 className="w-3.5 h-3.5 text-muted-foreground" /></button>
                         )}
-                        {hasPermission("users.delete") && user.id !== "u1" && (
-                          <button onClick={() => deleteUser(user.id)} className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
+                        {hasPermission("users.delete") && user.id !== authUser?.id && (
+                          <button onClick={() => { if (confirm(`Delete user "${user.name}"? This cannot be undone.`)) deleteUser(user.id); }} className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                         )}
                       </div>
                     </td>
