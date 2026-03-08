@@ -197,8 +197,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       rc_number: profile.rcNumber || null,
     };
 
-    if (profile.id) {
-      await supabase.from("company_profiles").update(payload).eq("id", profile.id);
+    const { data: existingRows } = await supabase
+      .from("company_profiles")
+      .select("id")
+      .eq("owner_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    const existingCompanyId = profile.id || existingRows?.[0]?.id;
+
+    if (existingCompanyId) {
+      await supabase.from("company_profiles").update(payload).eq("id", existingCompanyId);
+      profile.id = existingCompanyId;
     } else {
       const { data } = await supabase.from("company_profiles").insert(payload).select("id").single();
       if (data) profile.id = data.id;
