@@ -29,7 +29,7 @@ const tooltipStyle = {
 };
 
 export default function ReportsPage() {
-  const { settings, formatCurrency, users } = useAppSettings();
+  const { settings, formatCurrency, users, hasPermission } = useAppSettings();
   const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense, expenseCategories } = useSharedData();
   const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
   const { user } = useAuth();
