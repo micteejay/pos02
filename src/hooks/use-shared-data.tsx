@@ -36,7 +36,20 @@ export interface Expense {
   recurring: boolean;
   recurringInterval?: "daily" | "weekly" | "monthly" | "yearly";
   nextDueDate?: string;
-  parentId?: string; // links generated entries back to the recurring template
+  parentId?: string;
+}
+
+export type CategoryType = "inventory" | "expense" | "general";
+
+export interface Category {
+  id: string;
+  name: string;
+  type: CategoryType;
+  description?: string;
+  status: "approved" | "pending" | "rejected";
+  createdBy: string;
+  createdAt: string;
+  approvedBy?: string;
 }
 
 interface SharedDataContextType {
