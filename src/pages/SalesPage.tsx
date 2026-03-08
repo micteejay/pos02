@@ -60,22 +60,7 @@ const initialTransactions: Transaction[] = [];
 
 const salesReps: { name: string; store: string; sales: number; revenue: number; target: number; avgTicket: number; rating: number; trend: "up" | "down" }[] = [];
 
-const revenueData = [
-  { day: "Mon", revenue: 4200, orders: 38 },
-  { day: "Tue", revenue: 5100, orders: 45 },
-  { day: "Wed", revenue: 3800, orders: 32 },
-  { day: "Thu", revenue: 6200, orders: 52 },
-  { day: "Fri", revenue: 7400, orders: 61 },
-  { day: "Sat", revenue: 8900, orders: 74 },
-  { day: "Sun", revenue: 5600, orders: 47 },
-];
-
-const hourlyData = [
-  { hour: "9AM", sales: 12 }, { hour: "10AM", sales: 18 }, { hour: "11AM", sales: 24 },
-  { hour: "12PM", sales: 31 }, { hour: "1PM", sales: 28 }, { hour: "2PM", sales: 22 },
-  { hour: "3PM", sales: 19 }, { hour: "4PM", sales: 26 }, { hour: "5PM", sales: 34 },
-  { hour: "6PM", sales: 29 }, { hour: "7PM", sales: 15 }, { hour: "8PM", sales: 8 },
-];
+// Revenue and hourly data derived from transactions in AnalyticsTab
 
 const statusConfig = {
   completed: { label: "Completed", className: "bg-success/10 text-success" },
