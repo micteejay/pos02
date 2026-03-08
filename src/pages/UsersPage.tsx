@@ -69,7 +69,7 @@ export default function UsersPage() {
             <p className="text-sm text-muted-foreground mt-1">Manage user accounts, roles, and permissions</p>
           </div>
           <div className="flex gap-2">
-            {tab === "users" && hasPermission("users.create") && (
+            {tab === "users" && hasPermission("users.create") && canCreateUsersForStore && (
               <button onClick={() => setShowAddUser(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
                 <UserPlus className="w-4 h-4" />Add User
               </button>
