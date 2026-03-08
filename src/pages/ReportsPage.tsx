@@ -685,7 +685,23 @@ export default function ReportsPage() {
                       {stores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   </div>
-                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Save Expense</button>
+                  <div className="flex items-center gap-4 mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={expenseForm.recurring} onChange={e => setExpenseForm(f => ({ ...f, recurring: e.target.checked }))} className="rounded border-border" />
+                      <span className="text-sm text-foreground">Recurring</span>
+                    </label>
+                    {expenseForm.recurring && (
+                      <select value={expenseForm.recurringInterval} onChange={e => setExpenseForm(f => ({ ...f, recurringInterval: e.target.value as any }))} className="h-8 rounded-lg border border-border bg-background px-3 text-xs text-foreground">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                      </select>
+                    )}
+                  </div>
+                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">
+                    {expenseForm.recurring ? "Save Recurring Expense" : "Save Expense"}
+                  </button>
                 </div>
               )}
 
