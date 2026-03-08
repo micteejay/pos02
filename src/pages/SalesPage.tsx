@@ -60,10 +60,6 @@ type SortKey = "time" | "total" | "customer";
 // --- Initial Data ---
 const initialTransactions: Transaction[] = [];
 
-const salesReps: { name: string; store: string; sales: number; revenue: number; target: number; avgTicket: number; rating: number; trend: "up" | "down" }[] = [];
-
-// Revenue and hourly data derived from transactions in AnalyticsTab
-
 const statusConfig = {
   completed: { label: "Completed", className: "bg-success/10 text-success" },
   refunded: { label: "Refunded", className: "bg-destructive/10 text-destructive" },
