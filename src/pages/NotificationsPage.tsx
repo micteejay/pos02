@@ -1,12 +1,21 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
-import { useAppEvents, NotificationType } from "@/hooks/use-app-events";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { toast } from "sonner";
 import {
   Bell, CheckCircle2, AlertTriangle, MessageSquare, FileText, Package, Clock,
-  Trash2, X, Filter, ExternalLink, ShoppingCart, Shield, TrendingUp, Truck,
+  Trash2, X, Filter, ExternalLink, ShoppingCart, Shield, TrendingUp, Truck, Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+
+type NotificationType = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
+
+interface DBNotification {
+  id: string; type: NotificationType; title: string; message: string;
+  time: string; read: boolean; link?: string;
+  targetRoles?: string[]; createdBy?: string;
+}
 
 const typeConfig: Record<NotificationType, { icon: React.ElementType; color: string }> = {
   approval: { icon: CheckCircle2, color: "text-success" },
@@ -21,23 +30,80 @@ const typeConfig: Record<NotificationType, { icon: React.ElementType; color: str
 };
 
 export default function NotificationsPage() {
-  const { notifications, markRead, markAllRead, deleteNotification, getNotificationsForRole } = useAppEvents();
   const { user } = useAuth();
+  const [notifications, setNotifications] = useState<DBNotification[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
 
-  // Role-based notification filtering
-  const roleFilteredNotifications = useMemo(() => {
-    if (!user) return [];
-    return getNotificationsForRole(user.role, user.id);
-  }, [getNotificationsForRole, user]);
+  const fetchNotifications = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-  const unreadCount = roleFilteredNotifications.filter(n => !n.read).length;
+    if (data && !error) {
+      setNotifications(data.map(n => ({
+        id: n.id, type: n.type as NotificationType, title: n.title,
+        message: n.message || "", read: n.read || false,
+        time: new Date(n.created_at).toLocaleString(),
+        link: n.link || undefined,
+        targetRoles: n.target_roles || undefined,
+        createdBy: n.created_by_name || undefined,
+      })));
+    }
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
+
+  // Realtime subscription
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel("notif-page-realtime")
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "notifications",
+        filter: `user_id=eq.${user.id}`,
+      }, (payload) => {
+        const n = payload.new as any;
+        setNotifications(prev => [{
+          id: n.id, type: n.type, title: n.title, message: n.message || "",
+          read: false, time: "Just now", link: n.link || undefined,
+          targetRoles: n.target_roles || undefined, createdBy: n.created_by_name || undefined,
+        }, ...prev]);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const markRead = useCallback(async (id: string) => {
+    await supabase.from("notifications").update({ read: true }).eq("id", id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  }, []);
+
+  const markAllRead = useCallback(async () => {
+    if (!user) return;
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    toast.success("All notifications marked as read");
+  }, [user]);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    await supabase.from("notifications").delete().eq("id", id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const filtered = useMemo(() =>
-    filter === "all" ? roleFilteredNotifications :
-    filter === "unread" ? roleFilteredNotifications.filter(n => !n.read) :
-    roleFilteredNotifications.filter(n => n.type === filter),
-  [roleFilteredNotifications, filter]);
+    filter === "all" ? notifications :
+    filter === "unread" ? notifications.filter(n => !n.read) :
+    notifications.filter(n => n.type === filter),
+  [notifications, filter]);
 
   const filters = [
     { key: "all", label: "All" },
@@ -49,6 +115,10 @@ export default function NotificationsPage() {
     { key: "sales", label: "Sales" },
     { key: "supply", label: "Supply Chain" },
   ];
+
+  if (loading) {
+    return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
+  }
 
   return (
     <AppLayout>
@@ -76,8 +146,8 @@ export default function NotificationsPage() {
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             <Bell className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>No notifications for your role</p>
-            <p className="text-xs mt-1">Notifications are filtered based on your permissions</p>
+            <p>No notifications</p>
+            <p className="text-xs mt-1">You're all caught up!</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -101,7 +171,7 @@ export default function NotificationsPage() {
                       <span className="text-xs text-muted-foreground">{notif.time}</span>
                       <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{notif.type}</span>
                       {notif.createdBy && <span className="text-[10px] text-muted-foreground">by {notif.createdBy}</span>}
-                      {notif.targetRoles && (
+                      {notif.targetRoles && notif.targetRoles.length > 0 && (
                         <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                           {notif.targetRoles.join(", ")}
                         </span>
