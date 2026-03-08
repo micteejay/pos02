@@ -2156,6 +2156,7 @@ export type Database = {
         }
         Returns: string
       }
+      promote_to_super_admin: { Args: { _user_id: string }; Returns: undefined }
       send_notification: {
         Args: {
           _link?: string
