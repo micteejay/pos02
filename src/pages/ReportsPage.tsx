@@ -265,8 +265,11 @@ export default function ReportsPage() {
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-value">${eodData.count}</div><div class="stat-label">Transactions</div></div>
           <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalRevenue)}</div><div class="stat-label">Revenue</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalCost)}</div><div class="stat-label">Cost</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.profit)}</div><div class="stat-label">Profit</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalCost)}</div><div class="stat-label">Cost of Goods</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.opExpenses)}</div><div class="stat-label">Op. Expenses</div></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card" style="grid-column:span 4"><div class="stat-value ${eodData.profit >= 0 ? '' : 'loss'}" style="font-size:28px">${formatCurrency(eodData.profit)}</div><div class="stat-label">Net Profit (Revenue − COGS − Expenses)</div></div>
         </div>
         <h3>Payment Methods</h3>
         <table><thead><tr><th>Method</th><th>Amount</th></tr></thead><tbody>
