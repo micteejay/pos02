@@ -31,7 +31,7 @@ function OrgTreeNode({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
 type Tab = "stores" | "warehouses" | "departments" | "hierarchy";
 
 export default function OrganizationPage() {
-  const { settings } = useAppSettings();
+  const { settings, hasPermission } = useAppSettings();
   const {
     stores, addStore, updateStore, deleteStore,
     warehouses, addWarehouse, deleteWarehouse,
