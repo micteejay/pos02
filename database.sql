@@ -1712,3 +1712,69 @@ $$;
 CREATE TRIGGER tr_chat_attachment_to_doc
   AFTER INSERT ON public.chat_messages
   FOR EACH ROW EXECUTE FUNCTION public.handle_chat_attachment();
+
+-- =====================================================
+-- EXPENSES TABLE
+-- =====================================================
+
+CREATE TABLE public.expenses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL, -- 'Rent', 'Utilities', 'Salaries', 'Marketing', 'Maintenance', 'Logistics', 'Supplies', 'Other'
+  description TEXT NOT NULL,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  store_id UUID REFERENCES public.stores(id) ON DELETE SET NULL,
+  recurring BOOLEAN DEFAULT FALSE,
+  recurring_interval TEXT, -- 'daily', 'weekly', 'monthly', 'yearly'
+  created_by UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view expenses for their stores"
+  ON public.expenses FOR SELECT TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin')
+    OR store_id IN (SELECT store_id FROM public.user_store_assignments WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "Managers+ can insert expenses"
+  ON public.expenses FOR INSERT TO authenticated
+  WITH CHECK (
+    public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager')
+  );
+
+CREATE POLICY "Managers+ can update expenses"
+  ON public.expenses FOR UPDATE TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin') OR public.has_role(auth.uid(), 'manager')
+  );
+
+CREATE POLICY "Admins can delete expenses"
+  ON public.expenses FOR DELETE TO authenticated
+  USING (
+    public.has_role(auth.uid(), 'admin') OR public.has_role(auth.uid(), 'super_admin')
+  );
+
+-- Trigger to auto-audit expense changes
+CREATE OR REPLACE FUNCTION public.audit_expense_change()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  INSERT INTO public.audit_logs (user_id, action, entity_type, entity_id, details, severity)
+  VALUES (
+    COALESCE(NEW.created_by, OLD.created_by),
+    TG_OP,
+    'expense',
+    COALESCE(NEW.id, OLD.id)::TEXT,
+    jsonb_build_object('category', COALESCE(NEW.category, OLD.category), 'amount', COALESCE(NEW.amount, OLD.amount), 'description', COALESCE(NEW.description, OLD.description)),
+    'info'
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+CREATE TRIGGER tr_audit_expense
+  AFTER INSERT OR UPDATE OR DELETE ON public.expenses
+  FOR EACH ROW EXECUTE FUNCTION public.audit_expense_change();

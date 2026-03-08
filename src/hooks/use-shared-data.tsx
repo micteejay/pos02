@@ -24,6 +24,18 @@ export interface OrgDepartment {
   id: number; name: string; head: string; headcount: number; budget: string; teams: string[];
 }
 
+export interface Expense {
+  id: string;
+  category: string; // 'rent', 'utilities', 'salaries', 'marketing', 'maintenance', 'logistics', 'supplies', 'other'
+  description: string;
+  amount: number;
+  date: string;
+  store: string;
+  createdBy: string;
+  createdByRole: string;
+  recurring: boolean;
+}
+
 interface SharedDataContextType {
   // Inventory
   inventory: InventoryItem[];
@@ -36,6 +48,12 @@ interface SharedDataContextType {
   // Sales
   sales: SaleRecord[];
   addSale: (sale: Omit<SaleRecord, "id" | "date">) => void;
+
+  // Expenses
+  expenses: Expense[];
+  addExpense: (expense: Omit<Expense, "id">) => void;
+  updateExpense: (id: string, updates: Partial<Expense>) => void;
+  deleteExpense: (id: string) => void;
 
   // Documents
   documents: SharedDocument[];
@@ -75,6 +93,7 @@ function calcStatus(qty: number, reorder: number): InventoryItem["status"] {
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [documents, setDocuments] = useState<SharedDocument[]>([]);
   const [stores, setStores] = useState<OrgStore[]>([]);
   const [warehouses, setWarehouses] = useState<OrgWarehouse[]>([]);
@@ -136,6 +155,19 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     }, ...prev]);
   }, []);
 
+  // Expenses
+  const addExpense = useCallback((expense: Omit<Expense, "id">) => {
+    setExpenses(prev => [{ ...expense, id: `EXP-${Date.now()}` }, ...prev]);
+  }, []);
+
+  const updateExpense = useCallback((id: string, updates: Partial<Expense>) => {
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  }, []);
+
+  const deleteExpense = useCallback((id: string) => {
+    setExpenses(prev => prev.filter(e => e.id !== id));
+  }, []);
+
   // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
     setDocuments(prev => [...prev, { ...doc, id: `doc-${Date.now()}` }]);
@@ -193,6 +225,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     <SharedDataContext.Provider value={{
       inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, addStockFromPO,
       sales, addSale,
+      expenses, addExpense, updateExpense, deleteExpense,
       documents, addDocument, deleteDocument,
       stores, addStore, updateStore, deleteStore,
       warehouses, addWarehouse, updateWarehouse, deleteWarehouse,

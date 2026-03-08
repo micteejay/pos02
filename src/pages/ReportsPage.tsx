@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { useSharedData } from "@/hooks/use-shared-data";
+import { useSharedData, Expense } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
@@ -9,13 +9,16 @@ import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   Download, Calendar, FileText, PieChart as PieIcon, Printer,
   Building2, Warehouse, ClipboardCheck, Activity, GitBranch,
+  Plus, Trash2, Receipt, X,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
 
-type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "operations";
+type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "expenses" | "operations";
+
+const EXPENSE_CATEGORIES = ["Rent", "Utilities", "Salaries", "Marketing", "Maintenance", "Logistics", "Supplies", "Other"];
 
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
@@ -27,36 +30,53 @@ const tooltipStyle = {
 
 export default function ReportsPage() {
   const { settings, formatCurrency, users } = useAppSettings();
-  const { inventory, sales, stores, warehouses } = useSharedData();
+  const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense } = useSharedData();
   const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
   const { user } = useAuth();
   const { logAction } = useAudit();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "" });
 
-  // Derive revenue data from actual sales
+  // Total operational expenses
+  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+
+  const expensesByCategory = useMemo(() => {
+    const map: Record<string, number> = {};
+    expenses.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount; });
+    const colors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)", "hsl(280,60%,55%)", "hsl(0,72%,51%)", "hsl(45,90%,55%)", "hsl(190,70%,50%)"];
+    return Object.entries(map).map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }));
+  }, [expenses]);
+
+  // Derive revenue data from actual sales + operational expenses
   const monthlyRevenue = useMemo(() => {
-    if (sales.length === 0) return [];
-    const grouped: Record<string, { revenue: number; expenses: number }> = {};
+    if (sales.length === 0 && expenses.length === 0) return [];
+    const grouped: Record<string, { revenue: number; costOfGoods: number; opExpenses: number }> = {};
     sales.forEach(sale => {
       const d = new Date(sale.date);
       const key = d.toLocaleDateString("en-US", { month: "short" });
-      if (!grouped[key]) grouped[key] = { revenue: 0, expenses: 0 };
+      if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
       grouped[key].revenue += sale.total;
-      // Use cost price for expenses if available
       const costTotal = sale.items.reduce((s, item) => {
         const invItem = inventory.find(i => i.sku === item.sku);
         return s + (invItem?.costPrice || item.price * 0.6) * item.qty;
       }, 0);
-      grouped[key].expenses += costTotal;
+      grouped[key].costOfGoods += costTotal;
+    });
+    expenses.forEach(exp => {
+      const d = new Date(exp.date);
+      const key = d.toLocaleDateString("en-US", { month: "short" });
+      if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
+      grouped[key].opExpenses += exp.amount;
     });
     return Object.entries(grouped).map(([month, data]) => ({
       month,
       revenue: data.revenue,
-      expenses: data.expenses,
-      profit: data.revenue - data.expenses,
+      expenses: data.costOfGoods + data.opExpenses,
+      profit: data.revenue - data.costOfGoods - data.opExpenses,
     }));
-  }, [sales, inventory]);
+  }, [sales, inventory, expenses]);
 
   // Sales by store
   const salesByStore = useMemo(() => {
@@ -102,7 +122,7 @@ export default function ReportsPage() {
     return { approved, rejected, pending };
   }, [approvalItems]);
 
-  // Gain/Loss data — cost vs revenue per item
+  // Gain/Loss data — cost vs revenue per item + operational expenses
   const gainLossData = useMemo(() => {
     const map: Record<string, { name: string; revenue: number; cost: number; units: number }> = {};
     sales.forEach(s => s.items.forEach(item => {
@@ -116,16 +136,24 @@ export default function ReportsPage() {
     return Object.values(map).map(d => ({ ...d, profit: d.revenue - d.cost, margin: d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue * 100) : 0 }));
   }, [sales, inventory]);
 
-  // End of Day summary
+  // Net gain/loss including operational expenses
+  const netGainLoss = useMemo(() => {
+    const grossProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
+    return grossProfit - totalExpenses;
+  }, [gainLossData, totalExpenses]);
+
+  // End of Day summary — includes today's operational expenses
   const eodData = useMemo(() => {
     const today = new Date().toDateString();
     const todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
+    const todayExpenses = expenses.filter(e => new Date(e.date).toDateString() === today);
     const totalRevenue = todaySales.reduce((s, sale) => s + sale.total, 0);
     const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((a, i) => a + i.qty, 0), 0);
     const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((a, item) => {
       const invItem = inventory.find(i => i.sku === item.sku);
       return a + (invItem?.costPrice || item.price * 0.6) * item.qty;
     }, 0), 0);
+    const todayOpExpenses = todayExpenses.reduce((s, e) => s + e.amount, 0);
     const byMethod: Record<string, number> = {};
     todaySales.forEach(s => { byMethod[s.method] = (byMethod[s.method] || 0) + s.total; });
     const byStaff: Record<string, { name: string; sales: number; revenue: number }> = {};
@@ -134,8 +162,8 @@ export default function ReportsPage() {
       byStaff[s.createdBy].sales++;
       byStaff[s.createdBy].revenue += s.total;
     });
-    return { sales: todaySales, totalRevenue, totalItems, totalCost, profit: totalRevenue - totalCost, byMethod, byStaff: Object.values(byStaff), count: todaySales.length };
-  }, [sales, inventory]);
+    return { sales: todaySales, totalRevenue, totalItems, totalCost, opExpenses: todayOpExpenses, profit: totalRevenue - totalCost - todayOpExpenses, byMethod, byStaff: Object.values(byStaff), count: todaySales.length, todayExpenses };
+  }, [sales, inventory, expenses]);
 
   const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
   const totalInventoryValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
@@ -152,10 +180,28 @@ export default function ReportsPage() {
     { key: "overview", label: "Overview", icon: BarChart3 },
     { key: "sales", label: "Sales", icon: DollarSign },
     { key: "inventory", label: "Inventory", icon: Package },
+    { key: "expenses", label: "Expenses", icon: Receipt },
     { key: "gainloss", label: "Gain/Loss", icon: TrendingUp },
     { key: "eod", label: "End of Day", icon: Calendar },
     { key: "operations", label: "Operations", icon: Activity },
   ];
+
+  const handleAddExpense = () => {
+    if (!expenseForm.description || !expenseForm.amount) return;
+    addExpense({
+      category: expenseForm.category,
+      description: expenseForm.description,
+      amount: parseFloat(expenseForm.amount),
+      date: new Date().toISOString(),
+      store: expenseForm.store || stores[0]?.name || "Main",
+      createdBy: user?.name || "System",
+      createdByRole: user?.role || "Admin",
+      recurring: false,
+    });
+    logAction("expense.add", "Expenses", expenseForm.category, `Added expense: ${expenseForm.description} — ${formatCurrency(parseFloat(expenseForm.amount))}`);
+    setExpenseForm({ category: "Rent", description: "", amount: "", store: "" });
+    setShowAddExpense(false);
+  };
 
   const exportCSV = () => {
     let csv = "";
@@ -164,9 +210,13 @@ export default function ReportsPage() {
     } else if (reportType === "inventory") {
       csv = "SKU,Name,Category,Warehouse,Qty,CostPrice,SellingPrice,Value\n" + inventory.map(i => `${i.sku},${i.name},${i.category},${i.warehouse},${i.qty},${i.costPrice || 0},${i.price},${i.qty * i.price}`).join("\n");
     } else if (reportType === "gainloss") {
-      csv = "Product,Revenue,Cost,Profit,Margin%\n" + gainLossData.map(d => `${d.name},${d.revenue},${d.cost},${d.profit},${d.margin.toFixed(1)}`).join("\n");
+      csv = "Product,Revenue,Cost,Profit,Margin%\n" + gainLossData.map(d => `${d.name},${d.revenue},${d.cost},${d.profit},${d.margin.toFixed(1)}`).join("\n")
+        + `\n\nOperational Expenses\nCategory,Amount\n` + expensesByCategory.map(e => `${e.name},${e.value}`).join("\n")
+        + `\n\nNet Gain/Loss,${netGainLoss}`;
+    } else if (reportType === "expenses") {
+      csv = "ID,Date,Category,Description,Amount,Store,By\n" + expenses.map(e => `${e.id},${new Date(e.date).toLocaleDateString()},${e.category},${e.description},${e.amount},${e.store},${e.createdBy}`).join("\n");
     } else if (reportType === "eod") {
-      csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nTotal Cost,${eodData.totalCost}\nProfit,${eodData.profit}`;
+      csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nCost of Goods,${eodData.totalCost}\nOperational Expenses,${eodData.opExpenses}\nNet Profit,${eodData.profit}`;
     } else {
       csv = `Approved,${approvalStats.approved}\nRejected,${approvalStats.rejected}\nPending,${approvalStats.pending}`;
     }
@@ -187,26 +237,39 @@ export default function ReportsPage() {
     const statsHtml = `<div class="stat-grid">${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}</div>`;
 
     if (reportType === "gainloss") {
-      const totalProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
+      const grossProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
       const totalRev = gainLossData.reduce((s, d) => s + d.revenue, 0);
       const totalCost = gainLossData.reduce((s, d) => s + d.cost, 0);
       bodyContent = `${headerHtml}
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-value">${formatCurrency(totalRev)}</div><div class="stat-label">Total Revenue</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(totalCost)}</div><div class="stat-label">Total Cost</div></div>
-          <div class="stat-card"><div class="stat-value ${totalProfit >= 0 ? '' : 'loss'}">${formatCurrency(totalProfit)}</div><div class="stat-label">Net ${totalProfit >= 0 ? 'Gain' : 'Loss'}</div></div>
-          <div class="stat-card"><div class="stat-value">${totalRev > 0 ? ((totalProfit / totalRev) * 100).toFixed(1) : 0}%</div><div class="stat-label">Margin</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalCost)}</div><div class="stat-label">Cost of Goods</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalExpenses)}</div><div class="stat-label">Operational Expenses</div></div>
+          <div class="stat-card"><div class="stat-value ${netGainLoss >= 0 ? '' : 'loss'}">${formatCurrency(netGainLoss)}</div><div class="stat-label">Net ${netGainLoss >= 0 ? 'Gain' : 'Loss'}</div></div>
         </div>
-        <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead><tbody>
+        <h3>Product Breakdown</h3>
+        <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Gross Profit</th><th>Margin</th></tr></thead><tbody>
         ${gainLossData.map(d => `<tr><td>${d.name}</td><td>${d.units}</td><td>${formatCurrency(d.revenue)}</td><td>${formatCurrency(d.cost)}</td><td class="${d.profit >= 0 ? '' : 'loss'}">${formatCurrency(d.profit)}</td><td>${d.margin.toFixed(1)}%</td></tr>`).join("")}
-        </tbody></table>`;
+        </tbody></table>
+        ${expenses.length > 0 ? `<h3>Operational Expenses</h3>
+        <table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Store</th><th>Date</th><th>By</th></tr></thead><tbody>
+        ${expenses.map(e => `<tr><td>${e.category}</td><td>${e.description}</td><td>${formatCurrency(e.amount)}</td><td>${e.store}</td><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.createdBy}</td></tr>`).join("")}
+        </tbody></table>` : ''}
+        <div class="stat-grid" style="margin-top:20px">
+          <div class="stat-card"><div class="stat-value">${formatCurrency(grossProfit)}</div><div class="stat-label">Gross Profit</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalExpenses)}</div><div class="stat-label">− Expenses</div></div>
+          <div class="stat-card" style="grid-column:span 2"><div class="stat-value ${netGainLoss >= 0 ? '' : 'loss'}" style="font-size:28px">${formatCurrency(netGainLoss)}</div><div class="stat-label">NET ${netGainLoss >= 0 ? 'GAIN' : 'LOSS'}</div></div>
+        </div>`;
     } else if (reportType === "eod") {
       bodyContent = `${headerHtml}
         <div class="stat-grid">
           <div class="stat-card"><div class="stat-value">${eodData.count}</div><div class="stat-label">Transactions</div></div>
           <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalRevenue)}</div><div class="stat-label">Revenue</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalCost)}</div><div class="stat-label">Cost</div></div>
-          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.profit)}</div><div class="stat-label">Profit</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalCost)}</div><div class="stat-label">Cost of Goods</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.opExpenses)}</div><div class="stat-label">Op. Expenses</div></div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card" style="grid-column:span 4"><div class="stat-value ${eodData.profit >= 0 ? '' : 'loss'}" style="font-size:28px">${formatCurrency(eodData.profit)}</div><div class="stat-label">Net Profit (Revenue − COGS − Expenses)</div></div>
         </div>
         <h3>Payment Methods</h3>
         <table><thead><tr><th>Method</th><th>Amount</th></tr></thead><tbody>
@@ -571,39 +634,166 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Gain/Loss */}
+        {/* Expenses */}
+        {reportType === "expenses" && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expenses.length}</p>
+                <p className="text-xs text-muted-foreground">Total Entries</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-warning">{formatCurrency(totalExpenses)}</p>
+                <p className="text-xs text-muted-foreground">Total Expenses</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expensesByCategory.length}</p>
+                <p className="text-xs text-muted-foreground">Categories</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{expenses.length > 0 ? formatCurrency(totalExpenses / expenses.length) : formatCurrency(0)}</p>
+                <p className="text-xs text-muted-foreground">Avg per Entry</p>
+              </div>
+            </div>
+
+            <div className="glass-card rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-foreground">Operational Expenses</h3>
+                  <p className="text-xs text-muted-foreground">Track rent, utilities, salaries, and other costs</p>
+                </div>
+                <button onClick={() => setShowAddExpense(true)} className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                  <Plus className="w-4 h-4" />Add Expense
+                </button>
+              </div>
+
+              {showAddExpense && (
+                <div className="p-4 rounded-lg bg-muted/30 border border-border mb-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-foreground">New Expense</h4>
+                    <button onClick={() => setShowAddExpense(false)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <select value={expenseForm.category} onChange={e => setExpenseForm(f => ({ ...f, category: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                      {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <input placeholder="Description" value={expenseForm.description} onChange={e => setExpenseForm(f => ({ ...f, description: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />
+                    <input type="number" placeholder="Amount" value={expenseForm.amount} onChange={e => setExpenseForm(f => ({ ...f, amount: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground" />
+                    <select value={expenseForm.store} onChange={e => setExpenseForm(f => ({ ...f, store: e.target.value }))} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                      <option value="">Select Store</option>
+                      {stores.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={handleAddExpense} disabled={!expenseForm.description || !expenseForm.amount} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50">Save Expense</button>
+                </div>
+              )}
+
+              {expenses.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Date</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Category</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Description</th>
+                        <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Amount</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Store</th>
+                        <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">By</th>
+                        <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {expenses.map(exp => (
+                        <tr key={exp.id} className="border-b border-border/50">
+                          <td className="px-3 py-2 text-xs text-muted-foreground">{new Date(exp.date).toLocaleDateString()}</td>
+                          <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-warning/10 text-warning font-medium">{exp.category}</span></td>
+                          <td className="px-3 py-2 text-sm text-foreground">{exp.description}</td>
+                          <td className="px-3 py-2 text-sm text-right font-semibold text-foreground">{formatCurrency(exp.amount)}</td>
+                          <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{exp.store}</td>
+                          <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{exp.createdBy}</td>
+                          <td className="px-3 py-2 text-center">
+                            <button onClick={() => { deleteExpense(exp.id); logAction("expense.delete", "Expenses", exp.category, `Deleted expense: ${exp.description}`); }} className="text-muted-foreground hover:text-destructive transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Receipt className="w-10 h-10 text-muted-foreground/30 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">No expenses recorded yet. Add your first expense above.</p>
+                </div>
+              )}
+            </div>
+
+            {expensesByCategory.length > 0 && (
+              <div className="glass-card rounded-xl p-5">
+                <h3 className="font-semibold text-foreground mb-4">Expenses by Category</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value" stroke="none">
+                        {expensesByCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="space-y-3 flex flex-col justify-center">
+                    {expensesByCategory.map(e => (
+                      <div key={e.name} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ background: e.color }} />
+                          <span className="text-sm text-muted-foreground">{e.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-semibold text-foreground">{formatCurrency(e.value)}</span>
+                          <span className="text-xs text-muted-foreground ml-2">({totalExpenses > 0 ? ((e.value / totalExpenses) * 100).toFixed(0) : 0}%)</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+
         {hasData && reportType === "gainloss" && (
           <div className="space-y-4 animate-fade-in">
             {gainLossData.length > 0 ? (
               <>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="glass-card rounded-xl p-4 text-center">
                     <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.revenue, 0))}</p>
                     <p className="text-xs text-muted-foreground">Total Revenue</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
                     <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.cost, 0))}</p>
-                    <p className="text-xs text-muted-foreground">Total Cost</p>
+                    <p className="text-xs text-muted-foreground">Cost of Goods</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
-                    {(() => {
-                      const net = gainLossData.reduce((s, d) => s + d.profit, 0);
-                      return <p className={`text-xl font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(net)}</p>;
-                    })()}
-                    <p className="text-xs text-muted-foreground">Net {gainLossData.reduce((s, d) => s + d.profit, 0) >= 0 ? "Gain" : "Loss"}</p>
+                    <p className="text-xl font-bold text-warning">{formatCurrency(totalExpenses)}</p>
+                    <p className="text-xs text-muted-foreground">Op. Expenses</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    <p className={`text-xl font-bold ${netGainLoss >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(netGainLoss)}</p>
+                    <p className="text-xs text-muted-foreground">Net {netGainLoss >= 0 ? "Gain" : "Loss"}</p>
                   </div>
                   <div className="glass-card rounded-xl p-4 text-center">
                     {(() => {
                       const rev = gainLossData.reduce((s, d) => s + d.revenue, 0);
-                      const prof = gainLossData.reduce((s, d) => s + d.profit, 0);
-                      return <p className="text-xl font-bold text-foreground">{rev > 0 ? ((prof / rev) * 100).toFixed(1) : 0}%</p>;
+                      return <p className="text-xl font-bold text-foreground">{rev > 0 ? ((netGainLoss / rev) * 100).toFixed(1) : 0}%</p>;
                     })()}
-                    <p className="text-xs text-muted-foreground">Avg Margin</p>
+                    <p className="text-xs text-muted-foreground">Net Margin</p>
                   </div>
                 </div>
                 <div className="glass-card rounded-xl p-5">
                   <h3 className="font-semibold text-foreground mb-1">Profit by Product</h3>
-                  <p className="text-xs text-muted-foreground mb-4">Revenue vs Cost breakdown</p>
+                  <p className="text-xs text-muted-foreground mb-4">Revenue vs Cost breakdown (before operational expenses)</p>
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={gainLossData.slice(0, 10)} barSize={20}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
@@ -616,8 +806,35 @@ export default function ReportsPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                {expenses.length > 0 && (
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-1">Operational Expenses Breakdown</h3>
+                    <p className="text-xs text-muted-foreground mb-4">Expenses by category reducing your net profit</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" stroke="none">
+                            {expensesByCategory.map((e, i) => <Cell key={i} fill={e.color} />)}
+                          </Pie>
+                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2 flex flex-col justify-center">
+                        {expensesByCategory.map(e => (
+                          <div key={e.name} className="flex items-center justify-between text-sm">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-full" style={{ background: e.color }} />
+                              <span className="text-muted-foreground">{e.name}</span>
+                            </div>
+                            <span className="font-semibold text-foreground">{formatCurrency(e.value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="glass-card rounded-xl p-5">
-                  <h3 className="font-semibold text-foreground mb-4">Detailed Gain/Loss</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Product Gain/Loss Detail</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -626,7 +843,7 @@ export default function ReportsPage() {
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Units</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Revenue</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Cost</th>
-                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Profit</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Gross Profit</th>
                           <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Margin</th>
                         </tr>
                       </thead>
@@ -645,6 +862,18 @@ export default function ReportsPage() {
                     </table>
                   </div>
                 </div>
+                {/* Net Summary */}
+                <div className="glass-card rounded-xl p-5 border-2 border-primary/20">
+                  <h3 className="font-semibold text-foreground mb-3">Net Profit Summary</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between"><span className="text-muted-foreground">Gross Profit (Revenue − COGS)</span><span className="font-semibold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.profit, 0))}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">− Operational Expenses</span><span className="font-semibold text-warning">{formatCurrency(totalExpenses)}</span></div>
+                    <div className="border-t border-border pt-2 flex justify-between">
+                      <span className="font-semibold text-foreground">Net {netGainLoss >= 0 ? "Gain" : "Loss"}</span>
+                      <span className={`text-lg font-bold ${netGainLoss >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(netGainLoss)}</span>
+                    </div>
+                  </div>
+                </div>
               </>
             ) : (
               <div className="glass-card rounded-xl p-10 text-center">
@@ -658,22 +887,26 @@ export default function ReportsPage() {
         {/* End of Day */}
         {hasData && reportType === "eod" && (
           <div className="space-y-4 animate-fade-in">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className="text-xl font-bold text-foreground">{eodData.count}</p>
-                <p className="text-xs text-muted-foreground">Today's Transactions</p>
+                <p className="text-xs text-muted-foreground">Transactions</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className="text-xl font-bold text-foreground">{formatCurrency(eodData.totalRevenue)}</p>
-                <p className="text-xs text-muted-foreground">Today's Revenue</p>
+                <p className="text-xs text-muted-foreground">Revenue</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
-                <p className="text-xl font-bold text-foreground">{eodData.totalItems}</p>
-                <p className="text-xs text-muted-foreground">Items Sold</p>
+                <p className="text-xl font-bold text-foreground">{formatCurrency(eodData.totalCost)}</p>
+                <p className="text-xs text-muted-foreground">Cost of Goods</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-warning">{formatCurrency(eodData.opExpenses)}</p>
+                <p className="text-xs text-muted-foreground">Op. Expenses</p>
               </div>
               <div className="glass-card rounded-xl p-4 text-center">
                 <p className={`text-xl font-bold ${eodData.profit >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(eodData.profit)}</p>
-                <p className="text-xs text-muted-foreground">Today's Profit</p>
+                <p className="text-xs text-muted-foreground">Net Profit</p>
               </div>
             </div>
 
