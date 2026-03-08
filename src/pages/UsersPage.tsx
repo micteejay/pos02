@@ -344,7 +344,7 @@ function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { 
   );
 }
 
-function EditUserForm({ user, roles, onSave, onCancel }: { user: AppUser; roles: AppRole[]; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
+function EditUserForm({ user, roles, storeNames, departmentNames, onSave, onCancel }: { user: AppUser; roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
   const [name, setName] = useState(user.name); const [email, setEmail] = useState(user.email); const [role, setRole] = useState(user.role); const [status, setStatus] = useState(user.status); const [department, setDepartment] = useState(user.department); const [store, setStore] = useState(user.store);
 
   return (
