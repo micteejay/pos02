@@ -225,6 +225,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     <SharedDataContext.Provider value={{
       inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, addStockFromPO,
       sales, addSale,
+      expenses, addExpense, updateExpense, deleteExpense,
       documents, addDocument, deleteDocument,
       stores, addStore, updateStore, deleteStore,
       warehouses, addWarehouse, updateWarehouse, deleteWarehouse,
