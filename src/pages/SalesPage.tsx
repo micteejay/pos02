@@ -273,10 +273,11 @@ function NewSaleModal({ onAdd, onClose, storeNames, users }: { onAdd: (data: any
 }
 
 // --- Transactions Tab ---
-function TransactionsTab({ transactions, onUpdateStatus, onDelete }: {
+function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters }: {
   transactions: Transaction[];
   onUpdateStatus: (id: string, status: Transaction["status"]) => void;
   onDelete: (id: string) => void;
+  storeFilters: string[];
 }) {
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("All Stores");
