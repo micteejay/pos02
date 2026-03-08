@@ -9,6 +9,7 @@ import { AppEventsProvider } from "./hooks/use-app-events";
 import { SharedDataProvider } from "./hooks/use-shared-data";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
 import CommandPalette from "./components/CommandPalette";
+import AIChatAssistant from "./components/AIChatAssistant";
 import Index from "./pages/Index";
 import ChatPage from "./pages/ChatPage";
 import DocumentsPage from "./pages/DocumentsPage";
