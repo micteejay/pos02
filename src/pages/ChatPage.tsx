@@ -18,34 +18,11 @@ interface Channel {
 }
 
 const initialChannels: Channel[] = [
-  { id: "general", name: "general", type: "channel", unread: 2, members: 24, description: "Company-wide announcements and discussions" },
-  { id: "sales-team", name: "sales-team", type: "channel", unread: 0, members: 12, description: "Sales team coordination" },
-  { id: "inventory-alerts", name: "inventory-alerts", type: "channel", unread: 5, members: 8, description: "Automated inventory notifications" },
-  { id: "management", name: "management", type: "channel", unread: 0, members: 6, description: "Management discussions" },
-  { id: "dev-ops", name: "dev-ops", type: "channel", unread: 1, members: 10, description: "DevOps and infrastructure" },
+  { id: "general", name: "general", type: "channel", unread: 0, members: 0, description: "Company-wide announcements and discussions" },
 ];
 
-const initialDMs: Channel[] = [
-  { id: "dm-sarah", name: "Sarah Chen", type: "dm", unread: 1, status: "online", lastMessage: "The Q4 report is ready" },
-  { id: "dm-mike", name: "Mike Ross", type: "dm", unread: 0, status: "online", lastMessage: "Thanks for the update" },
-  { id: "dm-lisa", name: "Lisa Park", type: "dm", unread: 0, status: "away", lastMessage: "Let me check on that" },
-  { id: "dm-james", name: "James Wilson", type: "dm", unread: 2, status: "offline", lastMessage: "Meeting moved to 3pm" },
-  { id: "dm-maria", name: "Maria Garcia", type: "dm", unread: 0, status: "online", lastMessage: "Approved!" },
-];
-
-const initialMessages: Message[] = [
-  { id: "m1", sender: "Sarah Chen", avatar: "SC", time: "10:24 AM", text: "The Q4 inventory report is ready for review. I've shared it in the documents section.", channel: "general", reactions: [{ emoji: "👍", count: 3, reacted: false }] },
-  { id: "m2", sender: "Mike Ross", avatar: "MR", time: "10:28 AM", text: "Thanks Sarah! I'll take a look. @Lisa can you cross-reference with the sales numbers?", channel: "general" },
-  { id: "m3", sender: "Lisa Park", avatar: "LP", time: "10:32 AM", text: "Sure, give me 30 minutes. Also, we need to discuss the new warehouse stock transfer workflow.", channel: "general", pinned: true },
-  { id: "m4", sender: "You", avatar: "YO", time: "10:35 AM", text: "Great teamwork everyone. Let's sync up after lunch to finalize the approvals.", channel: "general", reactions: [{ emoji: "🎉", count: 2, reacted: false }, { emoji: "✅", count: 1, reacted: true }] },
-  { id: "m5", sender: "David Kim", avatar: "DK", time: "10:40 AM", text: "Heads up — we have 3 low stock alerts on the West DC warehouse. Transfer request submitted.", channel: "inventory-alerts" },
-  { id: "m6", sender: "System", avatar: "SY", time: "10:42 AM", text: "⚠️ Stock Alert: PCB Board Rev3 is critically low (8 units). Reorder point: 25.", channel: "inventory-alerts" },
-  { id: "m7", sender: "Alice Chen", avatar: "AC", time: "9:15 AM", text: "Q1 targets have been distributed. Check the sales dashboard for your individual goals.", channel: "sales-team" },
-  { id: "m8", sender: "Bob Tran", avatar: "BT", time: "9:30 AM", text: "Just closed a $12k deal with Metro Corp! 🎉", channel: "sales-team", reactions: [{ emoji: "🎉", count: 5, reacted: false }, { emoji: "💰", count: 3, reacted: false }] },
-  { id: "m9", sender: "Sarah Chen", avatar: "SC", time: "11:00 AM", text: "Can you review the budget proposal I sent?", channel: "dm-sarah" },
-  { id: "m10", sender: "James Wilson", avatar: "JW", time: "2:15 PM", text: "Meeting has been moved to 3pm tomorrow. Please update your calendars.", channel: "dm-james" },
-  { id: "m11", sender: "James Wilson", avatar: "JW", time: "2:18 PM", text: "Also, we need to discuss the org restructuring plan.", channel: "dm-james" },
-];
+const initialDMs: Channel[] = [];
+const initialMessages: Message[] = [];
 
 const emojiList = ["👍", "❤️", "😂", "🎉", "🔥", "✅", "👀", "💯"];
 

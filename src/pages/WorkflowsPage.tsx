@@ -27,12 +27,7 @@ interface Workflow {
   amount: string;
 }
 
-const initialWorkflows: Workflow[] = [
-  { id: "WF-4521", title: "Purchase Order - Office Supplies", type: "Purchase Order Approval", status: "pending", currentStep: 1, steps: [{ name: "Manager Review", status: "completed", assignee: "Sarah Chen" }, { name: "Finance Review", status: "pending", assignee: "Lisa Zhang" }, { name: "Director Approval", status: "pending", assignee: "James Wilson" }], requester: "Sarah Chen", created: "Feb 12, 2026", amount: "$12,450" },
-  { id: "WF-4518", title: "Q1 Marketing Budget", type: "Expense Approval", status: "pending", currentStep: 2, steps: [{ name: "Dept Head Review", status: "completed", assignee: "Mike Ross" }, { name: "VP Approval", status: "completed", assignee: "David Kumar" }, { name: "Finance Review", status: "pending", assignee: "Lisa Zhang" }, { name: "CFO Sign-off", status: "pending", assignee: "Lisa Zhang" }], requester: "Mike Ross", created: "Feb 11, 2026", amount: "$2,340" },
-  { id: "WF-4515", title: "Warehouse B Stock Transfer", type: "Stock Transfer Approval", status: "approved", currentStep: 2, steps: [{ name: "Inventory Check", status: "completed", assignee: "Lisa Park" }, { name: "Logistics Approval", status: "completed", assignee: "Robert Chen" }], requester: "Lisa Park", created: "Feb 10, 2026", amount: "500 units" },
-  { id: "WF-4512", title: "Employee Discount Override", type: "Discount Override Approval", status: "rejected", currentStep: 2, steps: [{ name: "Sales Manager", status: "completed", assignee: "Alice Chen" }, { name: "Finance Check", status: "completed", assignee: "Diana Lee" }, { name: "Director", status: "rejected", assignee: "James Wilson" }], requester: "James Wilson", created: "Feb 9, 2026", amount: "35% off" },
-];
+const initialWorkflows: Workflow[] = [];
 
 const statusConfig = {
   pending: { icon: Clock, color: "text-warning", bg: "bg-warning/10", label: "Pending" },

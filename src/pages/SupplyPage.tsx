@@ -21,23 +21,8 @@ interface Supplier {
   id: string; name: string; contact: string; email: string; phone: string; address: string; rating: number; totalOrders: number; onTimeRate: number; categories: string[]; status: "active" | "inactive";
 }
 
-const initialOrders: PurchaseOrder[] = [
-  { id: "PO-5001", supplier: "TechParts Inc", items: [{ name: "Widget Alpha", qty: 500, unitPrice: 18.50 }, { name: "PCB Board Rev3", qty: 200, unitPrice: 9.75 }], status: "approved", created: "Feb 10, 2026", expectedDelivery: "Feb 20, 2026", total: 11200, warehouse: "Main HQ", notes: "Urgent restock for critical items", approvedBy: "Sarah Chen" },
-  { id: "PO-5002", supplier: "Global Sensors", items: [{ name: "Sensor X10", qty: 100, unitPrice: 72.00 }], status: "shipped", created: "Feb 8, 2026", expectedDelivery: "Feb 18, 2026", total: 7200, warehouse: "West DC", notes: "Regular monthly order", approvedBy: "James Wilson" },
-  { id: "PO-5003", supplier: "PowerMax Supply", items: [{ name: "PSU 750W Gold", qty: 50, unitPrice: 95.00 }, { name: "Motor 500W", qty: 30, unitPrice: 110.00 }], status: "submitted", created: "Feb 12, 2026", expectedDelivery: "Feb 25, 2026", total: 8050, warehouse: "East DC", notes: "Q1 equipment refresh", approvedBy: null },
-  { id: "PO-5004", supplier: "CableWorld", items: [{ name: "Cat6 Cable (100ft)", qty: 300, unitPrice: 26.00 }], status: "received", created: "Feb 5, 2026", expectedDelivery: "Feb 15, 2026", total: 7800, warehouse: "Main HQ", notes: "Networking infrastructure expansion", approvedBy: "Lisa Park" },
-  { id: "PO-5005", supplier: "CoolTech Co", items: [{ name: "Cooling Fan 120mm", qty: 200, unitPrice: 7.50 }], status: "draft", created: "Feb 14, 2026", expectedDelivery: "—", total: 1500, warehouse: "South Hub", notes: "Pending budget approval", approvedBy: null },
-  { id: "PO-5006", supplier: "TechParts Inc", items: [{ name: "Widget Beta", qty: 1000, unitPrice: 14.00 }], status: "cancelled", created: "Feb 3, 2026", expectedDelivery: "—", total: 14000, warehouse: "Main HQ", notes: "Cancelled — supplier couldn't meet deadline", approvedBy: null },
-];
-
-const initialSuppliers: Supplier[] = [
-  { id: "SUP-01", name: "TechParts Inc", contact: "John Rivera", email: "john@techparts.com", phone: "+1 555-1001", address: "Silicon Valley, CA", rating: 4.8, totalOrders: 142, onTimeRate: 96, categories: ["Components", "Electronics"], status: "active" },
-  { id: "SUP-02", name: "Global Sensors", contact: "Mei Zhang", email: "mei@globalsensors.com", phone: "+1 555-1002", address: "Portland, OR", rating: 4.6, totalOrders: 89, onTimeRate: 92, categories: ["Electronics"], status: "active" },
-  { id: "SUP-03", name: "PowerMax Supply", contact: "Carlos Diaz", email: "carlos@powermax.com", phone: "+1 555-1003", address: "Houston, TX", rating: 4.4, totalOrders: 67, onTimeRate: 88, categories: ["Electronics", "Machinery"], status: "active" },
-  { id: "SUP-04", name: "CableWorld", contact: "Amy Park", email: "amy@cableworld.com", phone: "+1 555-1004", address: "Atlanta, GA", rating: 4.7, totalOrders: 112, onTimeRate: 94, categories: ["Networking"], status: "active" },
-  { id: "SUP-05", name: "CoolTech Co", contact: "Ben Harris", email: "ben@cooltech.com", phone: "+1 555-1005", address: "Denver, CO", rating: 4.2, totalOrders: 34, onTimeRate: 85, categories: ["Components"], status: "active" },
-  { id: "SUP-06", name: "MetalWorks Ltd", contact: "Nina Patel", email: "nina@metalworks.com", phone: "+1 555-1006", address: "Detroit, MI", rating: 3.9, totalOrders: 18, onTimeRate: 78, categories: ["Machinery"], status: "inactive" },
-];
+const initialOrders: PurchaseOrder[] = [];
+const initialSuppliers: Supplier[] = [];
 
 const statusConfig: Record<POStatus, { label: string; className: string; icon: React.ElementType }> = {
   draft: { label: "Draft", className: "bg-muted text-muted-foreground", icon: FileText },
@@ -67,10 +52,10 @@ export default function SupplyPage() {
     const inTransit = orders.filter(o => o.status === "shipped").length;
     const totalSpend = orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
     return [
-      { label: "Active POs", value: active.toString(), change: `+${active}`, trend: "up" as const, icon: FileText },
-      { label: "In Transit", value: inTransit.toString(), change: "0", trend: "up" as const, icon: Truck },
-      { label: "Total Spend", value: formatCurrency(totalSpend), change: "+8.2%", trend: "up" as const, icon: DollarSign },
-      { label: "Suppliers", value: suppliers.filter(s => s.status === "active").length.toString(), change: "+1", trend: "up" as const, icon: Building2 },
+      { label: "Active POs", value: active.toString(), change: "", trend: "up" as const, icon: FileText },
+      { label: "In Transit", value: inTransit.toString(), change: "", trend: "up" as const, icon: Truck },
+      { label: "Total Spend", value: formatCurrency(totalSpend), change: "", trend: "up" as const, icon: DollarSign },
+      { label: "Suppliers", value: suppliers.filter(s => s.status === "active").length.toString(), change: "", trend: "up" as const, icon: Building2 },
     ];
   }, [orders, suppliers, formatCurrency]);
 
