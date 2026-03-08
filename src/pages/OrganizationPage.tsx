@@ -54,14 +54,14 @@ export default function OrganizationPage() {
   ];
 
   const stats = [
-    { label: "Total Stores", value: stores.length.toString(), icon: Building2, color: "text-primary" },
-    { label: "Warehouses", value: warehouses.length.toString(), icon: Warehouse, color: "text-info" },
+    { label: "Total Stores", value: assignedStores.length.toString(), icon: Building2, color: "text-primary" },
+    { label: "Warehouses", value: assignedWarehouses.length.toString(), icon: Warehouse, color: "text-info" },
     { label: "Departments", value: departments.length.toString(), icon: Boxes, color: "text-accent" },
     { label: "Total Headcount", value: departments.reduce((s, d) => s + d.headcount, 0).toString(), icon: Users, color: "text-success" },
   ];
 
-  const filteredStores = stores.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
-  const filteredWarehouses = warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredStores = assignedStores.filter((s) => s.name.toLowerCase().includes(search.toLowerCase()));
+  const filteredWarehouses = assignedWarehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase()));
   const filteredDepts = departments.filter((d) => d.name.toLowerCase().includes(search.toLowerCase()));
 
   // Build org tree from departments
