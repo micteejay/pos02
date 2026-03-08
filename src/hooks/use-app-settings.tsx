@@ -60,6 +60,16 @@ export interface AppUser {
   store: string;
 }
 
+export interface IntegrationConfig {
+  name: string;
+  description: string;
+  connected: boolean;
+  icon: string;
+  category: "payment" | "communication" | "accounting" | "other";
+  configFields: string[];
+  configValues: Record<string, string>;
+}
+
 const allPermissions: Permission[] = [
   "users.view","users.create","users.edit","users.delete",
   "roles.view","roles.create","roles.edit","roles.delete",
@@ -95,6 +105,20 @@ const defaultUsers: AppUser[] = [
   { id: "u1", name: "Admin", email: "admin@app.com", avatar: "A", role: "Super Admin", status: "active", lastActive: "Now", department: "", store: "" },
 ];
 
+const defaultIntegrations: IntegrationConfig[] = [
+  { name: "Stripe", description: "Payment processing and billing", connected: false, icon: "💳", category: "payment", configFields: ["API Key", "Secret Key", "Webhook Secret"], configValues: {} },
+  { name: "Paystack", description: "African payment processing", connected: false, icon: "💰", category: "payment", configFields: ["Public Key", "Secret Key"], configValues: {} },
+  { name: "Flutterwave", description: "Pan-African payments", connected: false, icon: "🦋", category: "payment", configFields: ["Public Key", "Secret Key", "Encryption Key"], configValues: {} },
+  { name: "SendGrid", description: "Transactional email delivery", connected: false, icon: "📧", category: "communication", configFields: ["API Key", "From Email", "From Name"], configValues: {} },
+  { name: "Twilio", description: "SMS and voice communications", connected: false, icon: "📱", category: "communication", configFields: ["Account SID", "Auth Token", "Phone Number"], configValues: {} },
+  { name: "WhatsApp Business", description: "WhatsApp messaging API", connected: false, icon: "💬", category: "communication", configFields: ["Phone Number ID", "Access Token", "Business Account ID"], configValues: {} },
+  { name: "SMTP Email", description: "Custom SMTP email server", connected: false, icon: "✉️", category: "communication", configFields: ["Host", "Port", "Username", "Password"], configValues: {} },
+  { name: "QuickBooks", description: "Accounting and bookkeeping", connected: false, icon: "📊", category: "accounting", configFields: ["Client ID", "Client Secret", "Realm ID"], configValues: {} },
+  { name: "Xero", description: "Cloud-based accounting", connected: false, icon: "📒", category: "accounting", configFields: ["Client ID", "Client Secret", "Tenant ID"], configValues: {} },
+  { name: "Slack", description: "Team notifications and alerts", connected: false, icon: "🔔", category: "communication", configFields: ["Webhook URL", "Channel"], configValues: {} },
+  { name: "Shopify", description: "E-commerce platform sync", connected: false, icon: "🛒", category: "other", configFields: ["Store URL", "API Key", "Secret Key"], configValues: {} },
+];
+
 interface AppSettingsContextType {
   settings: AppSettings;
   updateSettings: (updates: Partial<AppSettings>) => void;
@@ -110,6 +134,12 @@ interface AppSettingsContextType {
   hasPermission: (permission: Permission) => boolean;
   allPermissions: Permission[];
   formatCurrency: (amount: number) => string;
+  // Integrations
+  integrations: IntegrationConfig[];
+  connectIntegration: (name: string, configValues: Record<string, string>) => void;
+  disconnectIntegration: (name: string) => void;
+  isIntegrationConnected: (name: string) => boolean;
+  getIntegrationConfig: (name: string) => IntegrationConfig | undefined;
 }
 
 const AppSettingsContext = createContext<AppSettingsContextType>(null!);
@@ -143,6 +173,11 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<AppUser[]>(() => {
     const stored = localStorage.getItem("app-users");
     return stored ? JSON.parse(stored) : defaultUsers;
+  });
+
+  const [integrations, setIntegrations] = useState<IntegrationConfig[]>(() => {
+    const stored = localStorage.getItem("app-integrations");
+    return stored ? JSON.parse(stored) : defaultIntegrations;
   });
 
   const currentUser = users[0];
@@ -213,6 +248,31 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     return `${settings.currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, [settings.currencySymbol]);
 
+  // Integration methods
+  const connectIntegration = useCallback((name: string, configValues: Record<string, string>) => {
+    setIntegrations(prev => {
+      const next = prev.map(i => i.name === name ? { ...i, connected: true, configValues } : i);
+      localStorage.setItem("app-integrations", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const disconnectIntegration = useCallback((name: string) => {
+    setIntegrations(prev => {
+      const next = prev.map(i => i.name === name ? { ...i, connected: false, configValues: {} } : i);
+      localStorage.setItem("app-integrations", JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const isIntegrationConnected = useCallback((name: string) => {
+    return integrations.find(i => i.name === name)?.connected || false;
+  }, [integrations]);
+
+  const getIntegrationConfig = useCallback((name: string) => {
+    return integrations.find(i => i.name === name);
+  }, [integrations]);
+
   return (
     <AppSettingsContext.Provider value={{
       settings, updateSettings,
@@ -220,6 +280,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       users, addUser, updateUser, deleteUser,
       currentUser, hasPermission, allPermissions,
       formatCurrency,
+      integrations, connectIntegration, disconnectIntegration, isIntegrationConnected, getIntegrationConfig,
     }}>
       {children}
     </AppSettingsContext.Provider>
