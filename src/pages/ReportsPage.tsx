@@ -3,17 +3,19 @@ import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
+import { useAudit } from "@/hooks/use-audit";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   Download, Calendar, FileText, PieChart as PieIcon, Printer,
-  Building2, Warehouse, ClipboardCheck, Activity,
+  Building2, Warehouse, ClipboardCheck, Activity, GitBranch,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
 } from "recharts";
 
-type ReportType = "overview" | "sales" | "inventory" | "operations";
+type ReportType = "overview" | "sales" | "inventory" | "gainloss" | "eod" | "operations";
 
 const tooltipStyle = {
   background: "hsl(222,22%,11%)",
@@ -26,10 +28,11 @@ const tooltipStyle = {
 export default function ReportsPage() {
   const { settings, formatCurrency, users } = useAppSettings();
   const { inventory, sales, stores, warehouses } = useSharedData();
-  const { approvalItems } = useAppEvents();
+  const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
+  const { user } = useAuth();
+  const { logAction } = useAudit();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
-  const printRef = useRef<HTMLDivElement>(null);
 
   // Derive revenue data from actual sales
   const monthlyRevenue = useMemo(() => {
@@ -40,7 +43,12 @@ export default function ReportsPage() {
       const key = d.toLocaleDateString("en-US", { month: "short" });
       if (!grouped[key]) grouped[key] = { revenue: 0, expenses: 0 };
       grouped[key].revenue += sale.total;
-      grouped[key].expenses += sale.total * 0.6; // estimate
+      // Use cost price for expenses if available
+      const costTotal = sale.items.reduce((s, item) => {
+        const invItem = inventory.find(i => i.sku === item.sku);
+        return s + (invItem?.costPrice || item.price * 0.6) * item.qty;
+      }, 0);
+      grouped[key].expenses += costTotal;
     });
     return Object.entries(grouped).map(([month, data]) => ({
       month,
@@ -48,9 +56,9 @@ export default function ReportsPage() {
       expenses: data.expenses,
       profit: data.revenue - data.expenses,
     }));
-  }, [sales]);
+  }, [sales, inventory]);
 
-  // Derive sales by store from actual sales
+  // Sales by store
   const salesByStore = useMemo(() => {
     if (sales.length === 0) return [];
     const counts: Record<string, number> = {};
@@ -77,7 +85,7 @@ export default function ReportsPage() {
       .slice(0, 5);
   }, [sales]);
 
-  // Warehouse utilization from org data
+  // Warehouse utilization
   const warehouseUtil = useMemo(() => {
     return warehouses.map(w => ({
       name: w.name,
@@ -86,7 +94,7 @@ export default function ReportsPage() {
     }));
   }, [warehouses, inventory]);
 
-  // Approval metrics from actual data
+  // Approval metrics
   const approvalStats = useMemo(() => {
     const approved = approvalItems.filter(a => a.status === "approved").length;
     const rejected = approvalItems.filter(a => a.status === "rejected").length;
@@ -94,8 +102,44 @@ export default function ReportsPage() {
     return { approved, rejected, pending };
   }, [approvalItems]);
 
+  // Gain/Loss data — cost vs revenue per item
+  const gainLossData = useMemo(() => {
+    const map: Record<string, { name: string; revenue: number; cost: number; units: number }> = {};
+    sales.forEach(s => s.items.forEach(item => {
+      const invItem = inventory.find(i => i.sku === item.sku);
+      const cost = (invItem?.costPrice || item.price * 0.6) * item.qty;
+      if (!map[item.name]) map[item.name] = { name: item.name, revenue: 0, cost: 0, units: 0 };
+      map[item.name].revenue += item.qty * item.price;
+      map[item.name].cost += cost;
+      map[item.name].units += item.qty;
+    }));
+    return Object.values(map).map(d => ({ ...d, profit: d.revenue - d.cost, margin: d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue * 100) : 0 }));
+  }, [sales, inventory]);
+
+  // End of Day summary
+  const eodData = useMemo(() => {
+    const today = new Date().toDateString();
+    const todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
+    const totalRevenue = todaySales.reduce((s, sale) => s + sale.total, 0);
+    const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((a, i) => a + i.qty, 0), 0);
+    const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((a, item) => {
+      const invItem = inventory.find(i => i.sku === item.sku);
+      return a + (invItem?.costPrice || item.price * 0.6) * item.qty;
+    }, 0), 0);
+    const byMethod: Record<string, number> = {};
+    todaySales.forEach(s => { byMethod[s.method] = (byMethod[s.method] || 0) + s.total; });
+    const byStaff: Record<string, { name: string; sales: number; revenue: number }> = {};
+    todaySales.forEach(s => {
+      if (!byStaff[s.createdBy]) byStaff[s.createdBy] = { name: s.createdBy, sales: 0, revenue: 0 };
+      byStaff[s.createdBy].sales++;
+      byStaff[s.createdBy].revenue += s.total;
+    });
+    return { sales: todaySales, totalRevenue, totalItems, totalCost, profit: totalRevenue - totalCost, byMethod, byStaff: Object.values(byStaff), count: todaySales.length };
+  }, [sales, inventory]);
+
   const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
   const totalInventoryValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
+  const totalInventoryCost = inventory.reduce((s, i) => s + i.qty * (i.costPrice || 0), 0);
 
   const stats = useMemo(() => [
     { label: "Total Revenue", value: formatCurrency(totalRevenue), change: sales.length > 0 ? `${sales.length} sales` : "—", trend: "up" as const, icon: DollarSign },
@@ -108,6 +152,8 @@ export default function ReportsPage() {
     { key: "overview", label: "Overview", icon: BarChart3 },
     { key: "sales", label: "Sales", icon: DollarSign },
     { key: "inventory", label: "Inventory", icon: Package },
+    { key: "gainloss", label: "Gain/Loss", icon: TrendingUp },
+    { key: "eod", label: "End of Day", icon: Calendar },
     { key: "operations", label: "Operations", icon: Activity },
   ];
 
@@ -116,7 +162,11 @@ export default function ReportsPage() {
     if (reportType === "overview" || reportType === "sales") {
       csv = "Month,Revenue,Expenses,Profit\n" + monthlyRevenue.map(r => `${r.month},${r.revenue},${r.expenses},${r.profit}`).join("\n");
     } else if (reportType === "inventory") {
-      csv = "Warehouse,Items,Capacity\n" + warehouseUtil.map(r => `${r.name},${r.items},${r.capacity}%`).join("\n");
+      csv = "SKU,Name,Category,Warehouse,Qty,CostPrice,SellingPrice,Value\n" + inventory.map(i => `${i.sku},${i.name},${i.category},${i.warehouse},${i.qty},${i.costPrice || 0},${i.price},${i.qty * i.price}`).join("\n");
+    } else if (reportType === "gainloss") {
+      csv = "Product,Revenue,Cost,Profit,Margin%\n" + gainLossData.map(d => `${d.name},${d.revenue},${d.cost},${d.profit},${d.margin.toFixed(1)}`).join("\n");
+    } else if (reportType === "eod") {
+      csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nTotal Cost,${eodData.totalCost}\nProfit,${eodData.profit}`;
     } else {
       csv = `Approved,${approvalStats.approved}\nRejected,${approvalStats.rejected}\nPending,${approvalStats.pending}`;
     }
@@ -125,16 +175,78 @@ export default function ReportsPage() {
     const a = document.createElement("a"); a.href = url;
     a.download = `report-${reportType}-${new Date().toISOString().split("T")[0]}.csv`;
     a.click(); URL.revokeObjectURL(url);
+    logAction("report.export", "Reports", reportType, `Exported ${reportType} report as CSV`);
   };
 
   const printReport = () => {
     const win = window.open("", "_blank");
     if (!win) return;
+
+    let bodyContent = "";
+    const headerHtml = `<h1>${settings.appName}</h1><p class="subtitle">${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report — Generated ${new Date().toLocaleDateString()} by ${user?.name || "System"}</p>`;
+    const statsHtml = `<div class="stat-grid">${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}</div>`;
+
+    if (reportType === "gainloss") {
+      const totalProfit = gainLossData.reduce((s, d) => s + d.profit, 0);
+      const totalRev = gainLossData.reduce((s, d) => s + d.revenue, 0);
+      const totalCost = gainLossData.reduce((s, d) => s + d.cost, 0);
+      bodyContent = `${headerHtml}
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalRev)}</div><div class="stat-label">Total Revenue</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalCost)}</div><div class="stat-label">Total Cost</div></div>
+          <div class="stat-card"><div class="stat-value ${totalProfit >= 0 ? '' : 'loss'}">${formatCurrency(totalProfit)}</div><div class="stat-label">Net ${totalProfit >= 0 ? 'Gain' : 'Loss'}</div></div>
+          <div class="stat-card"><div class="stat-value">${totalRev > 0 ? ((totalProfit / totalRev) * 100).toFixed(1) : 0}%</div><div class="stat-label">Margin</div></div>
+        </div>
+        <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Profit</th><th>Margin</th></tr></thead><tbody>
+        ${gainLossData.map(d => `<tr><td>${d.name}</td><td>${d.units}</td><td>${formatCurrency(d.revenue)}</td><td>${formatCurrency(d.cost)}</td><td class="${d.profit >= 0 ? '' : 'loss'}">${formatCurrency(d.profit)}</td><td>${d.margin.toFixed(1)}%</td></tr>`).join("")}
+        </tbody></table>`;
+    } else if (reportType === "eod") {
+      bodyContent = `${headerHtml}
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-value">${eodData.count}</div><div class="stat-label">Transactions</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalRevenue)}</div><div class="stat-label">Revenue</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.totalCost)}</div><div class="stat-label">Cost</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(eodData.profit)}</div><div class="stat-label">Profit</div></div>
+        </div>
+        <h3>Payment Methods</h3>
+        <table><thead><tr><th>Method</th><th>Amount</th></tr></thead><tbody>
+        ${Object.entries(eodData.byMethod).map(([m, v]) => `<tr><td>${m}</td><td>${formatCurrency(v)}</td></tr>`).join("")}
+        </tbody></table>
+        <h3>Staff Performance</h3>
+        <table><thead><tr><th>Staff</th><th>Sales</th><th>Revenue</th></tr></thead><tbody>
+        ${eodData.byStaff.map(s => `<tr><td>${s.name}</td><td>${s.sales}</td><td>${formatCurrency(s.revenue)}</td></tr>`).join("")}
+        </tbody></table>
+        <h3>Transaction Detail</h3>
+        <table><thead><tr><th>#</th><th>Customer</th><th>Method</th><th>Items</th><th>Total</th><th>By</th></tr></thead><tbody>
+        ${eodData.sales.map((s, i) => `<tr><td>${i + 1}</td><td>${s.customer}</td><td>${s.method}</td><td>${s.items.length}</td><td>${formatCurrency(s.total)}</td><td>${s.createdBy}</td></tr>`).join("")}
+        </tbody></table>`;
+    } else if (reportType === "inventory") {
+      bodyContent = `${headerHtml}
+        <div class="stat-grid">
+          <div class="stat-card"><div class="stat-value">${inventory.length}</div><div class="stat-label">Total SKUs</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalInventoryValue)}</div><div class="stat-label">Retail Value</div></div>
+          <div class="stat-card"><div class="stat-value">${formatCurrency(totalInventoryCost)}</div><div class="stat-label">Cost Value</div></div>
+          <div class="stat-card"><div class="stat-value">${inventory.filter(i => i.status === "critical" || i.status === "low").length}</div><div class="stat-label">Low Stock</div></div>
+        </div>
+        <table><thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Warehouse</th><th>Qty</th><th>Cost</th><th>Price</th><th>Value</th><th>Status</th></tr></thead><tbody>
+        ${inventory.map(i => `<tr><td>${i.sku}</td><td>${i.name}</td><td>${i.category}</td><td>${i.warehouse}</td><td>${i.qty}</td><td>${formatCurrency(i.costPrice || 0)}</td><td>${formatCurrency(i.price)}</td><td>${formatCurrency(i.qty * i.price)}</td><td class="${i.status === 'critical' ? 'loss' : ''}">${i.status}</td></tr>`).join("")}
+        </tbody></table>`;
+    } else if (reportType === "sales") {
+      bodyContent = `${headerHtml}${statsHtml}
+        <h3>All Sales</h3>
+        <table><thead><tr><th>ID</th><th>Date</th><th>Customer</th><th>Items</th><th>Method</th><th>Total</th><th>By</th></tr></thead><tbody>
+        ${sales.map(s => `<tr><td>${s.id}</td><td>${new Date(s.date).toLocaleDateString()}</td><td>${s.customer}</td><td>${s.items.length}</td><td>${s.method}</td><td>${formatCurrency(s.total)}</td><td>${s.createdBy}</td></tr>`).join("")}
+        </tbody></table>`;
+    } else {
+      bodyContent = `${headerHtml}${statsHtml}`;
+    }
+
     win.document.write(`
-      <html><head><title>${settings.appName} - ${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report</title>
+      <html><head><title>${settings.appName} - ${reportType} Report</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 40px; color: #1a1a2e; }
         h1 { font-size: 24px; margin-bottom: 4px; }
+        h3 { font-size: 16px; margin: 20px 0 8px; }
         .subtitle { color: #666; font-size: 14px; margin-bottom: 24px; }
         table { width: 100%; border-collapse: collapse; margin: 16px 0; }
         th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
@@ -143,37 +255,54 @@ export default function ReportsPage() {
         .stat-card { border: 1px solid #eee; border-radius: 8px; padding: 16px; }
         .stat-value { font-size: 22px; font-weight: 700; }
         .stat-label { font-size: 12px; color: #666; }
+        .loss { color: #dc2626; }
         .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
+        @media print { .no-print { display: none; } }
       </style></head><body>
-      <h1>${settings.appName}</h1>
-      <p class="subtitle">${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report — Generated ${new Date().toLocaleDateString()}</p>
-      <div class="stat-grid">
-        ${stats.map(s => `<div class="stat-card"><div class="stat-value">${s.value}</div><div class="stat-label">${s.label}</div></div>`).join("")}
-      </div>
-      <div class="footer">Generated by ${settings.appName} · ${new Date().toLocaleString()}</div>
+      ${bodyContent}
+      <div class="footer">Generated by ${settings.appName} · ${new Date().toLocaleString()} · Printed by ${user?.name || "System"}</div>
       </body></html>
     `);
     win.document.close();
     win.print();
+    logAction("report.print", "Reports", reportType, `Printed ${reportType} report`);
+  };
+
+  const submitReportForApproval = () => {
+    addApprovalItem({
+      title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report Review`,
+      type: "workflow",
+      sourceId: `RPT-${Date.now()}`,
+      requester: user?.name || "You",
+      department: "Reports",
+      amount: null,
+      description: `${reportType} report generated on ${new Date().toLocaleDateString()} — requires manager sign-off`,
+      priority: "medium",
+    });
+    addNotification({ type: "workflow", title: `Report submitted for approval`, message: `${reportType} report sent to workflow`, link: "/approvals", targetRoles: ["Manager", "Admin", "Super Admin"] });
+    logAction("report.submit_approval", "Reports", reportType, `Submitted ${reportType} report for approval`);
   };
 
   const hasData = sales.length > 0 || inventory.length > 0;
 
   return (
     <AppLayout>
-      <div className="space-y-6 animate-fade-in" ref={printRef}>
+      <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Reports</h1>
             <p className="text-sm text-muted-foreground mt-1">Analytics, insights, and performance metrics across all modules.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
               <option value="30days">Last 30 Days</option>
               <option value="3months">Last 3 Months</option>
               <option value="6months">Last 6 Months</option>
               <option value="1year">Last Year</option>
             </select>
+            <button onClick={submitReportForApproval} className="flex items-center gap-2 px-3 py-2 bg-info/10 text-info rounded-lg text-sm font-medium hover:bg-info/20 transition-colors">
+              <GitBranch className="w-4 h-4" />Workflow
+            </button>
             <button onClick={printReport} className="flex items-center gap-2 px-4 py-2 bg-muted text-foreground rounded-lg text-sm font-medium hover:bg-muted/80 transition-colors">
               <Printer className="w-4 h-4" />Print
             </button>
@@ -310,7 +439,7 @@ export default function ReportsPage() {
               <>
                 <div className="glass-card rounded-xl p-5">
                   <h3 className="font-semibold text-foreground mb-1">Profit Trend</h3>
-                  <p className="text-xs text-muted-foreground mb-4">Monthly profit from revenue minus expenses</p>
+                  <p className="text-xs text-muted-foreground mb-4">Monthly profit from revenue minus cost</p>
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={monthlyRevenue}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
@@ -321,33 +450,35 @@ export default function ReportsPage() {
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <div className="glass-card rounded-xl p-5">
-                    <h3 className="font-semibold text-foreground mb-4">Revenue Breakdown</h3>
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={monthlyRevenue} barSize={20}>
-                        <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                        <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${settings.currencySymbol}${(v / 1000).toFixed(0)}k`} />
-                        <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
-                        <Bar dataKey="revenue" fill="hsl(172,66%,50%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                <div className="glass-card rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-foreground">Recent Sales</h3>
+                    <span className="text-xs text-muted-foreground">{sales.length} total</span>
                   </div>
-                  {salesByStore.length > 0 && (
-                    <div className="glass-card rounded-xl p-5">
-                      <h3 className="font-semibold text-foreground mb-4">Store Comparison</h3>
-                      <ResponsiveContainer width="100%" height={220}>
-                        <BarChart data={salesByStore} layout="vertical" barSize={16}>
-                          <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" />
-                          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" width={80} />
-                          <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [`${v}%`]} />
-                          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                            {salesByStore.map((e, i) => <Cell key={i} fill={e.color} />)}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">ID</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Customer</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Method</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Total</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">By</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sales.slice(0, 20).map(s => (
+                          <tr key={s.id} className="border-b border-border/50">
+                            <td className="px-3 py-2 text-xs font-mono text-primary">{s.id}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{s.customer}</td>
+                            <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{s.method}</td>
+                            <td className="px-3 py-2 text-sm font-semibold text-foreground text-right">{formatCurrency(s.total)}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground hidden md:table-cell">{s.createdBy}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </>
             ) : (
@@ -359,10 +490,28 @@ export default function ReportsPage() {
           </div>
         )}
 
-        {/* Inventory */}
+        {/* Inventory Report */}
         {hasData && reportType === "inventory" && (
           <div className="space-y-4 animate-fade-in">
-            {warehouseUtil.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{inventory.length}</p>
+                <p className="text-xs text-muted-foreground">Total SKUs</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{formatCurrency(totalInventoryValue)}</p>
+                <p className="text-xs text-muted-foreground">Retail Value</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{formatCurrency(totalInventoryCost)}</p>
+                <p className="text-xs text-muted-foreground">Cost Value</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{formatCurrency(totalInventoryValue - totalInventoryCost)}</p>
+                <p className="text-xs text-muted-foreground">Potential Margin</p>
+              </div>
+            </div>
+            {warehouseUtil.length > 0 && (
               <div className="glass-card rounded-xl p-5">
                 <h3 className="font-semibold text-foreground mb-4">Warehouse Utilization</h3>
                 <div className="space-y-4">
@@ -385,10 +534,210 @@ export default function ReportsPage() {
                   ))}
                 </div>
               </div>
+            )}
+            <div className="glass-card rounded-xl p-5">
+              <h3 className="font-semibold text-foreground mb-4">Full Inventory List</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">SKU</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Name</th>
+                      <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Warehouse</th>
+                      <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Qty</th>
+                      <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2 hidden md:table-cell">Cost</th>
+                      <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Price</th>
+                      <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {inventory.map(i => (
+                      <tr key={i.sku} className="border-b border-border/50">
+                        <td className="px-3 py-2 text-xs font-mono text-primary">{i.sku}</td>
+                        <td className="px-3 py-2 text-sm text-foreground">{i.name}</td>
+                        <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{i.warehouse}</td>
+                        <td className="px-3 py-2 text-sm text-right font-semibold text-foreground">{i.qty}</td>
+                        <td className="px-3 py-2 text-sm text-right text-muted-foreground hidden md:table-cell">{formatCurrency(i.costPrice || 0)}</td>
+                        <td className="px-3 py-2 text-sm text-right text-foreground">{formatCurrency(i.price)}</td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${i.status === "critical" ? "bg-destructive/10 text-destructive" : i.status === "low" ? "bg-warning/10 text-warning" : "bg-success/10 text-success"}`}>{i.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gain/Loss */}
+        {hasData && reportType === "gainloss" && (
+          <div className="space-y-4 animate-fade-in">
+            {gainLossData.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.revenue, 0))}</p>
+                    <p className="text-xs text-muted-foreground">Total Revenue</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    <p className="text-xl font-bold text-foreground">{formatCurrency(gainLossData.reduce((s, d) => s + d.cost, 0))}</p>
+                    <p className="text-xs text-muted-foreground">Total Cost</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    {(() => {
+                      const net = gainLossData.reduce((s, d) => s + d.profit, 0);
+                      return <p className={`text-xl font-bold ${net >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(net)}</p>;
+                    })()}
+                    <p className="text-xs text-muted-foreground">Net {gainLossData.reduce((s, d) => s + d.profit, 0) >= 0 ? "Gain" : "Loss"}</p>
+                  </div>
+                  <div className="glass-card rounded-xl p-4 text-center">
+                    {(() => {
+                      const rev = gainLossData.reduce((s, d) => s + d.revenue, 0);
+                      const prof = gainLossData.reduce((s, d) => s + d.profit, 0);
+                      return <p className="text-xl font-bold text-foreground">{rev > 0 ? ((prof / rev) * 100).toFixed(1) : 0}%</p>;
+                    })()}
+                    <p className="text-xs text-muted-foreground">Avg Margin</p>
+                  </div>
+                </div>
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold text-foreground mb-1">Profit by Product</h3>
+                  <p className="text-xs text-muted-foreground mb-4">Revenue vs Cost breakdown</p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={gainLossData.slice(0, 10)} barSize={20}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(220,18%,18%)" />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="hsl(220,10%,50%)" />
+                      <YAxis tick={{ fontSize: 11 }} stroke="hsl(220,10%,50%)" tickFormatter={(v) => `${settings.currencySymbol}${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => [formatCurrency(v)]} />
+                      <Legend />
+                      <Bar dataKey="revenue" fill="hsl(172,66%,50%)" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="cost" fill="hsl(0,72%,51%)" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold text-foreground mb-4">Detailed Gain/Loss</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Product</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Units</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Revenue</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Cost</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Profit</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {gainLossData.map(d => (
+                          <tr key={d.name} className="border-b border-border/50">
+                            <td className="px-3 py-2 text-sm font-medium text-foreground">{d.name}</td>
+                            <td className="px-3 py-2 text-sm text-right text-muted-foreground">{d.units}</td>
+                            <td className="px-3 py-2 text-sm text-right text-foreground">{formatCurrency(d.revenue)}</td>
+                            <td className="px-3 py-2 text-sm text-right text-muted-foreground">{formatCurrency(d.cost)}</td>
+                            <td className={`px-3 py-2 text-sm text-right font-semibold ${d.profit >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(d.profit)}</td>
+                            <td className="px-3 py-2 text-sm text-right text-muted-foreground">{d.margin.toFixed(1)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             ) : (
               <div className="glass-card rounded-xl p-10 text-center">
-                <Warehouse className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">No warehouses configured. Add warehouses in Organization.</p>
+                <TrendingUp className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No sales data. Complete POS sales to see gain/loss analysis.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* End of Day */}
+        {hasData && reportType === "eod" && (
+          <div className="space-y-4 animate-fade-in">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{eodData.count}</p>
+                <p className="text-xs text-muted-foreground">Today's Transactions</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{formatCurrency(eodData.totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground">Today's Revenue</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className="text-xl font-bold text-foreground">{eodData.totalItems}</p>
+                <p className="text-xs text-muted-foreground">Items Sold</p>
+              </div>
+              <div className="glass-card rounded-xl p-4 text-center">
+                <p className={`text-xl font-bold ${eodData.profit >= 0 ? "text-success" : "text-destructive"}`}>{formatCurrency(eodData.profit)}</p>
+                <p className="text-xs text-muted-foreground">Today's Profit</p>
+              </div>
+            </div>
+
+            {eodData.count > 0 ? (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-4">Payment Methods</h3>
+                    <div className="space-y-3">
+                      {Object.entries(eodData.byMethod).map(([method, amount]) => (
+                        <div key={method} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                          <span className="text-sm font-medium text-foreground capitalize">{method}</span>
+                          <span className="text-sm font-semibold text-primary">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="glass-card rounded-xl p-5">
+                    <h3 className="font-semibold text-foreground mb-4">Staff Performance</h3>
+                    <div className="space-y-3">
+                      {eodData.byStaff.map(s => (
+                        <div key={s.name} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{s.name}</p>
+                            <p className="text-xs text-muted-foreground">{s.sales} sale{s.sales > 1 ? "s" : ""}</p>
+                          </div>
+                          <span className="text-sm font-semibold text-primary">{formatCurrency(s.revenue)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="glass-card rounded-xl p-5">
+                  <h3 className="font-semibold text-foreground mb-4">Today's Transactions</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">ID</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">Customer</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 hidden sm:table-cell">Method</th>
+                          <th className="text-right text-xs font-medium text-muted-foreground px-3 py-2">Total</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2">By</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {eodData.sales.map(s => (
+                          <tr key={s.id} className="border-b border-border/50">
+                            <td className="px-3 py-2 text-xs font-mono text-primary">{s.id}</td>
+                            <td className="px-3 py-2 text-sm text-foreground">{s.customer}</td>
+                            <td className="px-3 py-2 text-sm text-muted-foreground hidden sm:table-cell">{s.method}</td>
+                            <td className="px-3 py-2 text-sm font-semibold text-foreground text-right">{formatCurrency(s.total)}</td>
+                            <td className="px-3 py-2 text-xs text-muted-foreground">{s.createdBy}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="glass-card rounded-xl p-10 text-center">
+                <Calendar className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No sales today yet. Complete POS transactions to see end-of-day summary.</p>
               </div>
             )}
           </div>
