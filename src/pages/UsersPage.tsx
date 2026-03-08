@@ -270,7 +270,14 @@ export default function UsersPage() {
       {/* Add User Modal */}
       {showAddUser && (
         <Modal title="Add User" onClose={() => setShowAddUser(false)}>
-          <AddUserForm roles={roles} storeNames={getStoreOptionsForUserCreation} departmentNames={departmentNames} onAdd={(data) => { addUser(data); logAction("user.create", "Users", data.name, `Created user ${data.name} (${data.role}) for store ${data.store}`); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
+          <AddUserForm roles={roles} storeNames={getStoreOptionsForUserCreation} departmentNames={departmentNames} onAdd={async (data) => {
+            const result = await addUser(data);
+            if (result.success) {
+              logAction("user.create", "Users", data.name, `Created user ${data.name} (${data.role}) for store ${data.store}`);
+              setShowAddUser(false);
+            }
+            return result;
+          }} onCancel={() => setShowAddUser(false)} />
         </Modal>
       )}
 
@@ -312,7 +319,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: any) => void; onCancel: () => void }) {
+function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onAdd: (data: any) => Promise<{ success: boolean; error?: string }>; onCancel: () => void }) {
   const [name, setName] = useState(""); const [username, setUsername] = useState(""); const [password, setPassword] = useState(""); const [confirmPassword, setConfirmPassword] = useState(""); const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState(roles[2]?.name || ""); const [department, setDepartment] = useState(departmentNames[0] || ""); const [store, setStore] = useState(storeNames[0] || "");
   const [submitting, setSubmitting] = useState(false); const [error, setError] = useState("");
@@ -322,12 +329,15 @@ function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { 
   const handleSubmit = async () => {
     setSubmitting(true);
     setError("");
-    onAdd({
+    const result = await onAdd({
       name, username, password,
       email: username.includes("@") ? username : `${username.toLowerCase().replace(/\s+/g, ".")}@staff.internal`,
       avatar: name.split(" ").map(n => n[0]).join("").slice(0, 2),
       role, status: "active", lastActive: "Just now", department, store,
     });
+    if (!result.success) {
+      setError(result.error || "Failed to create user. Username may already be taken.");
+    }
     setSubmitting(false);
   };
 
