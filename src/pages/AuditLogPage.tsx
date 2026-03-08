@@ -82,8 +82,8 @@ export default function AuditLogPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const modules = [...new Set(auditEntries.map((e) => e.module))];
-  const users = [...new Set(auditEntries.map((e) => e.user))];
+  const modules: string[] = [...new Set(auditEntries.map((e) => e.module))];
+  const users: string[] = [...new Set(auditEntries.map((e) => e.user))];
   const activeFilterCount = [filterSeverity, filterModule, filterUser].filter((f) => f !== "all").length;
 
   const stats = [
