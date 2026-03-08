@@ -36,7 +36,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { formatCurrency } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
-  const { inventory, addStockFromPO } = useSharedData();
+  const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState(initialOrders);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
