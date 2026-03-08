@@ -23,6 +23,7 @@ const paymentMethods = [
 export default function POSPage() {
   const { formatCurrency, settings } = useAppSettings();
   const { inventory, adjustInventoryQty, addSale, storeNames } = useSharedData();
+  const { user } = useAuth();
   const activeStore = storeNames[0] || "Default Store";
   const categories = useMemo(() => {
     const cats = [...new Set(inventory.map(i => i.category))];

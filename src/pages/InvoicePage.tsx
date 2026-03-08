@@ -11,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 export default function InvoicePage() {
   const { formatCurrency, settings } = useAppSettings();
   const { inventory, sales, addSale, adjustInventoryQty } = useSharedData();
+  const { user } = useAuth();
   const printRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState<InvoiceData>({
