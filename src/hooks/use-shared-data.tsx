@@ -424,13 +424,14 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateStore = useCallback(async (id: string, updates: Partial<OrgStore>) => {
+    const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name;
     if (updates.type !== undefined) payload.type = updates.type;
     if (updates.address !== undefined) payload.address = updates.address;
     if (updates.phone !== undefined) payload.phone = updates.phone;
     if (updates.email !== undefined) payload.email = updates.email;
-    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.status !== undefined) payload.status = statusMap[updates.status] || updates.status.toLowerCase();
     await supabase.from("stores").update(payload).eq("id", id);
     setStores(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   }, []);
