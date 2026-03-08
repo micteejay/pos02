@@ -263,6 +263,26 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, [processRecurringExpenses]);
 
+  // Categories
+  const addCategory = useCallback((cat: Omit<Category, "id" | "createdAt">) => {
+    setCategories(prev => [...prev, { ...cat, id: `cat-${Date.now()}`, createdAt: new Date().toISOString() }]);
+  }, []);
+
+  const approveCategory = useCallback((id: string, approvedBy: string) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, status: "approved" as const, approvedBy } : c));
+  }, []);
+
+  const rejectCategory = useCallback((id: string) => {
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, status: "rejected" as const } : c));
+  }, []);
+
+  const deleteCategory = useCallback((id: string) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+  }, []);
+
+  const inventoryCategories = categories.filter(c => c.type === "inventory" && c.status === "approved").map(c => c.name);
+  const expenseCategories = categories.filter(c => c.type === "expense" && c.status === "approved").map(c => c.name);
+
   // Documents
   const addDocument = useCallback((doc: Omit<SharedDocument, "id">) => {
     setDocuments(prev => [...prev, { ...doc, id: `doc-${Date.now()}` }]);
@@ -320,6 +340,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     <SharedDataContext.Provider value={{
       inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, addStockFromPO,
       sales, addSale,
+      categories, addCategory, approveCategory, rejectCategory, deleteCategory, inventoryCategories, expenseCategories,
       expenses, addExpense, updateExpense, deleteExpense,
       documents, addDocument, deleteDocument,
       stores, addStore, updateStore, deleteStore,
