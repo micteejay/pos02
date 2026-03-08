@@ -29,6 +29,7 @@ import InvoicePage from "./pages/InvoicePage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import CompanySetupPage from "./pages/CompanySetupPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ function AppRoutes() {
       <Route path="/organization" element={<ProtectedRoute><OrganizationPage /></ProtectedRoute>} />
       <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/invoices" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

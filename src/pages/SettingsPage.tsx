@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { useTheme } from "@/hooks/use-theme";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
+import { toast } from "sonner";
 import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2,
 } from "lucide-react";
@@ -112,8 +114,19 @@ export default function SettingsPage() {
   const handleSave = () => {
     setSaved(true);
     logAction("settings.update", "Settings", "all", "Settings saved");
+    toast.success("Settings saved successfully");
     setTimeout(() => setSaved(false), 2000);
   };
+
+  // Real active sessions
+  const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  useEffect(() => {
+    if (activeTab !== "security") return;
+    const { user } = companyProfile ? { user: { id: "" } } : { user: null };
+    supabase.from("user_sessions").select("*").order("started_at", { ascending: false }).limit(20).then(({ data }) => {
+      if (data) setActiveSessions(data);
+    });
+  }, [activeTab]);
 
   const receiptStyles = [
     { id: "classic", name: "Classic", description: "Traditional receipt with clean lines" },
@@ -526,15 +539,32 @@ export default function SettingsPage() {
                 <h3 className="text-sm font-semibold text-foreground">Active Sessions</h3>
               </div>
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <div className="flex items-center gap-3">
-                    <Monitor className="w-4 h-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">Current Session<span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span></p>
-                      <p className="text-[10px] text-muted-foreground">This device</p>
+                {activeSessions.length === 0 ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Monitor className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Current Session<span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span></p>
+                        <p className="text-[10px] text-muted-foreground">This device</p>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  activeSessions.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <Monitor className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">
+                            {s.user_agent ? s.user_agent.slice(0, 50) : "Unknown device"}
+                            {s.is_active && <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span>}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">{s.ip_address || "Unknown IP"} · {new Date(s.started_at).toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
