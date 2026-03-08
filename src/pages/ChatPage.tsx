@@ -321,6 +321,23 @@ export default function ChatPage() {
     setShowEmojiPicker(null);
   }, []);
 
+  const downloadAttachment = useCallback(async (attachment: Message["attachment"]) => {
+    if (!attachment?.storagePath || !attachment?.storageBucket) {
+      toast.error("No file available for download");
+      return;
+    }
+    const { data, error } = await supabase.storage.from(attachment.storageBucket).download(attachment.storagePath);
+    if (data && !error) {
+      const url = URL.createObjectURL(data);
+      const a = document.createElement("a");
+      a.href = url; a.download = attachment.name; a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Downloaded ${attachment.name}`);
+    } else {
+      toast.error("Download failed");
+    }
+  }, []);
+
   const deleteMessage = useCallback(async (msgId: string) => {
     await supabase.from("chat_messages").update({ deleted: true }).eq("id", msgId);
     setMessages(prev => prev.filter(m => m.id !== msgId));
