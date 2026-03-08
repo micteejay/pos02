@@ -37,7 +37,7 @@ const barColors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "h
 export default function InventoryPage() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, adjustInventoryQty, warehouses: orgWarehouses, warehouseNames, categories, addCategory, approveCategory, rejectCategory, deleteCategory, inventoryCategories, expenseCategories } = useSharedData();
   const { addNotification, addApprovalItem } = useAppEvents();
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, hasPermission } = useAppSettings();
   const { user } = useAuth();
   const { logAction } = useAudit();
   const [tab, setTab] = useState<Tab>("stock");
@@ -58,12 +58,15 @@ export default function InventoryPage() {
     ];
   }, [inventory, transfers, formatCurrency]);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "stock", label: "Stock Levels", icon: Package },
     { key: "warehouses", label: "Warehouses", icon: Warehouse },
     { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
     { key: "categories", label: "Categories", icon: Tag },
   ];
+
+  const tabPermMap: Record<Tab, string> = { stock: "pages.inventory.stock", warehouses: "pages.inventory.warehouses", transfers: "pages.inventory.transfers", categories: "pages.inventory.categories" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const addTransfer = (tr: Transfer) => {
     setTransfers((prev) => [tr, ...prev]);

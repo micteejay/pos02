@@ -34,7 +34,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 };
 
 export default function SupplyPage() {
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
@@ -95,10 +95,13 @@ export default function SupplyPage() {
     setSuppliers(prev => prev.map(s => s.id === id ? { ...s, status: s.status === "active" ? "inactive" : "active" } : s));
   }, []);
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "orders", label: "Purchase Orders", icon: FileText },
     { key: "suppliers", label: "Suppliers", icon: Building2 },
   ];
+
+  const tabPermMap: Record<Tab, string> = { orders: "pages.supply.orders", suppliers: "pages.supply.suppliers" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   return (
     <AppLayout>

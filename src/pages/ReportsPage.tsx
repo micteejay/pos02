@@ -29,7 +29,7 @@ const tooltipStyle = {
 };
 
 export default function ReportsPage() {
-  const { settings, formatCurrency, users } = useAppSettings();
+  const { settings, formatCurrency, users, hasPermission } = useAppSettings();
   const { inventory, sales, stores, warehouses, expenses, addExpense, deleteExpense, expenseCategories } = useSharedData();
   const { approvalItems, addNotification, addApprovalItem } = useAppEvents();
   const { user } = useAuth();
@@ -176,7 +176,7 @@ export default function ReportsPage() {
     { label: "Active Users", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
   ], [formatCurrency, totalRevenue, sales, totalInventoryValue, inventory, users]);
 
-  const tabs: { key: ReportType; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: ReportType; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: BarChart3 },
     { key: "sales", label: "Sales", icon: DollarSign },
     { key: "inventory", label: "Inventory", icon: Package },
@@ -185,6 +185,9 @@ export default function ReportsPage() {
     { key: "eod", label: "End of Day", icon: Calendar },
     { key: "operations", label: "Operations", icon: Activity },
   ];
+
+  const reportTabPermMap: Record<ReportType, string> = { overview: "pages.reports.overview", sales: "pages.reports.sales", inventory: "pages.reports.inventory", gainloss: "pages.reports.gainloss", eod: "pages.reports.eod", expenses: "pages.reports.expenses", operations: "pages.reports.operations" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(reportTabPermMap[t.key] as any)), [hasPermission]);
 
   const handleAddExpense = () => {
     if (!expenseForm.description || !expenseForm.amount) return;

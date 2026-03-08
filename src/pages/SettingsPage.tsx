@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
@@ -103,7 +103,7 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const { theme, setTheme } = useTheme();
-  const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration } = useAppSettings();
+  const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration, hasPermission } = useAppSettings();
   const { companyProfile } = useAuth();
   const [notifications, setNotifications] = useState({ email: true, push: true, sms: false });
   const [twoFactor, setTwoFactor] = useState(false);
@@ -121,12 +121,15 @@ export default function SettingsPage() {
     { id: "invoice", name: "Invoice", description: "Full invoice format with billing details" },
   ];
 
-  const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "general", label: "General", icon: Settings },
     { key: "receipt", label: "Receipt Design", icon: Receipt },
     { key: "integrations", label: "Integrations", icon: Plug },
     { key: "security", label: "Security", icon: Shield },
   ];
+
+  const tabPermMap: Record<Tab, string> = { general: "pages.settings.general", receipt: "pages.settings.receipt", integrations: "pages.settings.integrations", security: "pages.settings.security" };
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
