@@ -130,6 +130,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [categories, setCategories] = useState<Category[]>([
+    // Default approved categories
+    { id: "cat-inv-1", name: "Components", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-2", name: "Electronics", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-3", name: "Machinery", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-4", name: "Networking", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-5", name: "Accessories", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-inv-6", name: "Uncategorized", type: "inventory", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-1", name: "Rent", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-2", name: "Utilities", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-3", name: "Salaries", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-4", name: "Marketing", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-5", name: "Maintenance", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-6", name: "Logistics", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-7", name: "Supplies", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+    { id: "cat-exp-8", name: "Other", type: "expense", status: "approved", createdBy: "System", createdAt: new Date().toISOString() },
+  ]);
   const [documents, setDocuments] = useState<SharedDocument[]>([]);
   const [stores, setStores] = useState<OrgStore[]>([]);
   const [warehouses, setWarehouses] = useState<OrgWarehouse[]>([]);
