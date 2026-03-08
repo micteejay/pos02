@@ -246,7 +246,7 @@ export default function UsersPage() {
       {/* Add User Modal */}
       {showAddUser && (
         <Modal title="Add User" onClose={() => setShowAddUser(false)}>
-          <AddUserForm roles={roles} onAdd={(data) => { addUser(data); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
+          <AddUserForm roles={roles} storeNames={storeNames} departmentNames={departmentNames} onAdd={(data) => { addUser(data); setShowAddUser(false); }} onCancel={() => setShowAddUser(false)} />
         </Modal>
       )}
 
