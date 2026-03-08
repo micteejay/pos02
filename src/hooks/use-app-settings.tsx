@@ -325,10 +325,27 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setRoles(prev => prev.filter(r => r.id !== id));
   }, []);
 
-  const addUser = useCallback(async (user: Omit<AppUser, "id">) => {
-    // Note: actual user creation happens through auth signup. This updates the profile/role.
-    // For admin-created users, we'd need an edge function. For now, just update local state.
-    setUsers(prev => [...prev, { ...user, id: `temp-${Date.now()}` }]);
+  const addUser = useCallback(async (user: Omit<AppUser, "id"> & { password?: string; username?: string }) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await supabase.functions.invoke("create-user", {
+        body: {
+          username: user.username || user.email,
+          password: user.password || "changeme123",
+          name: user.name,
+          role: user.role,
+          department: user.department,
+          store: user.store,
+        },
+      });
+      if (res.error) throw new Error(res.error.message);
+      const created = res.data;
+      setUsers(prev => [...prev, { ...user, id: created.id, email: created.email }]);
+      return true;
+    } catch (err) {
+      console.error("Failed to create user:", err);
+      return false;
+    }
   }, []);
 
   const updateUser = useCallback(async (id: string, updates: Partial<AppUser>) => {

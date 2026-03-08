@@ -6,6 +6,7 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useStoreAccess } from "@/hooks/use-store-access";
 import { useAudit } from "@/hooks/use-audit";
 import { useAuth } from "@/hooks/use-auth";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Building2, Warehouse, Users, Network, Search, MapPin, Phone, Mail,
   ChevronRight, ChevronDown, Plus, Globe, Boxes, X, Edit2, Trash2, Lock,
@@ -31,7 +32,7 @@ function OrgTreeNode({ node, depth = 0 }: { node: OrgNode; depth?: number }) {
 type Tab = "stores" | "warehouses" | "departments" | "hierarchy";
 
 export default function OrganizationPage() {
-  const { settings, hasPermission } = useAppSettings();
+  const { settings, hasPermission, users } = useAppSettings();
   const {
     stores, addStore, updateStore, deleteStore,
     warehouses, addWarehouse, deleteWarehouse,
@@ -294,7 +295,7 @@ export default function OrganizationPage() {
               <h3 className="text-lg font-semibold text-foreground">Add Warehouse</h3>
               <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <WHForm onSave={(data) => { addWarehouse(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
+            <WHForm users={users} onSave={(data) => { addWarehouse(data); setShowAddModal(false); }} onCancel={() => setShowAddModal(false)} />
           </div>
         </div>
       )}
@@ -357,20 +358,26 @@ function DeptForm({ dept, onSave, onCancel }: { dept?: any; onSave: (data: any) 
   );
 }
 
-function WHForm({ onSave, onCancel }: { onSave: (data: any) => void; onCancel: () => void }) {
-  const [name, setName] = useState(""); const [location, setLocation] = useState(""); const [sqft, setSqft] = useState(""); const [manager, setManager] = useState(""); const [zones, setZones] = useState("6");
+function WHForm({ users, onSave, onCancel }: { users: { id: string; name: string }[]; onSave: (data: any) => void; onCancel: () => void }) {
+  const [name, setName] = useState(""); const [location, setLocation] = useState(""); const [sqft, setSqft] = useState(""); const [managerId, setManagerId] = useState(""); const [zones, setZones] = useState("6");
   return (
     <div className="space-y-3">
       <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
       <div><label className="text-xs font-medium text-muted-foreground">Location</label><Input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1" /></div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Sq. Ft.</label><Input value={sqft} onChange={(e) => setSqft(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Zones</label><Input type="number" value={zones} onChange={(e) => setZones(e.target.value)} className="mt-1" /></div>
-        <div><label className="text-xs font-medium text-muted-foreground">Manager</label><Input value={manager} onChange={(e) => setManager(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Manager</label>
+        <select value={managerId} onChange={(e) => setManagerId(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <option value="">Select a manager...</option>
+          {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-        <button disabled={!name} onClick={() => onSave({ name, location, sqft, manager, zones: parseInt(zones) || 6, capacity: 0, activePicks: 0 })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Add Warehouse</button>
+        <button disabled={!name} onClick={() => onSave({ name, location, sqft, manager: users.find(u => u.id === managerId)?.name || "", managerId: managerId || null, zones: parseInt(zones) || 6, capacity: 0, activePicks: 0 })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Add Warehouse</button>
       </div>
     </div>
   );

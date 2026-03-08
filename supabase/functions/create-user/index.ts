@@ -1,0 +1,97 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify caller is admin/super_admin
+    const callerClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user: caller } } = await callerClient.auth.getUser();
+    if (!caller) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Check caller has admin role
+    const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: caller.id, _roles: ["super_admin", "admin"] });
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { username, password, name, role, department, store } = await req.json();
+
+    if (!username || !password || !name) {
+      return new Response(JSON.stringify({ error: "username, password, and name are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Generate a synthetic email from username for Supabase Auth
+    const email = username.includes("@") ? username : `${username.toLowerCase().replace(/\s+/g, ".")}@staff.internal`;
+
+    // Create auth user with admin API (auto-confirms email)
+    const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name },
+    });
+
+    if (createError || !newUser?.user) {
+      return new Response(JSON.stringify({ error: createError?.message || "Failed to create user" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const userId = newUser.user.id;
+
+    // Update profile with name (trigger should have created it)
+    await adminClient.from("profiles").update({ name, email }).eq("id", userId);
+
+    // Assign role if specified
+    if (role) {
+      const { data: roleRow } = await adminClient.from("roles").select("id").eq("name", role).single();
+      if (roleRow) {
+        await adminClient.from("user_roles").delete().eq("user_id", userId);
+        await adminClient.from("user_roles").insert({ user_id: userId, role_id: roleRow.id });
+      }
+    }
+
+    // Assign store if specified
+    if (store) {
+      const { data: storeRow } = await adminClient.from("stores").select("id").eq("name", store).single();
+      if (storeRow) {
+        await adminClient.from("user_store_assignments").insert({ user_id: userId, store_id: storeRow.id, assigned_by: caller.id });
+        await adminClient.from("profiles").update({ store_id: storeRow.id }).eq("id", userId);
+      }
+    }
+
+    // Assign department if specified
+    if (department) {
+      const { data: deptRow } = await adminClient.from("departments").select("id").eq("name", department).single();
+      if (deptRow) {
+        await adminClient.from("profiles").update({ department_id: deptRow.id }).eq("id", userId);
+      }
+    }
+
+    return new Response(JSON.stringify({ id: userId, email, name }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});

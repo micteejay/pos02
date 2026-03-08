@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.ai-sales-insights]
 verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
