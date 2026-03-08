@@ -93,6 +93,7 @@ function calcStatus(qty: number, reorder: number): InventoryItem["status"] {
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [documents, setDocuments] = useState<SharedDocument[]>([]);
   const [stores, setStores] = useState<OrgStore[]>([]);
   const [warehouses, setWarehouses] = useState<OrgWarehouse[]>([]);
