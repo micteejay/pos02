@@ -351,6 +351,24 @@ export default function DocumentsPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {virtualFolders.map((folderName) => (
+                      <tr key={`vf-${folderName}`} className="border-b border-border/50 hover:bg-muted/30 transition-colors group cursor-pointer"
+                        onClick={() => handleFolderClick(folderName)}>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                              <Folder className="w-4 h-4 text-warning" />
+                            </div>
+                            <span className="text-sm font-medium text-foreground truncate">{folderName}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden sm:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden lg:table-cell">—</td>
+                        <td className="px-5 py-3 text-sm text-muted-foreground hidden lg:table-cell">—</td>
+                        <td className="px-5 py-3 text-right"></td>
+                      </tr>
+                    ))}
                     {currentDocs.map((doc) => {
                       const Icon = iconMap[doc.type] || File;
                       return (
@@ -384,7 +402,7 @@ export default function DocumentsPage() {
                         </tr>
                       );
                     })}
-                    {currentDocs.length === 0 && (
+                    {currentDocs.length === 0 && virtualFolders.length === 0 && (
                       <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-muted-foreground">{search ? "No files match your search." : "This folder is empty."}</td></tr>
                     )}
                   </tbody>
