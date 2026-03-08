@@ -191,6 +191,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       const { data } = await supabase.from("company_profiles").insert(payload).select("id").single();
       if (data) profile.id = data.id;
+
+      // Promote to Super Admin via secure server-side function
+      await supabase.rpc("promote_to_super_admin", { _user_id: user.id });
+      setUser(prev => prev ? { ...prev, role: "Super Admin" } : prev);
     }
 
     setCompanyProfile(profile);
