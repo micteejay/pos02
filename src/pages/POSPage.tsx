@@ -95,7 +95,7 @@ export default function POSPage() {
     // Record sale
     addSale({
       items: cart.map(i => ({ name: i.name, sku: i.sku, qty: i.qty, price: i.price })),
-      total, customer: customerName || "Walk-in", method: paymentMethod, store: "Main HQ",
+      total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
