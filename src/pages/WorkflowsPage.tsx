@@ -131,8 +131,14 @@ export default function WorkflowsPage() {
     const wf = workflows.find(w => w.id === id);
     if (!wf || wf.status !== "active") return;
 
+    // Check if user can approve this step
+    if (!canApproveStep(wf)) {
+      toast.error("You don't have permission to approve this step");
+      return;
+    }
+
     const newSteps = [...wf.steps];
-    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed" };
+    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed", assignee: user?.name || "Admin" };
     const nextStep = wf.currentStep + 1;
     const isComplete = nextStep >= newSteps.length;
 
@@ -161,9 +167,19 @@ export default function WorkflowsPage() {
       addNotification({ type: "workflow", title: `Workflow ${id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
       toast.success("Workflow completed");
     } else {
+      // Notify next step's role
+      const nextStepRole = newSteps[nextStep]?.role || "manager";
+      const nextRoleLabel = roleLabels[nextStepRole] || "Manager";
+      addNotification({
+        type: "workflow",
+        title: `Step approved: ${wf.title}`,
+        message: `Awaiting ${nextRoleLabel} approval`,
+        link: "/workflows",
+        targetRoles: ["Super Admin", "Admin", nextRoleLabel],
+      });
       toast.success("Step approved");
     }
-  }, [workflows, user, addNotification]);
+  }, [workflows, user, addNotification, canApproveStep]);
 
   const rejectWorkflow = useCallback(async (id: string) => {
     const wf = workflows.find(w => w.id === id);
