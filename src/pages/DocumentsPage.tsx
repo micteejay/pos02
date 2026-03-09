@@ -446,31 +446,12 @@ export default function DocumentsPage() {
         </div>
 
         {previewDoc && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewDoc(null)}>
-            <div className="glass-card rounded-2xl p-6 max-w-lg w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">File Preview</h3>
-                <button onClick={() => setPreviewDoc(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="w-full aspect-video rounded-xl bg-muted/50 flex items-center justify-center mb-4">
-                {(() => { const Icon = iconMap[previewDoc.type] || File; return <Icon className={`w-16 h-16 ${colorMap[previewDoc.type]}`} />; })()}
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Name</span><span className="font-medium text-foreground">{previewDoc.name}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Size</span><span className="text-foreground">{previewDoc.size}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Modified</span><span className="text-foreground">{previewDoc.modified}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Author</span><span className="text-foreground">{previewDoc.authorName}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Type</span><span className="text-foreground uppercase">{previewDoc.type}</span></div>
-                {previewDoc.source && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Source</span><span className="text-info">{previewDoc.source}</span></div>}
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => { downloadDocument(previewDoc); }} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"><Download className="w-4 h-4" /> Download</button>
-                <button onClick={() => { deleteDocument(previewDoc); setPreviewDoc(null); }} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10">
-                  <Trash2 className="w-4 h-4" /> Delete
-                </button>
-              </div>
-            </div>
-          </div>
+          <DocumentPreviewModal
+            doc={previewDoc}
+            onClose={() => setPreviewDoc(null)}
+            onDownload={downloadDocument}
+            onDelete={deleteDocument}
+          />
         )}
       </div>
     </AppLayout>
