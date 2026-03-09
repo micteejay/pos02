@@ -330,12 +330,23 @@ export default function WorkflowsPage() {
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";
+                          const userCanApprove = isActive && canApproveStep(wf);
                           return (
                             <div key={i} className="relative">
                               <div className={`absolute -left-[calc(1.5rem+5px)] w-3 h-3 rounded-full border-2 border-card ${step.status === "completed" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : isActive ? "bg-warning" : "bg-muted-foreground/30"}`} />
                               <div className={`p-3 rounded-lg ${isActive ? "bg-warning/5 border border-warning/20" : "bg-muted/30"}`}>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-foreground">{step.name}</span>
+                                  <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                                    {step.name}
+                                    <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {roleLabels[step.role] || step.role}
+                                    </span>
+                                    {isActive && !userCanApprove && (
+                                      <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-destructive/10 text-destructive flex items-center gap-1">
+                                        <Lock className="w-2.5 h-2.5" /> Not your role
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className={`text-[10px] font-medium ${step.status === "completed" ? "text-success" : step.status === "rejected" ? "text-destructive" : "text-muted-foreground"}`}>
                                     {step.status === "completed" ? "✓ Done" : step.status === "rejected" ? "✗ Rejected" : isActive ? "Awaiting..." : "Pending"}
                                   </span>
@@ -348,10 +359,17 @@ export default function WorkflowsPage() {
                       </div>
                       <div className="flex items-center gap-2 pt-3 border-t border-border">
                         {wf.status === "active" && wf.currentStep < wf.steps.length && (
-                          <>
-                            <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
-                            <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
-                          </>
+                          canApproveStep(wf) ? (
+                            <>
+                              <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
+                              <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-muted-foreground text-xs">
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Requires <strong className="text-foreground">{roleLabels[wf.steps[wf.currentStep]?.role] || wf.steps[wf.currentStep]?.role}</strong> role</span>
+                            </div>
+                          )
                         )}
                         <button onClick={() => deleteWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
