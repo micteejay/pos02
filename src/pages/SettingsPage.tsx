@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
 import {
-  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2,
+  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, GripVertical, Plus, Trash2, ArrowUp, ArrowDown,
 } from "lucide-react";
 
 type Tab = "general" | "receipt" | "integrations" | "security";
