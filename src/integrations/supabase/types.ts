@@ -42,12 +42,14 @@ export type Database = {
         Row: {
           amount: number | null
           created_at: string
+          current_workflow_step: number | null
           department: string | null
           description: string | null
           due_date: string | null
           id: string
           priority: Database["public"]["Enums"]["approval_priority"]
           requester: string | null
+          required_role: string | null
           review_notes: string | null
           reviewed_by: string | null
           source_id: string | null
@@ -56,16 +58,19 @@ export type Database = {
           title: string
           type: string
           updated_at: string
+          workflow_steps: Json | null
         }
         Insert: {
           amount?: number | null
           created_at?: string
+          current_workflow_step?: number | null
           department?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: Database["public"]["Enums"]["approval_priority"]
           requester?: string | null
+          required_role?: string | null
           review_notes?: string | null
           reviewed_by?: string | null
           source_id?: string | null
@@ -74,16 +79,19 @@ export type Database = {
           title: string
           type: string
           updated_at?: string
+          workflow_steps?: Json | null
         }
         Update: {
           amount?: number | null
           created_at?: string
+          current_workflow_step?: number | null
           department?: string | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: Database["public"]["Enums"]["approval_priority"]
           requester?: string | null
+          required_role?: string | null
           review_notes?: string | null
           reviewed_by?: string | null
           source_id?: string | null
@@ -92,6 +100,7 @@ export type Database = {
           title?: string
           type?: string
           updated_at?: string
+          workflow_steps?: Json | null
         }
         Relationships: []
       }
@@ -2080,6 +2089,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_approve_step: {
+        Args: { _approval_id: string; _user_id: string }
+        Returns: boolean
+      }
       generate_po_number: { Args: never; Returns: string }
       generate_receipt_number: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
