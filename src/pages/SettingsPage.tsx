@@ -590,7 +590,109 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Security Tab */}
+        {/* Workflows Tab */}
+        {activeTab === "workflows" && (
+          <div className="space-y-6">
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <GitBranch className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Approval Stage Configuration</h3>
+              </div>
+              <p className="text-xs text-muted-foreground mb-5">Define the approval stages for each workflow type. Each stage requires a specific role to approve. Admins and Super Admins can always approve any stage.</p>
+
+              {/* Workflow type selector */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                {([
+                  { key: "purchase_order" as const, label: "Purchase Orders" },
+                  { key: "stock_transfer" as const, label: "Stock Transfers" },
+                  { key: "expense" as const, label: "Expenses" },
+                  { key: "general" as const, label: "General" },
+                ]).map((wt) => (
+                  <button key={wt.key} onClick={() => setActiveWorkflowType(wt.key)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeWorkflowType === wt.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>
+                    {wt.label}
+                    <span className="ml-2 text-[10px] opacity-70">({workflowConfig[wt.key].length} stages)</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Stages list */}
+              <div className="space-y-3">
+                {workflowConfig[activeWorkflowType].map((stage, index) => (
+                  <div key={stage.id} className="flex items-start gap-3 p-4 rounded-xl bg-muted/30 border border-border group">
+                    {/* Stage number & reorder */}
+                    <div className="flex flex-col items-center gap-1 pt-1">
+                      <span className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">{index + 1}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <button onClick={() => moveStage("up", index)} disabled={index === 0}
+                          className="p-0.5 rounded hover:bg-muted disabled:opacity-20 text-muted-foreground hover:text-foreground">
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => moveStage("down", index)} disabled={index === workflowConfig[activeWorkflowType].length - 1}
+                          className="p-0.5 rounded hover:bg-muted disabled:opacity-20 text-muted-foreground hover:text-foreground">
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Stage details */}
+                    <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Stage Name</label>
+                        <Input value={stage.name} onChange={(e) => updateStage(index, { name: e.target.value })} onBlur={saveStagesDebounced} className="mt-1 h-9 text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Required Role</label>
+                        <select value={stage.role} onChange={(e) => { updateStage(index, { role: e.target.value }); setTimeout(() => saveWorkflowConfig({ ...workflowConfig, [activeWorkflowType]: workflowConfig[activeWorkflowType].map((s, i) => i === index ? { ...s, role: e.target.value } : s) }), 0); }}
+                          className="mt-1 w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                          {availableRoles.map(r => <option key={r} value={r}>{roleLabels[r] || r}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Description</label>
+                        <Input value={stage.description} onChange={(e) => updateStage(index, { description: e.target.value })} onBlur={saveStagesDebounced} className="mt-1 h-9 text-sm" placeholder="Optional description" />
+                      </div>
+                    </div>
+
+                    {/* Delete */}
+                    <button onClick={() => removeStage(index)}
+                      className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all mt-4">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {workflowConfig[activeWorkflowType].length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">No approval stages configured. Add one below.</div>
+                )}
+              </div>
+
+              <button onClick={addStage} className="mt-4 w-full py-2.5 rounded-xl border-2 border-dashed border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all flex items-center justify-center gap-2">
+                <Plus className="w-4 h-4" /> Add Approval Stage
+              </button>
+            </div>
+
+            {/* Visual pipeline preview */}
+            <div className="glass-card rounded-xl p-6">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Approval Pipeline Preview</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="px-3 py-1.5 rounded-lg bg-muted text-xs font-medium text-muted-foreground">Request Created</div>
+                {workflowConfig[activeWorkflowType].map((stage, i) => (
+                  <div key={stage.id} className="flex items-center gap-2">
+                    <div className="w-6 border-t border-dashed border-border" />
+                    <div className="px-3 py-1.5 rounded-lg bg-primary/10 text-xs font-medium text-primary border border-primary/20">
+                      {stage.name} <span className="text-[10px] opacity-70">({roleLabels[stage.role] || stage.role})</span>
+                    </div>
+                  </div>
+                ))}
+                <div className="w-6 border-t border-dashed border-border" />
+                <div className="px-3 py-1.5 rounded-lg bg-success/10 text-xs font-medium text-success">Approved ✓</div>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-3">Admins and Super Admins can approve any stage regardless of role assignment.</p>
+            </div>
+          </div>
+        )}
+
         {activeTab === "security" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="glass-card rounded-xl p-6">
