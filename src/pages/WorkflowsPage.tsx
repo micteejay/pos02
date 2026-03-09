@@ -58,7 +58,7 @@ const roleNameToKey: Record<string, string> = {
 };
 
 export default function WorkflowsPage() {
-  const { addNotification, addApprovalItem } = useAppEvents();
+  const { addNotification, addApprovalItem, getStagesForType } = useAppEvents();
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +66,18 @@ export default function WorkflowsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewWF, setShowNewWF] = useState(false);
+
+  // Check if current user can approve a workflow step
+  const canApproveStep = (wf: Workflow) => {
+    if (!user || wf.status !== "active") return false;
+    const userRoleKey = roleNameToKey[user.role] || user.role.toLowerCase().replace(/ /g, "_");
+    // Admin/super_admin can always approve
+    if (userRoleKey === "super_admin" || userRoleKey === "admin") return true;
+    // Check if user's role matches current step's required role
+    const currentStepData = wf.steps[wf.currentStep];
+    if (!currentStepData) return false;
+    return currentStepData.role === userRoleKey;
+  };
 
   useEffect(() => {
     const fetchWorkflows = async () => {
@@ -82,11 +94,12 @@ export default function WorkflowsPage() {
         setWorkflows(data.map((wf: any) => {
           const steps: WorkflowStep[] = Array.isArray(wf.steps) ? (wf.steps as any[]).map(s => ({
             name: s.name || "Step",
+            role: s.role || "manager",
             status: s.status || "pending",
             assignee: s.assignee || "Auto-assigned",
           })) : [
-            { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
-            { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
+            { name: "Manager Review", role: "manager", status: "pending", assignee: "Auto-assigned" },
+            { name: "Admin Approval", role: "admin", status: "pending", assignee: "Auto-assigned" },
           ];
 
           return {
