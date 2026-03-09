@@ -7,13 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock,
 } from "lucide-react";
 
 type WFStatus = "active" | "completed" | "paused" | "cancelled";
 
 interface WorkflowStep {
   name: string;
+  role: string;
   status: "pending" | "completed" | "rejected";
   assignee: string;
 }
@@ -36,6 +37,24 @@ const statusConfig = {
   completed: { icon: CheckCircle2, color: "text-success", bg: "bg-success/10", label: "Completed" },
   paused: { icon: AlertTriangle, color: "text-muted-foreground", bg: "bg-muted", label: "Paused" },
   cancelled: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Cancelled" },
+};
+
+const roleLabels: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  manager: "Manager",
+  sales_rep: "Sales Rep",
+  warehouse_staff: "Warehouse Staff",
+  viewer: "Viewer",
+};
+
+const roleNameToKey: Record<string, string> = {
+  "Super Admin": "super_admin",
+  "Admin": "admin",
+  "Manager": "manager",
+  "Sales Rep": "sales_rep",
+  "Warehouse Staff": "warehouse_staff",
+  "Viewer": "viewer",
 };
 
 export default function WorkflowsPage() {
