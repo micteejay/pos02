@@ -7,13 +7,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock,
 } from "lucide-react";
 
 type WFStatus = "active" | "completed" | "paused" | "cancelled";
 
 interface WorkflowStep {
   name: string;
+  role: string;
   status: "pending" | "completed" | "rejected";
   assignee: string;
 }
@@ -38,8 +39,26 @@ const statusConfig = {
   cancelled: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Cancelled" },
 };
 
+const roleLabels: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  manager: "Manager",
+  sales_rep: "Sales Rep",
+  warehouse_staff: "Warehouse Staff",
+  viewer: "Viewer",
+};
+
+const roleNameToKey: Record<string, string> = {
+  "Super Admin": "super_admin",
+  "Admin": "admin",
+  "Manager": "manager",
+  "Sales Rep": "sales_rep",
+  "Warehouse Staff": "warehouse_staff",
+  "Viewer": "viewer",
+};
+
 export default function WorkflowsPage() {
-  const { addNotification, addApprovalItem } = useAppEvents();
+  const { addNotification, addApprovalItem, getStagesForType } = useAppEvents();
   const { user } = useAuth();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +66,18 @@ export default function WorkflowsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewWF, setShowNewWF] = useState(false);
+
+  // Check if current user can approve a workflow step
+  const canApproveStep = (wf: Workflow) => {
+    if (!user || wf.status !== "active") return false;
+    const userRoleKey = roleNameToKey[user.role] || user.role.toLowerCase().replace(/ /g, "_");
+    // Admin/super_admin can always approve
+    if (userRoleKey === "super_admin" || userRoleKey === "admin") return true;
+    // Check if user's role matches current step's required role
+    const currentStepData = wf.steps[wf.currentStep];
+    if (!currentStepData) return false;
+    return currentStepData.role === userRoleKey;
+  };
 
   useEffect(() => {
     const fetchWorkflows = async () => {
@@ -63,11 +94,12 @@ export default function WorkflowsPage() {
         setWorkflows(data.map((wf: any) => {
           const steps: WorkflowStep[] = Array.isArray(wf.steps) ? (wf.steps as any[]).map(s => ({
             name: s.name || "Step",
+            role: s.role || "manager",
             status: s.status || "pending",
             assignee: s.assignee || "Auto-assigned",
           })) : [
-            { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
-            { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
+            { name: "Manager Review", role: "manager", status: "pending", assignee: "Auto-assigned" },
+            { name: "Admin Approval", role: "admin", status: "pending", assignee: "Auto-assigned" },
           ];
 
           return {
@@ -99,8 +131,14 @@ export default function WorkflowsPage() {
     const wf = workflows.find(w => w.id === id);
     if (!wf || wf.status !== "active") return;
 
+    // Check if user can approve this step
+    if (!canApproveStep(wf)) {
+      toast.error("You don't have permission to approve this step");
+      return;
+    }
+
     const newSteps = [...wf.steps];
-    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed" };
+    newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed", assignee: user?.name || "Admin" };
     const nextStep = wf.currentStep + 1;
     const isComplete = nextStep >= newSteps.length;
 
@@ -129,13 +167,29 @@ export default function WorkflowsPage() {
       addNotification({ type: "workflow", title: `Workflow ${id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
       toast.success("Workflow completed");
     } else {
+      // Notify next step's role
+      const nextStepRole = newSteps[nextStep]?.role || "manager";
+      const nextRoleLabel = roleLabels[nextStepRole] || "Manager";
+      addNotification({
+        type: "workflow",
+        title: `Step approved: ${wf.title}`,
+        message: `Awaiting ${nextRoleLabel} approval`,
+        link: "/workflows",
+        targetRoles: ["Super Admin", "Admin", nextRoleLabel],
+      });
       toast.success("Step approved");
     }
-  }, [workflows, user, addNotification]);
+  }, [workflows, user, addNotification, canApproveStep]);
 
   const rejectWorkflow = useCallback(async (id: string) => {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
+
+    // Check if user can reject this step
+    if (!canApproveStep(wf)) {
+      toast.error("You don't have permission to reject this step");
+      return;
+    }
 
     const newSteps = [...wf.steps];
     newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
@@ -172,10 +226,24 @@ export default function WorkflowsPage() {
   }, [workflows]);
 
   const addWorkflow = async (data: { title: string; type: string; amount: string }) => {
-    const steps: WorkflowStep[] = [
-      { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
-      { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
-    ];
+    // Map the type to workflow config key
+    const typeKeyMap: Record<string, string> = {
+      "Purchase Order Approval": "purchase_order",
+      "Expense Approval": "expense",
+      "Stock Transfer Approval": "stock_transfer",
+      "Discount Override Approval": "general",
+    };
+    const typeKey = typeKeyMap[data.type] || "general";
+    
+    // Get configured stages
+    const configuredStages = getStagesForType(typeKey);
+    
+    const steps: WorkflowStep[] = configuredStages.map(stage => ({
+      name: stage.name,
+      role: stage.role,
+      status: "pending" as const,
+      assignee: "Auto-assigned",
+    }));
 
     const { data: newWf, error } = await supabase.from("workflows").insert({
       title: data.title,
@@ -202,7 +270,7 @@ export default function WorkflowsPage() {
       }, ...prev]);
 
       setShowNewWF(false);
-      addApprovalItem({ title: data.title, type: "workflow", sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
+      addApprovalItem({ title: data.title, type: typeKey as any, sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
       addNotification({ type: "workflow", title: `Workflow created`, message: `${data.title} submitted for approval`, link: "/approvals" });
       toast.success("Workflow created");
     }
@@ -284,12 +352,23 @@ export default function WorkflowsPage() {
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";
+                          const userCanApprove = isActive && canApproveStep(wf);
                           return (
                             <div key={i} className="relative">
                               <div className={`absolute -left-[calc(1.5rem+5px)] w-3 h-3 rounded-full border-2 border-card ${step.status === "completed" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : isActive ? "bg-warning" : "bg-muted-foreground/30"}`} />
                               <div className={`p-3 rounded-lg ${isActive ? "bg-warning/5 border border-warning/20" : "bg-muted/30"}`}>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-semibold text-foreground">{step.name}</span>
+                                  <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                                    {step.name}
+                                    <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                      {roleLabels[step.role] || step.role}
+                                    </span>
+                                    {isActive && !userCanApprove && (
+                                      <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-destructive/10 text-destructive flex items-center gap-1">
+                                        <Lock className="w-2.5 h-2.5" /> Not your role
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className={`text-[10px] font-medium ${step.status === "completed" ? "text-success" : step.status === "rejected" ? "text-destructive" : "text-muted-foreground"}`}>
                                     {step.status === "completed" ? "✓ Done" : step.status === "rejected" ? "✗ Rejected" : isActive ? "Awaiting..." : "Pending"}
                                   </span>
@@ -302,10 +381,17 @@ export default function WorkflowsPage() {
                       </div>
                       <div className="flex items-center gap-2 pt-3 border-t border-border">
                         {wf.status === "active" && wf.currentStep < wf.steps.length && (
-                          <>
-                            <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
-                            <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
-                          </>
+                          canApproveStep(wf) ? (
+                            <>
+                              <button onClick={() => advanceStep(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><CheckCircle2 className="w-3.5 h-3.5" />Approve Step</button>
+                              <button onClick={() => rejectWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 text-destructive rounded-lg text-xs font-medium hover:bg-destructive/20"><XCircle className="w-3.5 h-3.5" />Reject</button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-muted-foreground text-xs">
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Requires <strong className="text-foreground">{roleLabels[wf.steps[wf.currentStep]?.role] || wf.steps[wf.currentStep]?.role}</strong> role</span>
+                            </div>
+                          )
                         )}
                         <button onClick={() => deleteWorkflow(wf.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>
                       </div>
