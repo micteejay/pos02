@@ -923,6 +923,16 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+
+      {/* Fullscreen image preview modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[60] bg-background/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground z-10">
+            <X className="w-6 h-6" />
+          </button>
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </AppLayout>
   );
 }
