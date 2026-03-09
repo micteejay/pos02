@@ -204,10 +204,24 @@ export default function WorkflowsPage() {
   }, [workflows]);
 
   const addWorkflow = async (data: { title: string; type: string; amount: string }) => {
-    const steps: WorkflowStep[] = [
-      { name: "Manager Review", status: "pending", assignee: "Auto-assigned" },
-      { name: "Director Approval", status: "pending", assignee: "Auto-assigned" },
-    ];
+    // Map the type to workflow config key
+    const typeKeyMap: Record<string, string> = {
+      "Purchase Order Approval": "purchase_order",
+      "Expense Approval": "expense",
+      "Stock Transfer Approval": "stock_transfer",
+      "Discount Override Approval": "general",
+    };
+    const typeKey = typeKeyMap[data.type] || "general";
+    
+    // Get configured stages
+    const configuredStages = getStagesForType(typeKey);
+    
+    const steps: WorkflowStep[] = configuredStages.map(stage => ({
+      name: stage.name,
+      role: stage.role,
+      status: "pending" as const,
+      assignee: "Auto-assigned",
+    }));
 
     const { data: newWf, error } = await supabase.from("workflows").insert({
       title: data.title,
@@ -234,7 +248,7 @@ export default function WorkflowsPage() {
       }, ...prev]);
 
       setShowNewWF(false);
-      addApprovalItem({ title: data.title, type: "workflow", sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
+      addApprovalItem({ title: data.title, type: typeKey as any, sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });
       addNotification({ type: "workflow", title: `Workflow created`, message: `${data.title} submitted for approval`, link: "/approvals" });
       toast.success("Workflow created");
     }
