@@ -11,7 +11,21 @@ import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, GripVertical, Plus, Trash2, ArrowUp, ArrowDown,
 } from "lucide-react";
 
-type Tab = "general" | "receipt" | "integrations" | "security";
+type Tab = "general" | "receipt" | "integrations" | "security" | "workflows";
+
+interface WorkflowStage {
+  id: string;
+  name: string;
+  role: string;
+  description: string;
+}
+
+interface WorkflowConfig {
+  purchase_order: WorkflowStage[];
+  stock_transfer: WorkflowStage[];
+  expense: WorkflowStage[];
+  general: WorkflowStage[];
+}
 
 const currencies = [
   { code: "USD", symbol: "$", name: "US Dollar" },
