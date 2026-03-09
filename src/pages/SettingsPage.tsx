@@ -202,7 +202,7 @@ export default function SettingsPage() {
 
   const saveWorkflowConfig = async (config: WorkflowConfig) => {
     setWorkflowConfig(config);
-    await supabase.from("app_settings").upsert({ key: "workflow_stages", value: config as any, updated_by: companyProfile?.owner_id || null }, { onConflict: "key" });
+    await supabase.from("app_settings").upsert({ key: "workflow_stages", value: config as any, updated_by: null }, { onConflict: "key" });
     toast.success("Workflow stages saved");
     logAction("settings.update", "Settings", "workflow_stages", "Updated workflow approval stages");
   };
