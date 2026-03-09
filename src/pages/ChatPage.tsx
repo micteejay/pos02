@@ -339,6 +339,15 @@ export default function ChatPage() {
     }
   }, []);
 
+  const getAttachmentUrl = useCallback(async (attachment: Message["attachment"]): Promise<string | null> => {
+    if (!attachment?.storagePath || !attachment?.storageBucket) return null;
+    const { data } = await supabase.storage.from(attachment.storageBucket).createSignedUrl(attachment.storagePath, 3600);
+    return data?.signedUrl || null;
+  }, []);
+
+  const isImageType = (type: string) => ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(type.toLowerCase());
+  const isPdfType = (type: string) => type.toLowerCase() === "pdf";
+
   const deleteMessage = useCallback(async (msgId: string) => {
     await supabase.from("chat_messages").update({ deleted: true }).eq("id", msgId);
     setMessages(prev => prev.filter(m => m.id !== msgId));
