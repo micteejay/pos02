@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import {
   FileText, Upload, Search, Eye, Download, Folder, File, Image, FileSpreadsheet,
-  Plus, FolderPlus, ChevronRight, MoreVertical, Trash2, X, Grid, List, ArrowUp, ArrowDown, Loader2,
+  Plus, FolderPlus, ChevronRight, MoreVertical, Trash2, X, Grid, List, ArrowUp, ArrowDown, Loader2, ExternalLink,
 } from "lucide-react";
 
 interface DocRecord {
