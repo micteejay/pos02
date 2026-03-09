@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import {
   FileText, Upload, Search, Eye, Download, Folder, File, Image, FileSpreadsheet,
-  Plus, FolderPlus, ChevronRight, MoreVertical, Trash2, X, Grid, List, ArrowUp, ArrowDown, Loader2,
+  Plus, FolderPlus, ChevronRight, MoreVertical, Trash2, X, Grid, List, ArrowUp, ArrowDown, Loader2, ExternalLink,
 } from "lucide-react";
 
 interface DocRecord {
@@ -36,6 +36,76 @@ const extToType = (name: string): string => {
   if (["zip"].includes(ext)) return "zip";
   return "txt";
 };
+
+const isImageType = (type: string) => ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(type.toLowerCase());
+const isPdfType = (type: string) => type.toLowerCase() === "pdf";
+
+function DocumentPreviewModal({ doc, onClose, onDownload, onDelete }: {
+  doc: DocRecord;
+  onClose: () => void;
+  onDownload: (d: DocRecord) => void;
+  onDelete: (d: DocRecord) => void;
+}) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  useEffect(() => {
+    if (!doc.storagePath || !doc.storageBucket) return;
+    if (isImageType(doc.type) || isPdfType(doc.type)) {
+      setLoadingPreview(true);
+      supabase.storage.from(doc.storageBucket).createSignedUrl(doc.storagePath, 3600)
+        .then(({ data }) => { setPreviewUrl(data?.signedUrl || null); setLoadingPreview(false); });
+    }
+  }, [doc.storagePath, doc.storageBucket, doc.type]);
+
+  const Icon = iconMap[doc.type] || File;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="glass-card rounded-2xl p-6 max-w-2xl w-full animate-fade-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-foreground">File Preview</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+        </div>
+
+        {/* Preview Area */}
+        <div className="w-full rounded-xl bg-muted/50 flex items-center justify-center mb-4 overflow-hidden">
+          {loadingPreview ? (
+            <div className="h-64 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
+          ) : isImageType(doc.type) && previewUrl ? (
+            <img src={previewUrl} alt={doc.name} className="max-w-full max-h-[50vh] object-contain" loading="lazy" />
+          ) : isPdfType(doc.type) && previewUrl ? (
+            <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-[50vh]" title={doc.name} />
+          ) : (
+            <div className="h-48 flex items-center justify-center">
+              <Icon className={`w-16 h-16 ${colorMap[doc.type]}`} />
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Name</span><span className="font-medium text-foreground truncate ml-2">{doc.name}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Size</span><span className="text-foreground">{doc.size}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Modified</span><span className="text-foreground">{doc.modified}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Author</span><span className="text-foreground">{doc.authorName}</span></div>
+          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Type</span><span className="text-foreground uppercase">{doc.type}</span></div>
+          {doc.source && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Source</span><span className="text-info">{doc.source}</span></div>}
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button onClick={() => onDownload(doc)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"><Download className="w-4 h-4" /> Download</button>
+          {isPdfType(doc.type) && previewUrl && (
+            <button onClick={() => window.open(previewUrl, "_blank")} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground text-sm font-medium hover:bg-muted">
+              <Eye className="w-4 h-4" /> Open Full
+            </button>
+          )}
+          <button onClick={() => { onDelete(doc); onClose(); }} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10">
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DocumentsPage() {
   const { user } = useAuth();
@@ -446,31 +516,12 @@ export default function DocumentsPage() {
         </div>
 
         {previewDoc && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPreviewDoc(null)}>
-            <div className="glass-card rounded-2xl p-6 max-w-lg w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-foreground">File Preview</h3>
-                <button onClick={() => setPreviewDoc(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-              </div>
-              <div className="w-full aspect-video rounded-xl bg-muted/50 flex items-center justify-center mb-4">
-                {(() => { const Icon = iconMap[previewDoc.type] || File; return <Icon className={`w-16 h-16 ${colorMap[previewDoc.type]}`} />; })()}
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Name</span><span className="font-medium text-foreground">{previewDoc.name}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Size</span><span className="text-foreground">{previewDoc.size}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Modified</span><span className="text-foreground">{previewDoc.modified}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Author</span><span className="text-foreground">{previewDoc.authorName}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Type</span><span className="text-foreground uppercase">{previewDoc.type}</span></div>
-                {previewDoc.source && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Source</span><span className="text-info">{previewDoc.source}</span></div>}
-              </div>
-              <div className="flex gap-2 mt-4">
-                <button onClick={() => { downloadDocument(previewDoc); }} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"><Download className="w-4 h-4" /> Download</button>
-                <button onClick={() => { deleteDocument(previewDoc); setPreviewDoc(null); }} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10">
-                  <Trash2 className="w-4 h-4" /> Delete
-                </button>
-              </div>
-            </div>
-          </div>
+          <DocumentPreviewModal
+            doc={previewDoc}
+            onClose={() => setPreviewDoc(null)}
+            onDownload={downloadDocument}
+            onDelete={deleteDocument}
+          />
         )}
       </div>
     </AppLayout>

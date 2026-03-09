@@ -3,7 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check, Download } from "lucide-react";
+import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check, Download, Image, Eye } from "lucide-react";
 
 interface Message {
   id: string; sender_id: string; sender_name: string; avatar: string; time: string; text: string; channel_id: string;
@@ -47,6 +47,7 @@ export default function ChatPage() {
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -338,6 +339,15 @@ export default function ChatPage() {
     }
   }, []);
 
+  const getAttachmentUrl = useCallback(async (attachment: Message["attachment"]): Promise<string | null> => {
+    if (!attachment?.storagePath || !attachment?.storageBucket) return null;
+    const { data } = await supabase.storage.from(attachment.storageBucket).createSignedUrl(attachment.storagePath, 3600);
+    return data?.signedUrl || null;
+  }, []);
+
+  const isImageType = (type: string) => ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(type.toLowerCase());
+  const isPdfType = (type: string) => type.toLowerCase() === "pdf";
+
   const deleteMessage = useCallback(async (msgId: string) => {
     await supabase.from("chat_messages").update({ deleted: true }).eq("id", msgId);
     setMessages(prev => prev.filter(m => m.id !== msgId));
@@ -480,6 +490,92 @@ export default function ChatPage() {
   const pinnedMessages = channelMessages.filter(m => m.pinned);
   const totalUnread = channels.reduce((s, c) => s + c.unread, 0);
   const groupChannels = channels.filter(c => c.type === "group");
+
+  // Inline attachment preview component
+  function AttachmentPreview({ attachment, isMe, onDownload, onPreviewImage, getUrl, isImageType, isPdfType }: {
+    attachment: Message["attachment"];
+    isMe: boolean;
+    onDownload: (att: Message["attachment"]) => void;
+    onPreviewImage: (url: string) => void;
+    getUrl: (att: Message["attachment"]) => Promise<string | null>;
+    isImageType: (t: string) => boolean;
+    isPdfType: (t: string) => boolean;
+  }) {
+    const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+    const [loadingThumb, setLoadingThumb] = useState(false);
+
+    useEffect(() => {
+      if (!attachment?.storagePath) return;
+      if (isImageType(attachment.type) || isPdfType(attachment.type)) {
+        setLoadingThumb(true);
+        getUrl(attachment).then(url => { setThumbUrl(url); setLoadingThumb(false); });
+      }
+    }, [attachment?.storagePath]);
+
+    if (!attachment) return null;
+
+    // Image preview
+    if (isImageType(attachment.type) && (thumbUrl || loadingThumb)) {
+      return (
+        <div className={`mt-1.5 max-w-[260px] ${isMe ? "ml-auto" : ""}`}>
+          <div className="rounded-lg overflow-hidden border border-border bg-muted/30 relative group cursor-pointer"
+            onClick={() => thumbUrl && onPreviewImage(thumbUrl)}>
+            {loadingThumb ? (
+              <div className="w-full h-32 flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+            ) : (
+              <img src={thumbUrl!} alt={attachment.name} className="w-full max-h-48 object-cover" loading="lazy" />
+            )}
+            <div className="absolute inset-0 bg-background/0 group-hover:bg-background/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+              <Eye className="w-5 h-5 text-foreground" />
+            </div>
+          </div>
+          <div className={`flex items-center gap-2 mt-1 text-xs ${isMe ? "justify-end" : ""}`}>
+            <span className="text-muted-foreground truncate">{attachment.name}</span>
+            <span className="text-muted-foreground/60">{attachment.size}</span>
+            <button onClick={(e) => { e.stopPropagation(); onDownload(attachment); }} className="p-0.5 rounded hover:bg-muted" title="Download">
+              <Download className="w-3 h-3 text-primary" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // PDF preview
+    if (isPdfType(attachment.type) && thumbUrl) {
+      return (
+        <div className={`mt-1.5 max-w-[280px] ${isMe ? "ml-auto" : ""}`}>
+          <div className="rounded-lg overflow-hidden border border-border bg-muted/30">
+            <iframe src={`${thumbUrl}#toolbar=0&navpanes=0`} className="w-full h-40 pointer-events-none" title={attachment.name} />
+          </div>
+          <div className={`flex items-center gap-2 mt-1 text-xs ${isMe ? "justify-end" : ""}`}>
+            <FileText className="w-3.5 h-3.5 text-destructive shrink-0" />
+            <span className="text-muted-foreground truncate">{attachment.name}</span>
+            <span className="text-muted-foreground/60">{attachment.size}</span>
+            <button onClick={() => thumbUrl && window.open(thumbUrl, "_blank")} className="p-0.5 rounded hover:bg-muted" title="Open PDF">
+              <Eye className="w-3 h-3 text-primary" />
+            </button>
+            <button onClick={() => onDownload(attachment)} className="p-0.5 rounded hover:bg-muted" title="Download">
+              <Download className="w-3 h-3 text-primary" />
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Generic file
+    return (
+      <div className={`mt-1 flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs ${isMe ? "justify-end" : ""}`}>
+        <FileText className="w-4 h-4 text-primary" />
+        <span className="text-foreground font-medium">{attachment.name}</span>
+        <span className="text-muted-foreground">{attachment.size}</span>
+        {attachment.storagePath && (
+          <button onClick={() => onDownload(attachment)} className="p-1 rounded-md hover:bg-muted ml-1" title="Download">
+            <Download className="w-3.5 h-3.5 text-primary" />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
@@ -656,16 +752,15 @@ export default function ChatPage() {
                             {msg.text}
                           </p>
                           {msg.attachment && (
-                            <div className={`mt-1 flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs ${isMe ? "justify-end" : ""}`}>
-                              <FileText className="w-4 h-4 text-primary" />
-                              <span className="text-foreground font-medium">{msg.attachment.name}</span>
-                              <span className="text-muted-foreground">{msg.attachment.size}</span>
-                              {msg.attachment.storagePath && (
-                                <button onClick={() => downloadAttachment(msg.attachment)} className="p-1 rounded-md hover:bg-muted ml-1" title="Download">
-                                  <Download className="w-3.5 h-3.5 text-primary" />
-                                </button>
-                              )}
-                            </div>
+                            <AttachmentPreview
+                              attachment={msg.attachment}
+                              isMe={isMe}
+                              onDownload={downloadAttachment}
+                              onPreviewImage={setPreviewImage}
+                              getUrl={getAttachmentUrl}
+                              isImageType={isImageType}
+                              isPdfType={isPdfType}
+                            />
                           )}
                         </>
                       )}
@@ -826,6 +921,16 @@ export default function ChatPage() {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Fullscreen image preview modal */}
+      {previewImage && (
+        <div className="fixed inset-0 z-[60] bg-background/90 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 p-2 rounded-full bg-muted/50 hover:bg-muted text-foreground z-10">
+            <X className="w-6 h-6" />
+          </button>
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </AppLayout>
