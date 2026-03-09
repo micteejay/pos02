@@ -666,16 +666,15 @@ export default function ChatPage() {
                             {msg.text}
                           </p>
                           {msg.attachment && (
-                            <div className={`mt-1 flex items-center gap-2 p-2 rounded-lg bg-muted/50 border border-border text-xs ${isMe ? "justify-end" : ""}`}>
-                              <FileText className="w-4 h-4 text-primary" />
-                              <span className="text-foreground font-medium">{msg.attachment.name}</span>
-                              <span className="text-muted-foreground">{msg.attachment.size}</span>
-                              {msg.attachment.storagePath && (
-                                <button onClick={() => downloadAttachment(msg.attachment)} className="p-1 rounded-md hover:bg-muted ml-1" title="Download">
-                                  <Download className="w-3.5 h-3.5 text-primary" />
-                                </button>
-                              )}
-                            </div>
+                            <AttachmentPreview
+                              attachment={msg.attachment}
+                              isMe={isMe}
+                              onDownload={downloadAttachment}
+                              onPreviewImage={setPreviewImage}
+                              getUrl={getAttachmentUrl}
+                              isImageType={isImageType}
+                              isPdfType={isPdfType}
+                            />
                           )}
                         </>
                       )}
