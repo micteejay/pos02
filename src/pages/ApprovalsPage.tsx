@@ -2,10 +2,11 @@ import { useState, useMemo } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAuth } from "@/hooks/use-auth";
 import {
   ClipboardCheck, Clock, CheckCircle2, XCircle, AlertTriangle, Search,
   ChevronRight, User, DollarSign, ArrowRightLeft, FileText, ShoppingCart,
-  MessageSquare, TrendingUp, TrendingDown, Package, GitBranch,
+  MessageSquare, TrendingUp, TrendingDown, Package, GitBranch, Lock,
 } from "lucide-react";
 
 type Tab = "pending" | "history";
@@ -17,6 +18,7 @@ const typeIcons: Record<string, React.ElementType> = {
   discount: DollarSign,
   document: FileText,
   workflow: GitBranch,
+  general: ClipboardCheck,
 };
 
 const priorityConfig = {
@@ -31,9 +33,19 @@ const statusConfig = {
   rejected: { label: "Rejected", className: "bg-destructive/10 text-destructive", icon: XCircle },
 };
 
+const roleLabels: Record<string, string> = {
+  super_admin: "Super Admin",
+  admin: "Admin",
+  manager: "Manager",
+  sales_rep: "Sales Rep",
+  warehouse_staff: "Warehouse Staff",
+  viewer: "Viewer",
+};
+
 export default function ApprovalsPage() {
-  const { approvalItems, approveItem, rejectItem } = useAppEvents();
+  const { approvalItems, approveItem, rejectItem, canApproveItem } = useAppEvents();
   const { formatCurrency, hasPermission } = useAppSettings();
+  const { user } = useAuth();
   const [tab, setTab] = useState<Tab>("pending");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -76,6 +88,8 @@ export default function ApprovalsPage() {
     const pc = priorityConfig[req.priority];
     const TypeIcon = typeIcons[req.type] || FileText;
     const expanded = expandedId === req.id;
+    const userCanApprove = canApproveItem(req);
+    const currentStepRole = req.steps[req.currentStep]?.role;
 
     return (
       <div key={req.id} className="glass-card rounded-xl overflow-hidden transition-all duration-300">
@@ -85,7 +99,7 @@ export default function ApprovalsPage() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-1">
-              <span className="text-xs font-mono text-primary">{req.id}</span>
+              <span className="text-xs font-mono text-primary">{req.id.substring(0, 8)}</span>
               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${pc.className}`}>{pc.label}</span>
               <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">{req.type.replace(/_/g, " ")}</span>
@@ -100,7 +114,8 @@ export default function ApprovalsPage() {
           </div>
           <div className="flex items-center gap-1.5 shrink-0 mr-2">
             {req.steps.map((step, i) => (
-              <div key={i} className={`w-2.5 h-2.5 rounded-full ${step.status === "approved" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : i === req.currentStep && req.status === "pending" ? "bg-warning animate-pulse" : "bg-muted-foreground/30"}`} />
+              <div key={i} title={`${step.name} (${roleLabels[step.role] || step.role})`}
+                className={`w-2.5 h-2.5 rounded-full ${step.status === "approved" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : i === req.currentStep && req.status === "pending" ? "bg-warning animate-pulse" : "bg-muted-foreground/30"}`} />
             ))}
           </div>
           <ChevronRight className={`w-4 h-4 text-muted-foreground shrink-0 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
@@ -110,19 +125,32 @@ export default function ApprovalsPage() {
           <div className="px-5 pb-5 animate-fade-in">
             <p className="text-xs text-muted-foreground mb-4">{req.description}</p>
             {req.sourceId && (
-              <p className="text-xs text-muted-foreground mb-3">Source: <span className="text-primary font-mono">{req.sourceId}</span></p>
+              <p className="text-xs text-muted-foreground mb-3">Source: <span className="text-primary font-mono">{req.sourceId.substring(0, 8)}</span></p>
             )}
 
+            {/* Workflow steps visualization */}
             <div className="relative pl-6 space-y-4 border-l-2 border-border ml-2">
               {req.steps.map((step, i) => {
                 const isActive = i === req.currentStep && req.status === "pending";
                 const stepColor = step.status === "approved" ? "bg-success" : step.status === "rejected" ? "bg-destructive" : isActive ? "bg-warning" : "bg-muted-foreground/30";
+                const canApproveThisStep = isActive && userCanApprove;
+                
                 return (
                   <div key={i} className="relative">
                     <div className={`absolute -left-[calc(1.5rem+5px)] w-3 h-3 rounded-full border-2 border-card ${stepColor}`} />
                     <div className={`p-3 rounded-lg ${isActive ? "bg-warning/5 border border-warning/20" : "bg-muted/30"}`}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-semibold text-foreground">{step.role}</span>
+                        <span className="text-xs font-semibold text-foreground flex items-center gap-2">
+                          {step.name}
+                          <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {roleLabels[step.role] || step.role}
+                          </span>
+                          {isActive && !canApproveThisStep && (
+                            <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-destructive/10 text-destructive flex items-center gap-1">
+                              <Lock className="w-2.5 h-2.5" /> Not your role
+                            </span>
+                          )}
+                        </span>
                         {step.date && <span className="text-[10px] text-muted-foreground">{step.date}</span>}
                       </div>
                       <p className="text-xs text-muted-foreground">{step.approver || (isActive ? "Awaiting approval…" : "—")}</p>
@@ -138,22 +166,35 @@ export default function ApprovalsPage() {
               })}
             </div>
 
+            {/* Approval actions - only show if user can approve */}
             {req.status === "pending" && (
               <div className="mt-4 pt-4 border-t border-border space-y-3">
-                <input
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  placeholder="Add a comment (optional)..."
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
-                />
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleApprove(req.id)} className="flex items-center gap-1.5 px-4 py-2 bg-success text-success-foreground rounded-lg text-xs font-medium hover:opacity-90">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> Approve
-                  </button>
-                  <button onClick={() => handleReject(req.id)} className="flex items-center gap-1.5 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-xs font-medium hover:opacity-90">
-                    <XCircle className="w-3.5 h-3.5" /> Reject
-                  </button>
-                </div>
+                {userCanApprove ? (
+                  <>
+                    <input
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      placeholder="Add a comment (optional)..."
+                      className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleApprove(req.id)} className="flex items-center gap-1.5 px-4 py-2 bg-success text-success-foreground rounded-lg text-xs font-medium hover:opacity-90">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Approve Step
+                      </button>
+                      <button onClick={() => handleReject(req.id)} className="flex items-center gap-1.5 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-xs font-medium hover:opacity-90">
+                        <XCircle className="w-3.5 h-3.5" /> Reject
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30 text-muted-foreground text-xs">
+                    <Lock className="w-4 h-4" />
+                    <span>
+                      You cannot approve this step. It requires <strong className="text-foreground">{roleLabels[currentStepRole] || currentStepRole}</strong> role.
+                      {user?.role && <span className="ml-1">(Your role: {user.role})</span>}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -167,7 +208,7 @@ export default function ApprovalsPage() {
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Approvals</h1>
-          <p className="text-sm text-muted-foreground mt-1">Review pending requests and track approval workflows.</p>
+          <p className="text-sm text-muted-foreground mt-1">Review pending requests and track approval workflows. Each step requires a specific role.</p>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
