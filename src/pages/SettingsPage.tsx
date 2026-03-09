@@ -155,11 +155,91 @@ export default function SettingsPage() {
   const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "general", label: "General", icon: Settings },
     { key: "receipt", label: "Receipt Design", icon: Receipt },
+    { key: "workflows", label: "Workflows", icon: GitBranch },
     { key: "integrations", label: "Integrations", icon: Plug },
     { key: "security", label: "Security", icon: Shield },
   ];
 
-  const tabPermMap: Record<Tab, string> = { general: "pages.settings.general", receipt: "pages.settings.receipt", integrations: "pages.settings.integrations", security: "pages.settings.security" };
+  const tabPermMap: Record<Tab, string> = { general: "pages.settings.general", receipt: "pages.settings.receipt", workflows: "pages.settings.general", integrations: "pages.settings.integrations", security: "pages.settings.security" };
+
+  // Workflow stages config
+  const availableRoles = ["super_admin", "admin", "manager", "sales_rep", "warehouse_staff", "viewer"];
+  const roleLabels: Record<string, string> = { super_admin: "Super Admin", admin: "Admin", manager: "Manager", sales_rep: "Sales Rep", warehouse_staff: "Warehouse Staff", viewer: "Viewer" };
+
+  const defaultWorkflowConfig: WorkflowConfig = {
+    purchase_order: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews the purchase order" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin gives final approval" },
+    ],
+    stock_transfer: [
+      { id: "1", name: "Warehouse Check", role: "warehouse_staff", description: "Warehouse staff verifies stock" },
+      { id: "2", name: "Manager Approval", role: "manager", description: "Manager approves transfer" },
+    ],
+    expense: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews expense" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin approves expense" },
+    ],
+    general: [
+      { id: "1", name: "Manager Approval", role: "manager", description: "Manager reviews and approves" },
+    ],
+  };
+
+  const [workflowConfig, setWorkflowConfig] = useState<WorkflowConfig>(defaultWorkflowConfig);
+  const [activeWorkflowType, setActiveWorkflowType] = useState<keyof WorkflowConfig>("purchase_order");
+
+  // Load workflow config from app_settings
+  useEffect(() => {
+    if (activeTab !== "workflows") return;
+    supabase.from("app_settings").select("*").eq("key", "workflow_stages").single().then(({ data }) => {
+      if (data?.value) {
+        try {
+          const val = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
+          setWorkflowConfig(prev => ({ ...prev, ...val }));
+        } catch {}
+      }
+    });
+  }, [activeTab]);
+
+  const saveWorkflowConfig = async (config: WorkflowConfig) => {
+    setWorkflowConfig(config);
+    await supabase.from("app_settings").upsert({ key: "workflow_stages", value: config as any, updated_by: companyProfile?.owner_id || null }, { onConflict: "key" });
+    toast.success("Workflow stages saved");
+    logAction("settings.update", "Settings", "workflow_stages", "Updated workflow approval stages");
+  };
+
+  const moveStage = (dir: "up" | "down", index: number) => {
+    const stages = [...workflowConfig[activeWorkflowType]];
+    const swapIdx = dir === "up" ? index - 1 : index + 1;
+    if (swapIdx < 0 || swapIdx >= stages.length) return;
+    [stages[index], stages[swapIdx]] = [stages[swapIdx], stages[index]];
+    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
+    saveWorkflowConfig(updated);
+  };
+
+  const addStage = () => {
+    const stages = [...workflowConfig[activeWorkflowType]];
+    stages.push({ id: Date.now().toString(), name: "New Stage", role: "manager", description: "" });
+    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
+    saveWorkflowConfig(updated);
+  };
+
+  const removeStage = (index: number) => {
+    const stages = [...workflowConfig[activeWorkflowType]];
+    stages.splice(index, 1);
+    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
+    saveWorkflowConfig(updated);
+  };
+
+  const updateStage = (index: number, updates: Partial<WorkflowStage>) => {
+    const stages = [...workflowConfig[activeWorkflowType]];
+    stages[index] = { ...stages[index], ...updates };
+    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
+    setWorkflowConfig(updated);
+  };
+
+  const saveStagesDebounced = () => {
+    saveWorkflowConfig(workflowConfig);
+  };
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
