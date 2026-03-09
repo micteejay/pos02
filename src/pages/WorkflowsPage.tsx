@@ -185,6 +185,12 @@ export default function WorkflowsPage() {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
 
+    // Check if user can reject this step
+    if (!canApproveStep(wf)) {
+      toast.error("You don't have permission to reject this step");
+      return;
+    }
+
     const newSteps = [...wf.steps];
     newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
 
