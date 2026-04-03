@@ -8,10 +8,11 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
 import {
-  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, GripVertical, Plus, Trash2, ArrowUp, ArrowDown,
+  Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, Plus, Trash2, ArrowUp, ArrowDown,
+  Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi,
 } from "lucide-react";
 
-type Tab = "general" | "receipt" | "integrations" | "security" | "workflows";
+type Tab = "general" | "business" | "receipt" | "integrations" | "security" | "data" | "workflows";
 
 interface WorkflowStage {
   id: string;
@@ -120,11 +121,28 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
   );
 }
 
+function ToggleSwitch({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} className={`w-10 h-6 rounded-full transition-colors relative ${enabled ? "bg-primary" : "bg-muted"}`}>
+      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${enabled ? "translate-x-5" : "translate-x-1"}`} />
+    </button>
+  );
+}
+
+function SettingRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+      <div><p className="text-sm font-medium text-foreground">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
+      {children}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("general");
   const { theme, setTheme } = useTheme();
   const { settings, updateSettings, formatCurrency, integrations, connectIntegration, disconnectIntegration, hasPermission } = useAppSettings();
-  const { companyProfile } = useAuth();
+  const { companyProfile, user: authUser } = useAuth();
   const { logAction } = useAudit();
   const [saved, setSaved] = useState(false);
 
@@ -135,11 +153,10 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   };
 
-  // Real active sessions
+  // Active sessions
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   useEffect(() => {
     if (activeTab !== "security") return;
-    const { user } = companyProfile ? { user: { id: "" } } : { user: null };
     supabase.from("user_sessions").select("*").order("started_at", { ascending: false }).limit(20).then(({ data }) => {
       if (data) setActiveSessions(data);
     });
@@ -157,13 +174,20 @@ export default function SettingsPage() {
 
   const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "general", label: "General", icon: Settings },
+    { key: "business", label: "Business Rules", icon: Package },
     { key: "receipt", label: "Receipt Design", icon: Receipt },
     { key: "workflows", label: "Workflows", icon: GitBranch },
     { key: "integrations", label: "Integrations", icon: Plug },
     { key: "security", label: "Security", icon: Shield },
+    { key: "data", label: "Data & Backup", icon: Database },
   ];
 
-  const tabPermMap: Record<Tab, string> = { general: "pages.settings.general", receipt: "pages.settings.receipt", workflows: "pages.settings.general", integrations: "pages.settings.integrations", security: "pages.settings.security" };
+  const tabPermMap: Record<Tab, string> = {
+    general: "pages.settings.general", business: "pages.settings.general",
+    receipt: "pages.settings.receipt", workflows: "pages.settings.general",
+    integrations: "pages.settings.integrations", security: "pages.settings.security",
+    data: "pages.settings.general",
+  };
 
   // Workflow stages config
   const availableRoles = ["super_admin", "admin", "manager", "sales_rep", "warehouse_staff", "viewer"];
@@ -201,7 +225,6 @@ export default function SettingsPage() {
   const [workflowConfig, setWorkflowConfig] = useState<WorkflowConfig>(defaultWorkflowConfig);
   const [activeWorkflowType, setActiveWorkflowType] = useState<keyof WorkflowConfig>("purchase_order");
 
-  // Load workflow config from app_settings
   useEffect(() => {
     if (activeTab !== "workflows") return;
     supabase.from("app_settings").select("*").eq("key", "workflow_stages").single().then(({ data }) => {
@@ -226,34 +249,37 @@ export default function SettingsPage() {
     const swapIdx = dir === "up" ? index - 1 : index + 1;
     if (swapIdx < 0 || swapIdx >= stages.length) return;
     [stages[index], stages[swapIdx]] = [stages[swapIdx], stages[index]];
-    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
-    saveWorkflowConfig(updated);
+    saveWorkflowConfig({ ...workflowConfig, [activeWorkflowType]: stages });
   };
 
   const addStage = () => {
     const stages = [...workflowConfig[activeWorkflowType]];
     stages.push({ id: Date.now().toString(), name: "New Stage", role: "manager", description: "" });
-    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
-    saveWorkflowConfig(updated);
+    saveWorkflowConfig({ ...workflowConfig, [activeWorkflowType]: stages });
   };
 
   const removeStage = (index: number) => {
     const stages = [...workflowConfig[activeWorkflowType]];
     stages.splice(index, 1);
-    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
-    saveWorkflowConfig(updated);
+    saveWorkflowConfig({ ...workflowConfig, [activeWorkflowType]: stages });
   };
 
   const updateStage = (index: number, updates: Partial<WorkflowStage>) => {
     const stages = [...workflowConfig[activeWorkflowType]];
     stages[index] = { ...stages[index], ...updates };
-    const updated = { ...workflowConfig, [activeWorkflowType]: stages };
-    setWorkflowConfig(updated);
+    setWorkflowConfig(prev => ({ ...prev, [activeWorkflowType]: stages }));
   };
 
   const saveStagesDebounced = () => {
     saveWorkflowConfig(workflowConfig);
   };
+
+  const resetWorkflowToDefault = () => {
+    const updated = { ...workflowConfig, [activeWorkflowType]: defaultWorkflowConfig[activeWorkflowType] };
+    saveWorkflowConfig(updated);
+    toast.success("Reset to default stages");
+  };
+
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
 
   const [configModal, setConfigModal] = useState<typeof integrations[0] | null>(null);
@@ -293,7 +319,7 @@ export default function SettingsPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-            <p className="text-sm text-muted-foreground mt-1">Configure system preferences, integrations, and security</p>
+            <p className="text-sm text-muted-foreground mt-1">Configure system preferences, business rules, integrations, and security</p>
           </div>
           <button onClick={handleSave} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${saved ? "bg-success text-success-foreground" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
             {saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
@@ -315,7 +341,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {/* General Tab */}
+        {/* ===================== GENERAL TAB ===================== */}
         {activeTab === "general" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Company Profile Summary */}
@@ -343,7 +369,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* App Logo & Name */}
+            {/* App Branding */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Image className="w-4 h-4 text-primary" />
@@ -377,11 +403,11 @@ export default function SettingsPage() {
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Application Name</label>
                 <Input value={settings.appName} onChange={(e) => updateSettings({ appName: e.target.value })} className="mt-1" />
-                <p className="text-[10px] text-muted-foreground mt-1">Changes the name across the entire app — sidebar, mobile header, receipts</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Changes the name across the entire app</p>
               </div>
             </div>
 
-            {/* Theme */}
+            {/* Appearance */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Palette className="w-4 h-4 text-primary" />
@@ -413,7 +439,6 @@ export default function SettingsPage() {
                   }} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     {currencies.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>)}
                   </select>
-                  <p className="text-[10px] text-muted-foreground mt-1">Affects currency display in POS, Sales, Reports, and Dashboard</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Tax Rate (%)</label>
@@ -422,52 +447,144 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Business Info */}
+            {/* Locale & Formats */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Globe className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Business Information</h3>
+                <h3 className="text-sm font-semibold text-foreground">Locale & Formats</h3>
               </div>
               <div className="space-y-3">
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Language</label>
                   <select value={settings.language} onChange={(e) => updateSettings({ language: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                    <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option>
+                    <option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="ar">Arabic</option><option value="pt">Portuguese</option><option value="zh">Chinese</option>
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Timezone</label>
                   <select value={settings.timezone} onChange={(e) => updateSettings({ timezone: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                    <option>UTC-05:00 Eastern</option><option>UTC-06:00 Central</option><option>UTC-07:00 Mountain</option><option>UTC-08:00 Pacific</option><option>UTC+00:00 GMT</option><option>UTC+01:00 CET</option>
+                    <option>UTC-05:00 Eastern</option><option>UTC-06:00 Central</option><option>UTC-07:00 Mountain</option><option>UTC-08:00 Pacific</option><option>UTC+00:00 GMT</option><option>UTC+01:00 CET</option><option>UTC+01:00 WAT</option><option>UTC+05:30 IST</option><option>UTC+08:00 SGT</option><option>UTC+09:00 JST</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Date Format</label>
+                  <select value={settings.dateFormat} onChange={(e) => updateSettings({ dateFormat: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option><option value="DD.MM.YYYY">DD.MM.YYYY</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Time Format</label>
+                  <select value={settings.timeFormat} onChange={(e) => updateSettings({ timeFormat: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="12h">12-hour (1:30 PM)</option><option value="24h">24-hour (13:30)</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* Notifications */}
+            {/* Notification Preferences */}
             <div className="glass-card rounded-xl p-6 lg:col-span-2">
               <div className="flex items-center gap-2 mb-4">
                 <Bell className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground">Notification Preferences</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {([{ key: "notifyEmail" as const, label: "Email", desc: "Receive updates via email" }, { key: "notifyPush" as const, label: "Push", desc: "Browser push notifications" }, { key: "notifySms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" }]).map((n) => (
-                  <div key={n.key} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div><p className="text-sm font-medium text-foreground">{n.label}</p><p className="text-xs text-muted-foreground">{n.desc}</p></div>
-                    <button onClick={() => updateSettings({ [n.key]: !settings[n.key] })} className={`w-10 h-6 rounded-full transition-colors relative ${settings[n.key] ? "bg-primary" : "bg-muted"}`}>
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings[n.key] ? "translate-x-5" : "translate-x-1"}`} />
-                    </button>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  { key: "notifyEmail" as const, label: "Email", desc: "Receive updates via email" },
+                  { key: "notifyPush" as const, label: "Push", desc: "Browser push notifications" },
+                  { key: "notifySms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" },
+                  { key: "notifyLowStock" as const, label: "Low Stock", desc: "Alert when stock is low" },
+                  { key: "notifyNewOrder" as const, label: "New Orders", desc: "Notify on new orders" },
+                  { key: "notifyApproval" as const, label: "Approvals", desc: "Approval request alerts" },
+                ]).map((n) => (
+                  <SettingRow key={n.key} label={n.label} desc={n.desc}>
+                    <ToggleSwitch enabled={settings[n.key]} onToggle={() => updateSettings({ [n.key]: !settings[n.key] })} />
+                  </SettingRow>
                 ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* Receipt Design Tab */}
+        {/* ===================== BUSINESS RULES TAB ===================== */}
+        {activeTab === "business" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Inventory Rules */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Package className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Inventory Rules</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Low Stock Threshold (units)</label>
+                  <Input type="number" min={1} value={settings.lowStockThreshold} onChange={(e) => updateSettings({ lowStockThreshold: Number(e.target.value) })} className="mt-1" />
+                  <p className="text-[10px] text-muted-foreground mt-1">Items below this qty trigger low-stock warnings</p>
+                </div>
+                <SettingRow label="Allow Negative Stock" desc="Permit selling below zero inventory">
+                  <ToggleSwitch enabled={settings.allowNegativeStock} onToggle={() => updateSettings({ allowNegativeStock: !settings.allowNegativeStock })} />
+                </SettingRow>
+                <SettingRow label="Auto-Reorder" desc="Automatically create POs when stock is low">
+                  <ToggleSwitch enabled={settings.autoReorderEnabled} onToggle={() => updateSettings({ autoReorderEnabled: !settings.autoReorderEnabled })} />
+                </SettingRow>
+              </div>
+            </div>
+
+            {/* Approval Rules */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Approval Rules</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Require Approval Above ({settings.currencySymbol})</label>
+                  <Input type="number" min={0} value={settings.requireApprovalAbove} onChange={(e) => updateSettings({ requireApprovalAbove: Number(e.target.value) })} className="mt-1" />
+                  <p className="text-[10px] text-muted-foreground mt-1">Transactions above this amount need manager approval</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Defaults */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CreditCard className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Payment Defaults</h3>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Default Payment Method</label>
+                  <select value={settings.defaultPaymentMethod} onChange={(e) => updateSettings({ defaultPaymentMethod: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="cash">Cash</option>
+                    <option value="card">Card</option>
+                    <option value="transfer">Bank Transfer</option>
+                    <option value="mobile">Mobile Payment</option>
+                  </select>
+                  <p className="text-[10px] text-muted-foreground mt-1">Pre-selected in POS checkout</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Business Info Card */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Building2 className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Quick Reference</h3>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between p-2 rounded bg-muted/30"><span className="text-muted-foreground">Currency</span><span className="font-medium text-foreground">{settings.currencySymbol} {settings.currency}</span></div>
+                <div className="flex justify-between p-2 rounded bg-muted/30"><span className="text-muted-foreground">Tax Rate</span><span className="font-medium text-foreground">{settings.taxRate}%</span></div>
+                <div className="flex justify-between p-2 rounded bg-muted/30"><span className="text-muted-foreground">Low Stock Alert</span><span className="font-medium text-foreground">{settings.lowStockThreshold} units</span></div>
+                <div className="flex justify-between p-2 rounded bg-muted/30"><span className="text-muted-foreground">Approval Threshold</span><span className="font-medium text-foreground">{formatCurrency(settings.requireApprovalAbove)}</span></div>
+                <div className="flex justify-between p-2 rounded bg-muted/30"><span className="text-muted-foreground">Negative Stock</span><span className={`font-medium ${settings.allowNegativeStock ? "text-warning" : "text-success"}`}>{settings.allowNegativeStock ? "Allowed" : "Blocked"}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== RECEIPT DESIGN TAB ===================== */}
         {activeTab === "receipt" && (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
               {receiptStyles.map((style) => (
                 <button key={style.id} onClick={() => updateSettings({ receiptStyle: style.id })}
                   className={`glass-card rounded-xl p-3 text-left transition-all ${settings.receiptStyle === style.id ? "border-primary ring-1 ring-primary/30" : "hover:border-muted-foreground/30"}`}>
@@ -504,12 +621,9 @@ export default function SettingsPage() {
                         <option>Small</option><option>Medium</option><option>Large</option>
                       </select>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div><p className="text-sm font-medium text-foreground">Show QR Code</p><p className="text-xs text-muted-foreground">Add scannable QR code</p></div>
-                      <button onClick={() => updateSettings({ showQRCode: !settings.showQRCode })} className={`w-10 h-6 rounded-full transition-colors relative ${settings.showQRCode ? "bg-primary" : "bg-muted"}`}>
-                        <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings.showQRCode ? "translate-x-5" : "translate-x-1"}`} />
-                      </button>
-                    </div>
+                    <SettingRow label="Show QR Code" desc="Add scannable QR code">
+                      <ToggleSwitch enabled={settings.showQRCode} onToggle={() => updateSettings({ showQRCode: !settings.showQRCode })} />
+                    </SettingRow>
                   </div>
                 </div>
               </div>
@@ -517,7 +631,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Integrations Tab */}
+        {/* ===================== INTEGRATIONS TAB ===================== */}
         {activeTab === "integrations" && (
           <div className="space-y-4">
             {connectedCount > 0 && (
@@ -551,9 +665,7 @@ export default function SettingsPage() {
                     </span>
                     <div className="flex items-center gap-2">
                       {int.connected && (
-                        <button onClick={() => openConfig(int)} className="text-xs text-muted-foreground hover:text-foreground">
-                          Configure
-                        </button>
+                        <button onClick={() => openConfig(int)} className="text-xs text-muted-foreground hover:text-foreground">Configure</button>
                       )}
                       <button onClick={() => int.connected ? disconnectIntegration(int.name) : openConfig(int)}
                         className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${int.connected ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-primary text-primary-foreground hover:bg-primary/90"}`}>
@@ -596,25 +708,28 @@ export default function SettingsPage() {
               <div className="flex gap-2 mt-5">
                 <button onClick={() => setConfigModal(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
                 <button onClick={saveConfig} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-                  <Check className="w-4 h-4" /> {configModal.connected ? "Update" : "Connect"}
+                  <Plug className="w-4 h-4" />{configModal.connected ? "Update" : "Connect"}
                 </button>
               </div>
-              <p className="text-[10px] text-muted-foreground text-center mt-3">Credentials are stored locally. Enable Lovable Cloud for production use.</p>
             </div>
           </div>
         )}
 
-        {/* Workflows Tab */}
+        {/* ===================== WORKFLOWS TAB ===================== */}
         {activeTab === "workflows" && (
           <div className="space-y-6">
             <div className="glass-card rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-2">
-                <GitBranch className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Approval Stage Configuration</h3>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Approval Stage Configuration</h3>
+                </div>
+                <button onClick={resetWorkflowToDefault} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset to Default
+                </button>
               </div>
-              <p className="text-xs text-muted-foreground mb-5">Define the approval stages for each workflow type. Each stage requires a specific role to approve. Admins and Super Admins can always approve any stage.</p>
+              <p className="text-xs text-muted-foreground mb-5">Define the approval stages for each workflow type. Each stage requires a specific role. Admins and Super Admins can always approve any stage.</p>
 
-              {/* Workflow type selector */}
               <div className="flex flex-wrap gap-2 mb-6">
                 {([
                   { key: "purchase_order" as const, label: "Purchase Orders" },
@@ -633,11 +748,9 @@ export default function SettingsPage() {
                 ))}
               </div>
 
-              {/* Stages list */}
               <div className="space-y-3">
                 {workflowConfig[activeWorkflowType].map((stage, index) => (
                   <div key={stage.id} className="flex items-start gap-3 p-4 rounded-xl bg-muted/30 border border-border group">
-                    {/* Stage number & reorder */}
                     <div className="flex flex-col items-center gap-1 pt-1">
                       <span className="w-7 h-7 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">{index + 1}</span>
                       <div className="flex flex-col gap-0.5">
@@ -652,7 +765,6 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* Stage details */}
                     <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Stage Name</label>
@@ -671,7 +783,6 @@ export default function SettingsPage() {
                       </div>
                     </div>
 
-                    {/* Delete */}
                     <button onClick={() => removeStage(index)}
                       className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all mt-4">
                       <Trash2 className="w-4 h-4" />
@@ -694,7 +805,7 @@ export default function SettingsPage() {
               <h3 className="text-sm font-semibold text-foreground mb-4">Approval Pipeline Preview</h3>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="px-3 py-1.5 rounded-lg bg-muted text-xs font-medium text-muted-foreground">Request Created</div>
-                {workflowConfig[activeWorkflowType].map((stage, i) => (
+                {workflowConfig[activeWorkflowType].map((stage) => (
                   <div key={stage.id} className="flex items-center gap-2">
                     <div className="w-6 border-t border-dashed border-border" />
                     <div className="px-3 py-1.5 rounded-lg bg-primary/10 text-xs font-medium text-primary border border-primary/20">
@@ -710,45 +821,98 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* ===================== SECURITY TAB ===================== */}
         {activeTab === "security" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Authentication */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Lock className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground">Authentication</h3>
               </div>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div><p className="text-sm font-medium text-foreground">Two-Factor Authentication</p><p className="text-xs text-muted-foreground">Add an extra layer of security</p></div>
-                  <button onClick={() => updateSettings({ twoFactorEnabled: !settings.twoFactorEnabled })} className={`w-10 h-6 rounded-full transition-colors relative ${settings.twoFactorEnabled ? "bg-primary" : "bg-muted"}`}>
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-card shadow transition-transform ${settings.twoFactorEnabled ? "translate-x-5" : "translate-x-1"}`} />
-                  </button>
-                </div>
-                <div><label className="text-xs font-medium text-muted-foreground">Session Timeout</label>
+                <SettingRow label="Two-Factor Authentication" desc="Add an extra layer of security">
+                  <ToggleSwitch enabled={settings.twoFactorEnabled} onToggle={() => updateSettings({ twoFactorEnabled: !settings.twoFactorEnabled })} />
+                </SettingRow>
+                <SettingRow label="Auto-Lock Screen" desc="Lock after inactivity period">
+                  <ToggleSwitch enabled={settings.autoLockScreen} onToggle={() => updateSettings({ autoLockScreen: !settings.autoLockScreen })} />
+                </SettingRow>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Session Timeout</label>
                   <select value={settings.sessionTimeout} onChange={(e) => updateSettings({ sessionTimeout: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                    <option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>8 hours</option>
+                    <option>15 minutes</option><option>30 minutes</option><option>1 hour</option><option>4 hours</option><option>8 hours</option><option>24 hours</option>
                   </select>
                 </div>
-                <div><label className="text-xs font-medium text-muted-foreground">Password Policy</label>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Password Policy</label>
                   <select value={settings.passwordPolicy} onChange={(e) => updateSettings({ passwordPolicy: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
                     <option>Strong (12+ chars, mixed case, symbols)</option><option>Medium (8+ chars, mixed case)</option><option>Basic (6+ chars)</option>
                   </select>
                 </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Max Login Attempts</label>
+                  <Input type="number" min={1} max={20} value={settings.maxLoginAttempts} onChange={(e) => updateSettings({ maxLoginAttempts: Number(e.target.value) })} className="mt-1" />
+                  <p className="text-[10px] text-muted-foreground mt-1">Account locks after this many failed attempts</p>
+                </div>
               </div>
             </div>
+
+            {/* Access Control */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <ShieldAlert className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Access Control</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">IP Whitelist</label>
+                  <textarea
+                    value={settings.ipWhitelist}
+                    onChange={(e) => updateSettings({ ipWhitelist: e.target.value })}
+                    placeholder="Enter IP addresses, one per line. Leave empty to allow all."
+                    className="mt-1 w-full h-24 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Restrict access to specific IP addresses</p>
+                </div>
+              </div>
+            </div>
+
+            {/* API Keys */}
             <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
                 <Key className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground">API Keys</h3>
               </div>
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground text-center py-4">No API keys generated yet.</p>
-                <button className="w-full py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors">+ Generate New Key</button>
+                <p className="text-xs text-muted-foreground">API keys allow external services to interact with your system. Generate keys for custom integrations.</p>
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Read-Only Key</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">••••••••••••••••</p>
+                    </div>
+                    <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Not generated</span>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 border border-border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Full Access Key</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">••••••••••••••••</p>
+                    </div>
+                    <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full">Not generated</span>
+                  </div>
+                </div>
+                <button className="w-full py-2 rounded-lg border border-dashed border-border text-sm text-muted-foreground hover:text-foreground hover:border-muted-foreground transition-colors flex items-center justify-center gap-2">
+                  <Key className="w-3.5 h-3.5" /> Generate New API Key
+                </button>
               </div>
             </div>
-            <div className="glass-card rounded-xl p-6 lg:col-span-2">
+
+            {/* Active Sessions */}
+            <div className="glass-card rounded-xl p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Shield className="w-4 h-4 text-primary" />
+                <Wifi className="w-4 h-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground">Active Sessions</h3>
               </div>
               <div className="space-y-3">
@@ -758,7 +922,7 @@ export default function SettingsPage() {
                       <Monitor className="w-4 h-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Current Session<span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Active</span></p>
-                        <p className="text-[10px] text-muted-foreground">This device</p>
+                        <p className="text-[10px] text-muted-foreground">This device · {new Date().toLocaleString()}</p>
                       </div>
                     </div>
                   </div>
@@ -778,6 +942,112 @@ export default function SettingsPage() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== DATA & BACKUP TAB ===================== */}
+        {activeTab === "data" && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Audit Log Retention */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Audit Log Retention</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Retention Period (days)</label>
+                  <Input type="number" min={30} max={3650} value={settings.auditRetentionDays} onChange={(e) => updateSettings({ auditRetentionDays: Number(e.target.value) })} className="mt-1" />
+                  <p className="text-[10px] text-muted-foreground mt-1">Audit records older than this will be archived. Minimum 30 days.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/30 space-y-1">
+                  <p className="text-xs font-medium text-foreground">Current retention: <span className="text-primary">{settings.auditRetentionDays} days</span></p>
+                  <p className="text-[10px] text-muted-foreground">≈ {Math.round(settings.auditRetentionDays / 30)} months · {(settings.auditRetentionDays / 365).toFixed(1)} years</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Backup Settings */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <HardDrive className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Backup Settings</h3>
+              </div>
+              <div className="space-y-4">
+                <SettingRow label="Automatic Backups" desc="Schedule regular data backups">
+                  <ToggleSwitch enabled={settings.autoBackupEnabled} onToggle={() => updateSettings({ autoBackupEnabled: !settings.autoBackupEnabled })} />
+                </SettingRow>
+                {settings.autoBackupEnabled && (
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Backup Frequency</label>
+                    <select value={settings.backupFrequency} onChange={(e) => updateSettings({ backupFrequency: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                      <option value="hourly">Every Hour</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Data Export */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Download className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Data Export</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Default Export Format</label>
+                  <select value={settings.dataExportFormat} onChange={(e) => updateSettings({ dataExportFormat: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+                    <option value="csv">CSV (Comma Separated)</option>
+                    <option value="xlsx">Excel (XLSX)</option>
+                    <option value="json">JSON</option>
+                    <option value="pdf">PDF</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
+                    <Download className="w-3.5 h-3.5" /> Export Inventory
+                  </button>
+                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
+                    <Download className="w-3.5 h-3.5" /> Export Sales
+                  </button>
+                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
+                    <Download className="w-3.5 h-3.5" /> Export Users
+                  </button>
+                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
+                    <Download className="w-3.5 h-3.5" /> Export Audit Log
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Storage Info */}
+            <div className="glass-card rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Database className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Storage Overview</h3>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Documents", usage: "—", color: "bg-primary" },
+                  { label: "Chat Attachments", usage: "—", color: "bg-accent" },
+                  { label: "Avatars", usage: "—", color: "bg-success" },
+                  { label: "Logos", usage: "—", color: "bg-warning" },
+                ].map(bucket => (
+                  <div key={bucket.label} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${bucket.color}`} />
+                      <span className="text-sm text-foreground">{bucket.label}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{bucket.usage}</span>
+                  </div>
+                ))}
+                <p className="text-[10px] text-muted-foreground text-center mt-2">Storage is managed by Lovable Cloud</p>
               </div>
             </div>
           </div>

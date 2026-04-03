@@ -17,14 +17,33 @@ export interface AppSettings {
   language: string;
   timezone: string;
   logoUrl: string;
+  dateFormat: string;
+  timeFormat: string;
   // Security settings
   twoFactorEnabled: boolean;
   sessionTimeout: string;
   passwordPolicy: string;
+  autoLockScreen: boolean;
+  ipWhitelist: string;
+  maxLoginAttempts: number;
   // Notification preferences
   notifyEmail: boolean;
   notifyPush: boolean;
   notifySms: boolean;
+  notifyLowStock: boolean;
+  notifyNewOrder: boolean;
+  notifyApproval: boolean;
+  // Business rules
+  lowStockThreshold: number;
+  autoReorderEnabled: boolean;
+  requireApprovalAbove: number;
+  defaultPaymentMethod: string;
+  allowNegativeStock: boolean;
+  // Data management
+  auditRetentionDays: number;
+  autoBackupEnabled: boolean;
+  backupFrequency: string;
+  dataExportFormat: string;
 }
 
 export type Permission =
@@ -138,8 +157,15 @@ const defaultSettings: AppSettings = {
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
+  dateFormat: "MM/DD/YYYY", timeFormat: "12h",
   twoFactorEnabled: false, sessionTimeout: "30 minutes", passwordPolicy: "Strong (12+ chars, mixed case, symbols)",
+  autoLockScreen: false, ipWhitelist: "", maxLoginAttempts: 5,
   notifyEmail: true, notifyPush: true, notifySms: false,
+  notifyLowStock: true, notifyNewOrder: true, notifyApproval: true,
+  lowStockThreshold: 10, autoReorderEnabled: false, requireApprovalAbove: 5000,
+  defaultPaymentMethod: "cash", allowNegativeStock: false,
+  auditRetentionDays: 365, autoBackupEnabled: false, backupFrequency: "daily",
+  dataExportFormat: "csv",
 };
 
 const defaultIntegrations: IntegrationConfig[] = [
@@ -255,6 +281,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             language: g.language || prev.language,
             timezone: g.timezone || prev.timezone,
             logoUrl: g.logoUrl || prev.logoUrl,
+            dateFormat: g.dateFormat || prev.dateFormat,
+            timeFormat: g.timeFormat || prev.timeFormat,
           }));
         }
         if (parsed.receipt) {
@@ -277,6 +305,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             twoFactorEnabled: s.twoFactorEnabled ?? prev.twoFactorEnabled,
             sessionTimeout: s.sessionTimeout || prev.sessionTimeout,
             passwordPolicy: s.passwordPolicy || prev.passwordPolicy,
+            autoLockScreen: s.autoLockScreen ?? prev.autoLockScreen,
+            ipWhitelist: s.ipWhitelist ?? prev.ipWhitelist,
+            maxLoginAttempts: s.maxLoginAttempts ?? prev.maxLoginAttempts,
           }));
         }
         if (parsed.notifications) {
@@ -286,6 +317,30 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             notifyEmail: n.notifyEmail ?? prev.notifyEmail,
             notifyPush: n.notifyPush ?? prev.notifyPush,
             notifySms: n.notifySms ?? prev.notifySms,
+            notifyLowStock: n.notifyLowStock ?? prev.notifyLowStock,
+            notifyNewOrder: n.notifyNewOrder ?? prev.notifyNewOrder,
+            notifyApproval: n.notifyApproval ?? prev.notifyApproval,
+          }));
+        }
+        if (parsed.business_rules) {
+          const b = parsed.business_rules;
+          setSettings(prev => ({
+            ...prev,
+            lowStockThreshold: b.lowStockThreshold ?? prev.lowStockThreshold,
+            autoReorderEnabled: b.autoReorderEnabled ?? prev.autoReorderEnabled,
+            requireApprovalAbove: b.requireApprovalAbove ?? prev.requireApprovalAbove,
+            defaultPaymentMethod: b.defaultPaymentMethod || prev.defaultPaymentMethod,
+            allowNegativeStock: b.allowNegativeStock ?? prev.allowNegativeStock,
+          }));
+        }
+        if (parsed.data_management) {
+          const d = parsed.data_management;
+          setSettings(prev => ({
+            ...prev,
+            auditRetentionDays: d.auditRetentionDays ?? prev.auditRetentionDays,
+            autoBackupEnabled: d.autoBackupEnabled ?? prev.autoBackupEnabled,
+            backupFrequency: d.backupFrequency || prev.backupFrequency,
+            dataExportFormat: d.dataExportFormat || prev.dataExportFormat,
           }));
         }
       }
@@ -326,34 +381,27 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     setSettings(prev => {
       const next = { ...prev, ...updates };
       // Persist to Supabase
-      const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl"];
+      const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl", "dateFormat", "timeFormat"];
       const receiptKeys = ["receiptStyle", "receiptHeader", "receiptFooter", "receiptReturnPolicy", "paperWidth", "fontSize", "showQRCode"];
-      const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy"];
-      const notificationKeys = ["notifyEmail", "notifyPush", "notifySms"];
-      const hasGeneral = Object.keys(updates).some(k => generalKeys.includes(k));
-      const hasReceipt = Object.keys(updates).some(k => receiptKeys.includes(k));
-      const hasSecurity = Object.keys(updates).some(k => securityKeys.includes(k));
-      const hasNotifications = Object.keys(updates).some(k => notificationKeys.includes(k));
-      if (hasGeneral) {
-        const generalValue: any = {};
-        generalKeys.forEach(k => { generalValue[k] = (next as any)[k]; });
-        supabase.from("app_settings").upsert({ key: "general", value: generalValue, updated_by: authUser?.id || null }, { onConflict: "key" });
-      }
-      if (hasReceipt) {
-        const receiptValue: any = {};
-        receiptKeys.forEach(k => { receiptValue[k] = (next as any)[k]; });
-        supabase.from("app_settings").upsert({ key: "receipt", value: receiptValue, updated_by: authUser?.id || null }, { onConflict: "key" });
-      }
-      if (hasSecurity) {
-        const securityValue: any = {};
-        securityKeys.forEach(k => { securityValue[k] = (next as any)[k]; });
-        supabase.from("app_settings").upsert({ key: "security", value: securityValue, updated_by: authUser?.id || null }, { onConflict: "key" });
-      }
-      if (hasNotifications) {
-        const notifValue: any = {};
-        notificationKeys.forEach(k => { notifValue[k] = (next as any)[k]; });
-        supabase.from("app_settings").upsert({ key: "notifications", value: notifValue, updated_by: authUser?.id || null }, { onConflict: "key" });
-      }
+      const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy", "autoLockScreen", "ipWhitelist", "maxLoginAttempts"];
+      const notificationKeys = ["notifyEmail", "notifyPush", "notifySms", "notifyLowStock", "notifyNewOrder", "notifyApproval"];
+      const businessKeys = ["lowStockThreshold", "autoReorderEnabled", "requireApprovalAbove", "defaultPaymentMethod", "allowNegativeStock"];
+      const dataKeys = ["auditRetentionDays", "autoBackupEnabled", "backupFrequency", "dataExportFormat"];
+
+      const persistCategory = (keys: string[], dbKey: string) => {
+        if (Object.keys(updates).some(k => keys.includes(k))) {
+          const val: any = {};
+          keys.forEach(k => { val[k] = (next as any)[k]; });
+          supabase.from("app_settings").upsert({ key: dbKey, value: val, updated_by: authUser?.id || null }, { onConflict: "key" });
+        }
+      };
+
+      persistCategory(generalKeys, "general");
+      persistCategory(receiptKeys, "receipt");
+      persistCategory(securityKeys, "security");
+      persistCategory(notificationKeys, "notifications");
+      persistCategory(businessKeys, "business_rules");
+      persistCategory(dataKeys, "data_management");
       return next;
     });
   }, [authUser]);
