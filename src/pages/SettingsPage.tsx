@@ -24,6 +24,9 @@ interface WorkflowConfig {
   purchase_order: WorkflowStage[];
   stock_transfer: WorkflowStage[];
   expense: WorkflowStage[];
+  discount: WorkflowStage[];
+  document: WorkflowStage[];
+  workflow: WorkflowStage[];
   general: WorkflowStage[];
 }
 
@@ -178,6 +181,17 @@ export default function SettingsPage() {
     expense: [
       { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews expense" },
       { id: "2", name: "Admin Approval", role: "admin", description: "Admin approves expense" },
+    ],
+    discount: [
+      { id: "1", name: "Manager Approval", role: "manager", description: "Manager approves discount request" },
+    ],
+    document: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews document" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin gives final approval" },
+    ],
+    workflow: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews workflow request" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin approves workflow" },
     ],
     general: [
       { id: "1", name: "Manager Approval", role: "manager", description: "Manager reviews and approves" },
@@ -606,6 +620,9 @@ export default function SettingsPage() {
                   { key: "purchase_order" as const, label: "Purchase Orders" },
                   { key: "stock_transfer" as const, label: "Stock Transfers" },
                   { key: "expense" as const, label: "Expenses" },
+                  { key: "discount" as const, label: "Discounts" },
+                  { key: "document" as const, label: "Documents" },
+                  { key: "workflow" as const, label: "Workflows" },
                   { key: "general" as const, label: "General" },
                 ]).map((wt) => (
                   <button key={wt.key} onClick={() => setActiveWorkflowType(wt.key)}
