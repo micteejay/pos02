@@ -157,8 +157,15 @@ const defaultSettings: AppSettings = {
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
+  dateFormat: "MM/DD/YYYY", timeFormat: "12h",
   twoFactorEnabled: false, sessionTimeout: "30 minutes", passwordPolicy: "Strong (12+ chars, mixed case, symbols)",
+  autoLockScreen: false, ipWhitelist: "", maxLoginAttempts: 5,
   notifyEmail: true, notifyPush: true, notifySms: false,
+  notifyLowStock: true, notifyNewOrder: true, notifyApproval: true,
+  lowStockThreshold: 10, autoReorderEnabled: false, requireApprovalAbove: 5000,
+  defaultPaymentMethod: "cash", allowNegativeStock: false,
+  auditRetentionDays: 365, autoBackupEnabled: false, backupFrequency: "daily",
+  dataExportFormat: "csv",
 };
 
 const defaultIntegrations: IntegrationConfig[] = [
