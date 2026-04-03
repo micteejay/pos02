@@ -620,6 +620,9 @@ export default function SettingsPage() {
                   { key: "purchase_order" as const, label: "Purchase Orders" },
                   { key: "stock_transfer" as const, label: "Stock Transfers" },
                   { key: "expense" as const, label: "Expenses" },
+                  { key: "discount" as const, label: "Discounts" },
+                  { key: "document" as const, label: "Documents" },
+                  { key: "workflow" as const, label: "Workflows" },
                   { key: "general" as const, label: "General" },
                 ]).map((wt) => (
                   <button key={wt.key} onClick={() => setActiveWorkflowType(wt.key)}
