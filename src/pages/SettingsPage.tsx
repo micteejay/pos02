@@ -182,6 +182,17 @@ export default function SettingsPage() {
       { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews expense" },
       { id: "2", name: "Admin Approval", role: "admin", description: "Admin approves expense" },
     ],
+    discount: [
+      { id: "1", name: "Manager Approval", role: "manager", description: "Manager approves discount request" },
+    ],
+    document: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews document" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin gives final approval" },
+    ],
+    workflow: [
+      { id: "1", name: "Manager Review", role: "manager", description: "Manager reviews workflow request" },
+      { id: "2", name: "Admin Approval", role: "admin", description: "Admin approves workflow" },
+    ],
     general: [
       { id: "1", name: "Manager Approval", role: "manager", description: "Manager reviews and approves" },
     ],
