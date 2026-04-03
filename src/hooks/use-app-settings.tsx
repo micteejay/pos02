@@ -281,6 +281,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             language: g.language || prev.language,
             timezone: g.timezone || prev.timezone,
             logoUrl: g.logoUrl || prev.logoUrl,
+            dateFormat: g.dateFormat || prev.dateFormat,
+            timeFormat: g.timeFormat || prev.timeFormat,
           }));
         }
         if (parsed.receipt) {
