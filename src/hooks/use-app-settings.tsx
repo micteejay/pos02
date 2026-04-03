@@ -17,14 +17,33 @@ export interface AppSettings {
   language: string;
   timezone: string;
   logoUrl: string;
+  dateFormat: string;
+  timeFormat: string;
   // Security settings
   twoFactorEnabled: boolean;
   sessionTimeout: string;
   passwordPolicy: string;
+  autoLockScreen: boolean;
+  ipWhitelist: string;
+  maxLoginAttempts: number;
   // Notification preferences
   notifyEmail: boolean;
   notifyPush: boolean;
   notifySms: boolean;
+  notifyLowStock: boolean;
+  notifyNewOrder: boolean;
+  notifyApproval: boolean;
+  // Business rules
+  lowStockThreshold: number;
+  autoReorderEnabled: boolean;
+  requireApprovalAbove: number;
+  defaultPaymentMethod: string;
+  allowNegativeStock: boolean;
+  // Data management
+  auditRetentionDays: number;
+  autoBackupEnabled: boolean;
+  backupFrequency: string;
+  dataExportFormat: string;
 }
 
 export type Permission =
