@@ -303,6 +303,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             twoFactorEnabled: s.twoFactorEnabled ?? prev.twoFactorEnabled,
             sessionTimeout: s.sessionTimeout || prev.sessionTimeout,
             passwordPolicy: s.passwordPolicy || prev.passwordPolicy,
+            autoLockScreen: s.autoLockScreen ?? prev.autoLockScreen,
+            ipWhitelist: s.ipWhitelist ?? prev.ipWhitelist,
+            maxLoginAttempts: s.maxLoginAttempts ?? prev.maxLoginAttempts,
           }));
         }
         if (parsed.notifications) {
@@ -312,6 +315,30 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             notifyEmail: n.notifyEmail ?? prev.notifyEmail,
             notifyPush: n.notifyPush ?? prev.notifyPush,
             notifySms: n.notifySms ?? prev.notifySms,
+            notifyLowStock: n.notifyLowStock ?? prev.notifyLowStock,
+            notifyNewOrder: n.notifyNewOrder ?? prev.notifyNewOrder,
+            notifyApproval: n.notifyApproval ?? prev.notifyApproval,
+          }));
+        }
+        if (parsed.business_rules) {
+          const b = parsed.business_rules;
+          setSettings(prev => ({
+            ...prev,
+            lowStockThreshold: b.lowStockThreshold ?? prev.lowStockThreshold,
+            autoReorderEnabled: b.autoReorderEnabled ?? prev.autoReorderEnabled,
+            requireApprovalAbove: b.requireApprovalAbove ?? prev.requireApprovalAbove,
+            defaultPaymentMethod: b.defaultPaymentMethod || prev.defaultPaymentMethod,
+            allowNegativeStock: b.allowNegativeStock ?? prev.allowNegativeStock,
+          }));
+        }
+        if (parsed.data_management) {
+          const d = parsed.data_management;
+          setSettings(prev => ({
+            ...prev,
+            auditRetentionDays: d.auditRetentionDays ?? prev.auditRetentionDays,
+            autoBackupEnabled: d.autoBackupEnabled ?? prev.autoBackupEnabled,
+            backupFrequency: d.backupFrequency || prev.backupFrequency,
+            dataExportFormat: d.dataExportFormat || prev.dataExportFormat,
           }));
         }
       }
