@@ -24,6 +24,9 @@ interface WorkflowConfig {
   purchase_order: WorkflowStage[];
   stock_transfer: WorkflowStage[];
   expense: WorkflowStage[];
+  discount: WorkflowStage[];
+  document: WorkflowStage[];
+  workflow: WorkflowStage[];
   general: WorkflowStage[];
 }
 
