@@ -253,6 +253,7 @@ export default function WorkflowsPage() {
       current_step: 0,
       steps: steps as any,
       created_by: user?.id || null,
+      company_id: user?.companyId || null,
     }).select().single();
 
     if (newWf && !error) {

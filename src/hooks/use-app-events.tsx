@@ -309,6 +309,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       priority: item.priority as any, status: "pending" as any,
       workflow_steps: workflowSteps as any,
       current_workflow_step: 0,
+      company_id: user?.companyId || null,
     }).select().single();
 
     if (data && !error) {

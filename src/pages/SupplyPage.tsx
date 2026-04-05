@@ -356,6 +356,7 @@ export default function SupplyPage() {
                   subtotal: data.total,
                   total: data.total,
                   created_by: (await supabase.auth.getUser()).data.user?.id,
+                  company_id: user?.companyId || null,
                 }).select().single();
 
                 if (error || !po) { toast.error("Failed to create PO"); return; }
@@ -398,7 +399,7 @@ export default function SupplyPage() {
               const { data: sup, error } = await supabase.from("suppliers").insert({
                 name: data.name, contact_name: data.contact, email: data.email,
                 phone: data.phone, address: data.address, categories: data.categories,
-                status: data.status,
+                status: data.status, company_id: user?.companyId || null,
               }).select().single();
               if (error || !sup) { toast.error("Failed to add supplier"); return; }
               setSuppliers(prev => [...prev, {
