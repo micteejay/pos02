@@ -223,6 +223,7 @@ export default function DocumentsPage() {
       await supabase.from("document_folders").insert({
         name: newFolderName.trim(), path: folderPath === "/" ? `/${newFolderName.trim()}` : `${folderPath}/${newFolderName.trim()}`,
         created_by: user.id,
+        company_id: user.companyId || null,
       });
       setDocuments(prev => [{
         id: data.id, name: data.name, type: "folder", size: "0 items",
