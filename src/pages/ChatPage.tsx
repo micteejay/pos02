@@ -27,6 +27,7 @@ const emojiList = ["👍", "❤️", "😂", "🎉", "🔥", "✅", "👀", "�
 type CreateMode = "channel" | "dm" | "group" | null;
 
 export default function ChatPage() {
+  const { user: authUser } = useAuth();
   const { addNotification } = useAppEvents();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
