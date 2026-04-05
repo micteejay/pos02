@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check, Download, Image, Eye } from "lucide-react";
@@ -26,6 +27,7 @@ const emojiList = ["👍", "❤️", "😂", "🎉", "🔥", "✅", "👀", "�
 type CreateMode = "channel" | "dm" | "group" | null;
 
 export default function ChatPage() {
+  const { user: authUser } = useAuth();
   const { addNotification } = useAppEvents();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -413,6 +415,7 @@ export default function ChatPage() {
 
     const { data: ch, error } = await supabase.from("chat_channels").insert({
       name: dmName, type: "dm" as const, created_by: userId, is_private: true,
+      company_id: authUser?.companyId || null,
     }).select().single();
 
     if (error || !ch) { toast.error("Failed to create conversation"); return; }
@@ -440,6 +443,7 @@ export default function ChatPage() {
     const { data: ch, error } = await supabase.from("chat_channels").insert({
       name: newChannelName.trim() || dbName, type: "group" as const, created_by: userId,
       description: `Group with ${selectedUsers.length + 1} members`,
+      company_id: authUser?.companyId || null,
     }).select().single();
 
     if (error || !ch) { toast.error("Failed to create group"); return; }
@@ -466,6 +470,7 @@ export default function ChatPage() {
     const name = newChannelName.toLowerCase().replace(/\s+/g, "-");
     const { data: ch, error } = await supabase.from("chat_channels").insert({
       name, type: "channel" as const, created_by: userId, description: "New channel",
+      company_id: authUser?.companyId || null,
     }).select().single();
     if (error || !ch) { toast.error("Failed to create channel"); return; }
 

@@ -65,8 +65,12 @@ Deno.serve(async (req) => {
 
     const userId = newUser.user.id;
 
-    // Update profile with name (trigger should have created it)
-    await adminClient.from("profiles").update({ name, email }).eq("id", userId);
+    // Get caller's company_id to assign to the new user
+    const { data: callerProfile } = await adminClient.from("profiles").select("company_id").eq("id", callerId).single();
+    const companyId = callerProfile?.company_id || null;
+
+    // Update profile with name and company_id (trigger should have created it)
+    await adminClient.from("profiles").update({ name, email, company_id: companyId }).eq("id", userId);
 
     // Assign role if specified
     if (role) {

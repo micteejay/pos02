@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useSharedData } from "@/hooks/use-shared-data";
@@ -35,6 +36,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 };
 
 export default function SupplyPage() {
+  const { user } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
@@ -356,6 +358,7 @@ export default function SupplyPage() {
                   subtotal: data.total,
                   total: data.total,
                   created_by: (await supabase.auth.getUser()).data.user?.id,
+                  company_id: user?.companyId || null,
                 }).select().single();
 
                 if (error || !po) { toast.error("Failed to create PO"); return; }
@@ -398,7 +401,7 @@ export default function SupplyPage() {
               const { data: sup, error } = await supabase.from("suppliers").insert({
                 name: data.name, contact_name: data.contact, email: data.email,
                 phone: data.phone, address: data.address, categories: data.categories,
-                status: data.status,
+                status: data.status, company_id: user?.companyId || null,
               }).select().single();
               if (error || !sup) { toast.error("Failed to add supplier"); return; }
               setSuppliers(prev => [...prev, {

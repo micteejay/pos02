@@ -26,6 +26,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  companyId: string | null;
 }
 
 interface AuthContextType {
@@ -48,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = useCallback(async (supaUser: User) => {
-    // Get profile
+    // Get profile (including company_id)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, email, avatar")
+      .select("name, email, avatar, company_id")
       .eq("id", supaUser.id)
       .single();
 
@@ -74,23 +75,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const roleName = (roleChecks.find((role) => role !== null) ?? "Viewer") as string;
 
+    const profileCompanyId = profile?.company_id || null;
+
     const authUser: AuthUser = {
       id: supaUser.id,
       email: supaUser.email || "",
       name: profile?.name || supaUser.email?.split("@")[0] || "User",
       role: roleName,
+      companyId: profileCompanyId,
     };
     setUser(authUser);
 
-    // Fetch latest company profile for this owner (handles legacy duplicate rows safely)
-    const { data: companyRows } = await supabase
-      .from("company_profiles")
-      .select("*")
-      .eq("owner_id", supaUser.id)
-      .order("updated_at", { ascending: false })
-      .limit(1);
-
-    const company = companyRows?.[0] ?? null;
+    // Fetch company profile: by company_id on profile (works for both owners and staff)
+    let company: any = null;
+    if (profileCompanyId) {
+      const { data: companyRow } = await supabase
+        .from("company_profiles")
+        .select("*")
+        .eq("id", profileCompanyId)
+        .single();
+      company = companyRow;
+    } else {
+      // Fallback: check if user owns a company (pre-migration scenario)
+      const { data: companyRows } = await supabase
+        .from("company_profiles")
+        .select("*")
+        .eq("owner_id", supaUser.id)
+        .order("updated_at", { ascending: false })
+        .limit(1);
+      company = companyRows?.[0] ?? null;
+    }
 
     if (company) {
       setCompanyProfile({
@@ -231,9 +245,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await supabase.from("company_profiles").insert(payload).select("id").single();
       if (data) profile.id = data.id;
 
-      // Promote to Super Admin via secure server-side function
+      // Promote to Super Admin via secure server-side function (also sets company_id on profile)
       await supabase.rpc("promote_to_super_admin", { _user_id: user.id });
-      setUser(prev => prev ? { ...prev, role: "Super Admin" } : prev);
+      setUser(prev => prev ? { ...prev, role: "Super Admin", companyId: profile.id || null } : prev);
     }
 
     setCompanyProfile(profile);

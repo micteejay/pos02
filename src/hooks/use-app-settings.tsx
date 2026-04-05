@@ -392,7 +392,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         if (Object.keys(updates).some(k => keys.includes(k))) {
           const val: any = {};
           keys.forEach(k => { val[k] = (next as any)[k]; });
-          supabase.from("app_settings").upsert({ key: dbKey, value: val, updated_by: authUser?.id || null }, { onConflict: "key" });
+          supabase.from("app_settings").upsert({ key: dbKey, value: val, updated_by: authUser?.id || null, company_id: authUser?.companyId || null }, { onConflict: "key" });
         }
       };
 

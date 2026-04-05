@@ -116,8 +116,6 @@ export default function InvoicePage() {
     }
 
     // Save invoice to DB
-    const { data: companyData } = await supabase.from("company_profiles").select("id").limit(1).single();
-
     const { data: newInv, error } = await supabase.from("invoices").insert({
       number: form.number,
       type: form.type as any,
@@ -128,7 +126,7 @@ export default function InvoicePage() {
       service_charge_percent: form.serviceChargePercent || 0,
       status: "draft" as any,
       created_by: user?.id || null,
-      company_id: companyData?.id || null,
+      company_id: user?.companyId || null,
     }).select().single();
 
     if (!newInv || error) {
