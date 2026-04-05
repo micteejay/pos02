@@ -245,6 +245,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       sku: item.sku, name: item.name, category: item.category,
       warehouse_id: whId, qty: item.qty, reorder_point: item.reorder,
       cost_price: item.costPrice, price: item.price,
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setInventory(prev => [{ ...item, id: data.id, warehouseId: whId || undefined }, ...prev]);
@@ -313,6 +314,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       subtotal: sale.total, tax: 0, total: sale.total,
       store_id: storeId, cashier_id: user?.id || null,
       status: "completed",
+      company_id: user?.companyId || null,
     }).select().single();
 
     if (data && !error) {
@@ -343,6 +345,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       store_id: storeId, created_by: user?.id || null,
       recurring: expense.recurring, recurring_interval: expense.recurringInterval || null,
       next_due_date: expense.nextDueDate || null,
+      company_id: user?.companyId || null,
     }).select().single();
 
     if (data && !error) {
@@ -370,6 +373,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from("categories").insert({
       name: cat.name, type: cat.type as any, description: cat.description || null,
       status: cat.status as any, created_by: user?.id || null,
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setCategories(prev => [...prev, { ...cat, id: data.id, createdAt: data.created_at }]);
@@ -399,6 +403,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from("documents").insert({
       name: doc.name, type: doc.type as any, size_display: doc.size,
       folder_path: doc.folder, author: user?.id || null, source: doc.source || null,
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setDocuments(prev => [...prev, { ...doc, id: data.id }]);
@@ -417,6 +422,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       name: store.name, type: store.type, address: store.address || null,
       phone: store.phone || null, email: store.email || null,
       status: (statusMap[store.status] || store.status.toLowerCase()) as any,
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setStores(prev => [...prev, { ...store, id: data.id }]);
@@ -448,6 +454,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       capacity: wh.capacity || null, sqft: wh.sqft || null,
       zones: wh.zones || null,
       manager_id: wh.managerId || null,
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setWarehouses(prev => [...prev, { ...wh, id: data.id }]);
@@ -475,6 +482,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from("departments").insert({
       name: dept.name, budget: parseFloat(dept.budget) || 0,
       teams: dept.teams || [],
+      company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setDepartments(prev => [...prev, { ...dept, id: data.id }]);
