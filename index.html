@@ -2,27 +2,34 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Pos</title>
-    <meta name="description" content="By micteejay Globatech">
-    <meta name="author" content="Lovable" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <title>POS - Business Management Platform</title>
+    <meta name="description" content="Complete business management platform by Micteejay Globatech — POS, inventory, sales, invoicing, team management, and more.">
+    <meta name="author" content="Micteejay Globatech" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    
-    
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#6d28d9" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="POS" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/30646e38-b841-4cf1-a389-2bc9a8d61796?Expires=1773000735&amp;GoogleAccessId=go-api-on-aws%40gpt-engineer-390607.iam.gserviceaccount.com&amp;Signature=qki4AiIjzaB80FgRpjgi6L4vc8RXWl2DNoTp3a3gvs4RkOAxiryxz1Sxo70GvoBElyRFOelgWy9A34sBeOy%2FRC%2BhL9G929xi3lEiw5MOi9Mzg5Ep6RCzMJTW3UaXnBUl11SPDY2J1GBVrakml4YSPWvzy%2BPwPGc67ZK9dC2eZVVb7Br4XXRV3PRRt1tZj4DeY%2BIs5jwoOSxiEVeibvuF3ilvNw5o0wZolVxkObEELWmbhHBvyoqKhnTfvdU82ex%2BJbFBE6g46PQQ4SGgZGI9Lqw1mPeFU5JKJnr36sI5THapHYDiiyXdQ0uV4oWsruThGf3dwZS93zbiMaaykZl0%2Bw%3D%3D">
+    <meta property="og:title" content="POS - Business Management Platform" />
+    <meta property="og:description" content="Complete business management platform — POS, inventory, sales, invoicing, and team management." />
+    <meta property="og:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/30646e38-b841-4cf1-a389-2bc9a8d61796?Expires=1773000735&amp;GoogleAccessId=go-api-on-aws%40gpt-engineer-390607.iam.gserviceaccount.com&amp;Signature=qki4AiIjzaB80FgRpjgi6L4vc8RXWl2DNoTp3a3gvs4RkOAxiryxz1Sxo70GvoBElyRFOelgWy9A34sBeOy%2FRC%2BhL9G929xi3lEiw5MOi9Mzg5Ep6RCzMJTW3UaXnBUl11SPDY2J1GBVrakml4YSPWvzy%2BPwPGc67ZK9dC2eZVVb7Br4XXRV3PRRt1tZj4DeY%2BIs5jwoOSxiEVeibvuF3ilvNw5o0wZolVxkObEELWmbhHBvyoqKhnTfvdU82ex%2BJbFBE6g46PQQ4SGgZGI9Lqw1mPeFU5JKJnr36sI5THapHYDiiyXdQ0uV4oWsruThGf3dwZS93zbiMaaykZl0%2Bw%3D%3D" />
 
+    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/30646e38-b841-4cf1-a389-2bc9a8d61796?Expires=1773000735&amp;GoogleAccessId=go-api-on-aws%40gpt-engineer-390607.iam.gserviceaccount.com&amp;Signature=qki4AiIjzaB80FgRpjgi6L4vc8RXWl2DNoTp3a3gvs4RkOAxiryxz1Sxo70GvoBElyRFOelgWy9A34sBeOy%2FRC%2BhL9G929xi3lEiw5MOi9Mzg5Ep6RCzMJTW3UaXnBUl11SPDY2J1GBVrakml4YSPWvzy%2BPwPGc67ZK9dC2eZVVb7Br4XXRV3PRRt1tZj4DeY%2BIs5jwoOSxiEVeibvuF3ilvNw5o0wZolVxkObEELWmbhHBvyoqKhnTfvdU82ex%2BJbFBE6g46PQQ4SGgZGI9Lqw1mPeFU5JKJnr36sI5THapHYDiiyXdQ0uV4oWsruThGf3dwZS93zbiMaaykZl0%2Bw%3D%3D">
-    <meta property="og:title" content="Pos">
-  <meta name="twitter:title" content="Pos">
-  <meta property="og:description" content="By micteejay Globatech">
-  <meta name="twitter:description" content="By micteejay Globatech">
-</head>
+    <meta name="twitter:title" content="POS - Business Management Platform" />
+    <meta name="twitter:description" content="Complete business management platform — POS, inventory, sales, invoicing, and team management." />
+    <meta name="twitter:image" content="https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/30646e38-b841-4cf1-a389-2bc9a8d61796?Expires=1773000735&amp;GoogleAccessId=go-api-on-aws%40gpt-engineer-390607.iam.gserviceaccount.com&amp;Signature=qki4AiIjzaB80FgRpjgi6L4vc8RXWl2DNoTp3a3gvs4RkOAxiryxz1Sxo70GvoBElyRFOelgWy9A34sBeOy%2FRC%2BhL9G929xi3lEiw5MOi9Mzg5Ep6RCzMJTW3UaXnBUl11SPDY2J1GBVrakml4YSPWvzy%2BPwPGc67ZK9dC2eZVVb7Br4XXRV3PRRt1tZj4DeY%2BIs5jwoOSxiEVeibvuF3ilvNw5o0wZolVxkObEELWmbhHBvyoqKhnTfvdU82ex%2BJbFBE6g46PQQ4SGgZGI9Lqw1mPeFU5JKJnr36sI5THapHYDiiyXdQ0uV4oWsruThGf3dwZS93zbiMaaykZl0%2Bw%3D%3D" />
 
+    <!-- Canonical -->
+    <link rel="canonical" href="https://pos02.lovable.app/" />
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
