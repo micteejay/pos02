@@ -1799,6 +1799,7 @@ export type Database = {
       stock_transfers: {
         Row: {
           approved_by: string | null
+          company_id: string | null
           created_at: string
           eta: string | null
           from_warehouse_id: string | null
@@ -1812,6 +1813,7 @@ export type Database = {
         }
         Insert: {
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string
           eta?: string | null
           from_warehouse_id?: string | null
@@ -1825,6 +1827,7 @@ export type Database = {
         }
         Update: {
           approved_by?: string | null
+          company_id?: string | null
           created_at?: string
           eta?: string | null
           from_warehouse_id?: string | null
@@ -1837,6 +1840,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stock_transfers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "company_profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stock_transfers_from_warehouse_id_fkey"
             columns: ["from_warehouse_id"]
