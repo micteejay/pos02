@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
   Trash2, Receipt, User, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
@@ -38,14 +40,25 @@ export default function POSPage() {
   const [discountPercent, setDiscountPercent] = useState(0);
   const [heldOrders, setHeldOrders] = useState<{ id: string; cart: CartItem[]; customer: string }[]>([]);
   const [showHeld, setShowHeld] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   const filteredProducts = useMemo(() => {
     return inventory.filter((p) => {
-      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase()));
       const matchCategory = category === "All" || p.category === category;
       return matchSearch && matchCategory;
     });
   }, [search, category, inventory]);
+
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
+    if (item) {
+      addToCart(item);
+      toast.success(`Added ${item.name} to cart`);
+    } else {
+      toast.error("Product not found for barcode: " + barcode);
+    }
+  }, [inventory]);
 
   const addToCart = useCallback((item: typeof inventory[0]) => {
     setCart((prev) => {
@@ -135,7 +148,7 @@ export default function POSPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products or scan barcode..." className="pl-9" />
               </div>
-              <button className="p-2.5 rounded-lg border border-border hover:bg-muted transition-colors"><Barcode className="w-4 h-4 text-muted-foreground" /></button>
+              <button onClick={() => setShowScanner(true)} className="p-2.5 rounded-lg border border-border hover:bg-muted transition-colors"><Barcode className="w-4 h-4 text-muted-foreground" /></button>
             </div>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
               {categories.map((c) => (
