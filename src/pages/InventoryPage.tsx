@@ -258,12 +258,17 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [reorder, setReorder] = useState(item.reorder.toString());
   const [costPrice, setCostPrice] = useState((item.costPrice || 0).toString());
   const [price, setPrice] = useState(item.price.toString());
+  const [barcode, setBarcode] = useState(item.barcode || "");
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={item.sku} disabled className="mt-1 opacity-60" /></div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Barcode</label>
+        <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Enter or scan barcode" className="mt-1" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
@@ -287,7 +292,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       </div>
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
@@ -297,12 +302,25 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
   const { warehouseNames, inventoryCategories } = useSharedData();
   const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState(inventoryCategories[0] || "Uncategorized");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
+  const [barcode, setBarcode] = useState("");
+
+  const generateBarcode = () => {
+    const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join("");
+    setBarcode(digits);
+  };
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">SKU</label><Input value={sku} onChange={(e) => setSku(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Barcode</label>
+        <div className="flex gap-2 mt-1">
+          <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="Enter or auto-generate" className="flex-1" />
+          <button type="button" onClick={generateBarcode} className="px-3 py-2 rounded-md border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors whitespace-nowrap">Auto</button>
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Category</label>
@@ -330,7 +348,7 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>
@@ -406,7 +424,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
 
   const filtered = useMemo(() => {
     let result = items.filter((item) => {
-      const matchSearch = search === "" || item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = search === "" || item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase()) || (item.barcode && item.barcode.toLowerCase().includes(search.toLowerCase()));
       return matchSearch && (filterCategory === "all" || item.category === filterCategory) && (filterWarehouse === "all" || item.warehouse === filterWarehouse) && (filterStatus === "all" || item.status === filterStatus);
     });
     if (sortKey) {

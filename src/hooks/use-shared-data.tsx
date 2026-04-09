@@ -7,6 +7,7 @@ export interface InventoryItem {
   sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
   warehouseId?: string;
   categoryId?: string;
+  barcode?: string;
 }
 
 export interface SaleRecord {
@@ -130,10 +131,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       if (invRes.data) {
         setInventory(invRes.data.map(i => ({
           id: i.id, sku: i.sku, name: i.name, category: i.category || "Uncategorized",
-          warehouse: "", // will be resolved by warehouse name if needed
+          warehouse: "",
           qty: i.qty, reorder: i.reorder_point, costPrice: Number(i.cost_price) || 0,
           price: Number(i.price), status: i.status as InventoryItem["status"],
           warehouseId: i.warehouse_id || undefined, categoryId: i.category_id || undefined,
+          barcode: i.barcode || undefined,
         })));
       }
 
@@ -245,6 +247,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       sku: item.sku, name: item.name, category: item.category,
       warehouse_id: whId, qty: item.qty, reorder_point: item.reorder,
       cost_price: item.costPrice, price: item.price,
+      barcode: item.barcode || null,
       company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
@@ -263,6 +266,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     if (updates.reorder !== undefined) payload.reorder_point = updates.reorder;
     if (updates.costPrice !== undefined) payload.cost_price = updates.costPrice;
     if (updates.price !== undefined) payload.price = updates.price;
+    if (updates.barcode !== undefined) payload.barcode = updates.barcode || null;
     if (whId !== undefined) payload.warehouse_id = whId;
 
     await supabase.from("inventory_items").update(payload).eq("id", existing.id);
