@@ -424,7 +424,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
 
   const filtered = useMemo(() => {
     let result = items.filter((item) => {
-      const matchSearch = search === "" || item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = search === "" || item.name.toLowerCase().includes(search.toLowerCase()) || item.sku.toLowerCase().includes(search.toLowerCase()) || (item.barcode && item.barcode.toLowerCase().includes(search.toLowerCase()));
       return matchSearch && (filterCategory === "all" || item.category === filterCategory) && (filterWarehouse === "all" || item.warehouse === filterWarehouse) && (filterStatus === "all" || item.status === filterStatus);
     });
     if (sortKey) {
