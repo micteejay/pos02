@@ -1,45 +1,52 @@
 
-# Production Standards Implementation Plan
 
-## Phase 1: Performance & Loading Speed
-- **Code splitting**: Add `React.lazy()` + `Suspense` for all route pages
-- **Image optimization**: Add lazy loading to all images
-- **Bundle optimization**: Verify tree-shaking, minimize re-renders with `useMemo`/`useCallback` where needed
+# Barcode Implementation Plan
 
-## Phase 2: Mobile Responsive Polish
-- Audit all pages at 360px, 768px, 1024px, 1920px breakpoints
-- Fix any overflow/layout issues on mobile
-- Ensure touch targets are ≥44px
+## Current State
+- The `inventory_items` table has a `barcode` column but it is never used in the frontend
+- The `InventoryItem` interface lacks a `barcode` field
+- POS page has a non-functional barcode icon button and search that only matches by name/SKU
+- Inventory add/edit forms have no barcode field
+- No barcode scanning or generation capability exists
 
-## Phase 3: PWA (Installable Web App)
-- Add `manifest.json` with proper icons, theme color, display: standalone
-- **No service worker** (simpler approach — installable without offline complexity)
-- Add mobile-optimized meta tags to `index.html`
-- Create `/install` page with install prompt
+## What Will Be Built
 
-## Phase 4: Capacitor (Native Mobile Prep)
-- Install Capacitor dependencies
-- Configure `capacitor.config.ts` with app ID and live-reload URL
-- Provide user instructions for building iOS/Android
+### 1. Add barcode field throughout the data layer
+- Add `barcode?: string` to the `InventoryItem` interface in `use-shared-data.tsx`
+- Include `barcode` in insert, update, and fetch operations for inventory items
 
-## Phase 5: Security Hardening
-- Run security scan and fix findings
-- Add input validation with Zod on key forms
-- Ensure all RLS policies are company-scoped
-- Add rate limiting awareness on edge functions
+### 2. Barcode field in Inventory forms
+- Add a barcode input field to both `AddItemForm` and `EditItemForm` in `InventoryPage.tsx`
+- Auto-generate a barcode (EAN-13 format) if left empty, or allow manual entry
 
-## Phase 6: Error Handling & Reliability
-- Add global error boundary component
-- Add retry logic on failed Supabase queries (React Query already handles this)
-- Add toast notifications for all error states
-- Graceful loading/empty states
+### 3. Barcode scanning in POS
+- Install `html5-qrcode` library for camera-based barcode scanning
+- Wire the existing barcode button in POS to open a camera scanner modal
+- When a barcode is scanned, search inventory by barcode and auto-add the matching product to the cart
+- Also update the search filter to match against the `barcode` field
 
-## Phase 7: SEO & Accessibility
-- Add proper `<title>`, meta description, Open Graph tags
-- Semantic HTML audit (headings, landmarks, alt text)
-- Add `aria-label` to interactive elements
-- JSON-LD structured data for the app
-- Viewport meta tag optimization
+### 4. Barcode display on inventory items
+- Show barcode value on inventory item cards/rows
+- Generate a visual barcode (using `JsBarcode` library) that can be printed from item detail views
 
-## Implementation Order
-Phases 1, 5, 6, 7 first (code-only), then Phase 3 (PWA), then Phase 4 (Capacitor), with Phase 2 woven throughout.
+### 5. Barcode scanning in Inventory search
+- Allow searching inventory items by barcode in the stock tab
+
+## Technical Details
+
+**New dependencies**: `html5-qrcode` (camera scanner), `jsbarcode` (barcode image generation)
+
+**Files to modify**:
+- `src/hooks/use-shared-data.tsx` — add `barcode` to interface, fetch, insert, update
+- `src/pages/POSPage.tsx` — scanner modal, search by barcode, auto-add on scan
+- `src/pages/InventoryPage.tsx` — barcode field in add/edit forms, barcode display
+- New component: `src/components/BarcodeScanner.tsx` — reusable camera scanner modal
+- New component: `src/components/BarcodeDisplay.tsx` — renders a visual barcode from a string
+
+**Scanner flow**:
+1. User taps barcode button → camera opens in a modal
+2. Camera reads barcode (EAN-13, Code128, UPC, etc.)
+3. Match against `inventory_items.barcode` column
+4. If found, add to cart (POS) or highlight item (Inventory)
+5. If not found, show "Product not found" toast
+
