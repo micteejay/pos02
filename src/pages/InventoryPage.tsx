@@ -506,7 +506,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                   return (
                     <>
                       <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => setExpandedSku(isExpanded ? null : item.sku)}>
-                        <td className="px-5 py-3"><p className="text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted-foreground">{item.category}</p></td>
+                        <td className="px-5 py-3"><p className="text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted-foreground">{item.category}{item.barcode ? ` · ${item.barcode}` : ""}</p></td>
                         <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
                         <td className="px-5 py-3 text-right"><span className={`text-sm font-semibold ${item.status === "critical" ? "text-destructive" : item.status === "low" ? "text-warning" : "text-foreground"}`}>{item.qty}</span></td>
