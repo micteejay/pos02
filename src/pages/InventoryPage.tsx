@@ -518,17 +518,25 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                       {isExpanded && (
                         <tr key={`${item.sku}-actions`} className="bg-muted/20">
                           <td colSpan={8} className="px-5 py-3">
-                            <div className="flex flex-wrap items-center gap-2 animate-fade-in">
-                              <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
-                              <div className="flex items-center gap-1 ml-2">
-                                <Input type="number" placeholder="Qty" value={customQty[item.sku] || ""} onChange={(e) => setCustomQty(prev => ({ ...prev, [item.sku]: e.target.value }))} className="w-20 h-7 text-xs" />
-                                <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, q); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">+ Add</button>
-                                <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, -q); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">- Remove</button>
+                            <div className="space-y-3 animate-fade-in">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs text-muted-foreground">Reorder point: {item.reorder}</span>
+                                {item.barcode && <span className="text-xs text-muted-foreground">Barcode: <span className="font-mono text-foreground">{item.barcode}</span></span>}
+                                <div className="flex items-center gap-1 ml-2">
+                                  <Input type="number" placeholder="Qty" value={customQty[item.sku] || ""} onChange={(e) => setCustomQty(prev => ({ ...prev, [item.sku]: e.target.value }))} className="w-20 h-7 text-xs" />
+                                  <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, q); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">+ Add</button>
+                                  <button onClick={(e) => { e.stopPropagation(); const q = parseInt(customQty[item.sku] || "0"); if (q) onAdjustQty(item.sku, -q); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">- Remove</button>
+                                </div>
+                                <div className="ml-auto flex gap-2">
+                                  <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="text-xs px-2 py-1 rounded bg-info/10 text-info font-medium hover:bg-info/20"><Edit2 className="w-3 h-3 inline mr-1" />Edit</button>
+                                  <button onClick={(e) => { e.stopPropagation(); onDelete(item.sku); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20"><Trash2 className="w-3 h-3 inline mr-1" />Delete</button>
+                                </div>
                               </div>
-                              <div className="ml-auto flex gap-2">
-                                <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="text-xs px-2 py-1 rounded bg-info/10 text-info font-medium hover:bg-info/20"><Edit2 className="w-3 h-3 inline mr-1" />Edit</button>
-                                <button onClick={(e) => { e.stopPropagation(); onDelete(item.sku); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20"><Trash2 className="w-3 h-3 inline mr-1" />Delete</button>
-                              </div>
+                              {item.barcode && (
+                                <div className="flex items-center gap-3 p-2 rounded-lg bg-background border border-border w-fit">
+                                  <BarcodeDisplay value={item.barcode} height={40} width={1.5} />
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
