@@ -5,6 +5,7 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
@@ -42,24 +43,6 @@ export default function POSPage() {
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
-  const filteredProducts = useMemo(() => {
-    return inventory.filter((p) => {
-      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase()));
-      const matchCategory = category === "All" || p.category === category;
-      return matchSearch && matchCategory;
-    });
-  }, [search, category, inventory]);
-
-  const handleBarcodeScan = useCallback((barcode: string) => {
-    const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
-    if (item) {
-      addToCart(item);
-      toast.success(`Added ${item.name} to cart`);
-    } else {
-      toast.error("Product not found for barcode: " + barcode);
-    }
-  }, [inventory]);
-
   const addToCart = useCallback((item: typeof inventory[0]) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.sku === item.sku);
@@ -70,6 +53,30 @@ export default function POSPage() {
       return [...prev, { sku: item.sku, name: item.name, price: item.price, qty: 1, discount: 0, stock: item.qty }];
     });
   }, []);
+
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
+    if (item) {
+      addToCart(item);
+      toast.success(`Added ${item.name} to cart`);
+    } else {
+      toast.error("Product not found for barcode: " + barcode);
+    }
+  }, [inventory, addToCart]);
+
+  // Auto-detect USB/Bluetooth barcode scanners
+  useBarcodeScanner(handleBarcodeScan, !showScanner);
+
+  const filteredProducts = useMemo(() => {
+    return inventory.filter((p) => {
+      const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase()));
+      const matchCategory = category === "All" || p.category === category;
+      return matchSearch && matchCategory;
+    });
+  }, [search, category, inventory]);
+
+
+
 
   const updateQty = useCallback((sku: string, delta: number) => {
     setCart((prev) => prev.map((i) => {
