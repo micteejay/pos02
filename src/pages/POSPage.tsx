@@ -43,6 +43,27 @@ export default function POSPage() {
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
+  const addToCart = useCallback((item: typeof inventory[0]) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.sku === item.sku);
+      if (existing) {
+        if (existing.qty >= item.qty) return prev;
+        return prev.map((i) => i.sku === item.sku ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, { sku: item.sku, name: item.name, price: item.price, qty: 1, discount: 0, stock: item.qty }];
+    });
+  }, []);
+
+  const handleBarcodeScan = useCallback((barcode: string) => {
+    const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
+    if (item) {
+      addToCart(item);
+      toast.success(`Added ${item.name} to cart`);
+    } else {
+      toast.error("Product not found for barcode: " + barcode);
+    }
+  }, [inventory, addToCart]);
+
   // Auto-detect USB/Bluetooth barcode scanners
   useBarcodeScanner(handleBarcodeScan, !showScanner);
 
@@ -53,16 +74,6 @@ export default function POSPage() {
       return matchSearch && matchCategory;
     });
   }, [search, category, inventory]);
-
-  const handleBarcodeScan = useCallback((barcode: string) => {
-    const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
-    if (item) {
-      addToCart(item);
-      toast.success(`Added ${item.name} to cart`);
-    } else {
-      toast.error("Product not found for barcode: " + barcode);
-    }
-  }, [inventory]);
 
   const addToCart = useCallback((item: typeof inventory[0]) => {
     setCart((prev) => {
