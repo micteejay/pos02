@@ -6,6 +6,7 @@ import {
   ArrowRight, Clock, Eye, ArrowUpDown, ArrowUp, ArrowDown, X, Check, Trash2, Edit2,
   Tag, ShieldCheck, XCircle, Loader2,
 } from "lucide-react";
+import BarcodeDisplay from "@/components/BarcodeDisplay";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useSharedData, InventoryItem, CategoryType } from "@/hooks/use-shared-data";
