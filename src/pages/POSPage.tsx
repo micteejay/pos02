@@ -5,6 +5,7 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
