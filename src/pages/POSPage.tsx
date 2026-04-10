@@ -75,16 +75,8 @@ export default function POSPage() {
     });
   }, [search, category, inventory]);
 
-  const addToCart = useCallback((item: typeof inventory[0]) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.sku === item.sku);
-      if (existing) {
-        if (existing.qty >= item.qty) return prev;
-        return prev.map((i) => i.sku === item.sku ? { ...i, qty: i.qty + 1 } : i);
-      }
-      return [...prev, { sku: item.sku, name: item.name, price: item.price, qty: 1, discount: 0, stock: item.qty }];
-    });
-  }, []);
+
+
 
   const updateQty = useCallback((sku: string, delta: number) => {
     setCart((prev) => prev.map((i) => {
