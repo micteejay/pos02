@@ -43,6 +43,9 @@ export default function POSPage() {
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
+  // Auto-detect USB/Bluetooth barcode scanners
+  useBarcodeScanner(handleBarcodeScan, !showScanner);
+
   const filteredProducts = useMemo(() => {
     return inventory.filter((p) => {
       const matchSearch = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()) || (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase()));
