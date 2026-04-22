@@ -309,17 +309,25 @@ export default function InvoicePage() {
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {savedInvoices.map((inv, idx) => (
-                  <div key={inv.dbId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div>
+                  <div key={inv.dbId} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/30 flex-wrap">
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-foreground">{inv.number}</span>
                       <span className="text-xs text-muted-foreground ml-2">{inv.customerName} · {formatCurrency(inv.items.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${inv.status === "paid" ? "bg-success/10 text-success" : inv.status === "sent" ? "bg-info/10 text-info" : inv.type === "invoice" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {inv.status} · {inv.type}
                       </span>
+                      <button onClick={() => setPreviewInvoice(inv)} className="text-xs px-2 py-1 rounded bg-info/10 text-info hover:bg-info/20 inline-flex items-center gap-1"><Eye className="w-3 h-3" />Preview</button>
+                      <button onClick={() => loadForEdit(inv)} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning hover:bg-warning/20 inline-flex items-center gap-1"><Edit2 className="w-3 h-3" />Edit</button>
                       {inv.type === "quote" && inv.status === "draft" && (
-                        <button onClick={() => convertQuoteToInvoice(idx)} className="text-xs text-primary hover:underline">Convert to Invoice</button>
+                        <button onClick={() => convertQuoteToInvoice(inv)} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20">Convert to Invoice</button>
+                      )}
+                      {inv.type === "invoice" && inv.status !== "paid" && inv.status !== "cancelled" && (
+                        <button onClick={() => { setPayingInvoice(inv); setPaymentMethod("cash"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success hover:bg-success/20 inline-flex items-center gap-1"><CreditCard className="w-3 h-3" />Pay</button>
+                      )}
+                      {inv.status === "paid" && (
+                        <button onClick={() => printSaved(inv)} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 inline-flex items-center gap-1"><Receipt className="w-3 h-3" />Print Receipt</button>
                       )}
                     </div>
                   </div>
