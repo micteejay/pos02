@@ -9,7 +9,8 @@ import {
 import BarcodeDisplay from "@/components/BarcodeDisplay";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { useSharedData, InventoryItem, CategoryType } from "@/hooks/use-shared-data";
+import { useSharedData, InventoryItem, CategoryType, ItemUnit } from "@/hooks/use-shared-data";
+import { UnitsEditor } from "@/components/UnitsEditor";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +20,8 @@ import { toast } from "sonner";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
+
+const BASE_UNIT_OPTIONS = ["pcs", "kg", "g", "ltr", "ml", "m", "cm", "box", "pack", "bottle", "can", "bag", "pair", "set"];
 
 interface Transfer {
   id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
