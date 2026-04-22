@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { useSharedData } from "@/hooks/use-shared-data";
+import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
@@ -13,7 +13,21 @@ import {
 } from "lucide-react";
 
 interface CartItem {
-  sku: string; name: string; price: number; qty: number; discount: number; stock: number;
+  /** Unique line key = sku + unit name */
+  lineKey: string;
+  sku: string;
+  name: string;
+  /** Price per 1 of `unitName` */
+  price: number;
+  /** Number of selling units (e.g. 2 boxes) */
+  qty: number;
+  discount: number;
+  /** Stock remaining in BASE units */
+  stock: number;
+  /** Selling unit name (e.g. "pcs", "Box", "Carton") */
+  unitName: string;
+  /** Base units per 1 selling unit */
+  unitFactor: number;
 }
 
 const defaultCategories = ["All"];
@@ -43,14 +57,26 @@ export default function POSPage() {
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
-  const addToCart = useCallback((item: typeof inventory[0]) => {
+  /**
+   * Add an item to the cart in a specific unit. Defaults to the item's base unit.
+   */
+  const addToCart = useCallback((item: InventoryItem, unit?: ItemUnit) => {
+    const unitName = unit?.name || item.baseUnit || "pcs";
+    const unitFactor = unit?.factor || 1;
+    const price = unit?.price ?? item.price;
+    const lineKey = `${item.sku}::${unitName}`;
     setCart((prev) => {
-      const existing = prev.find((i) => i.sku === item.sku);
-      if (existing) {
-        if (existing.qty >= item.qty) return prev;
-        return prev.map((i) => i.sku === item.sku ? { ...i, qty: i.qty + 1 } : i);
+      const existing = prev.find((i) => i.lineKey === lineKey);
+      // total base units already in cart for this sku across all unit lines
+      const baseInCart = prev.filter(i => i.sku === item.sku).reduce((s, i) => s + i.qty * i.unitFactor, 0);
+      if (baseInCart + unitFactor > item.qty) {
+        toast.error(`Not enough stock (${item.qty} ${item.baseUnit || "pcs"} available)`);
+        return prev;
       }
-      return [...prev, { sku: item.sku, name: item.name, price: item.price, qty: 1, discount: 0, stock: item.qty }];
+      if (existing) {
+        return prev.map((i) => i.lineKey === lineKey ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, { lineKey, sku: item.sku, name: item.name, price, qty: 1, discount: 0, stock: item.qty, unitName, unitFactor }];
     });
   }, []);
 
@@ -78,17 +104,24 @@ export default function POSPage() {
 
 
 
-  const updateQty = useCallback((sku: string, delta: number) => {
-    setCart((prev) => prev.map((i) => {
-      if (i.sku !== sku) return i;
-      const newQty = i.qty + delta;
-      if (newQty <= 0 || newQty > i.stock) return i;
-      return { ...i, qty: newQty };
-    }));
+  const updateQty = useCallback((lineKey: string, delta: number) => {
+    setCart((prev) => {
+      const line = prev.find(i => i.lineKey === lineKey);
+      if (!line) return prev;
+      const newQty = line.qty + delta;
+      if (newQty <= 0) return prev.filter(i => i.lineKey !== lineKey);
+      const baseInCart = prev.filter(i => i.sku === line.sku && i.lineKey !== lineKey)
+        .reduce((s, i) => s + i.qty * i.unitFactor, 0);
+      if (baseInCart + newQty * line.unitFactor > line.stock) {
+        toast.error(`Not enough stock`);
+        return prev;
+      }
+      return prev.map(i => i.lineKey === lineKey ? { ...i, qty: newQty } : i);
+    });
   }, []);
 
-  const removeFromCart = useCallback((sku: string) => {
-    setCart((prev) => prev.filter((i) => i.sku !== sku));
+  const removeFromCart = useCallback((lineKey: string) => {
+    setCart((prev) => prev.filter((i) => i.lineKey !== lineKey));
   }, []);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty * (1 - i.discount / 100), 0), [cart]);
@@ -109,14 +142,14 @@ export default function POSPage() {
   };
 
   const completeSale = () => {
-    // Deduct from inventory
+    // Deduct from inventory in BASE units (qty × factor)
     cart.forEach(item => {
-      adjustInventoryQty(item.sku, -item.qty);
+      adjustInventoryQty(item.sku, -(item.qty * item.unitFactor));
     });
 
-    // Record sale
+    // Record sale (qty stored in selling units; consumer shows label with unit name)
     addSale({
-      items: cart.map(i => ({ name: i.name, sku: i.sku, qty: i.qty, price: i.price })),
+      items: cart.map(i => ({ name: `${i.name} (${i.unitName})`, sku: i.sku, qty: i.qty, price: i.price })),
       total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
       createdBy: user?.name || "System", createdByRole: user?.role || "",
     });
