@@ -488,6 +488,47 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+
+      {/* Saved invoice preview modal */}
+      {previewInvoice && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setPreviewInvoice(null)}>
+          <div className="max-w-3xl w-full animate-fade-in my-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end gap-2 mb-3">
+              <button onClick={() => printSaved(previewInvoice)} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 inline-flex items-center gap-1"><Printer className="w-4 h-4" />Print</button>
+              <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-lg bg-card border border-border hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <InvoiceTemplate ref={previewRef} data={previewInvoice} />
+          </div>
+        </div>
+      )}
+
+      {/* Payment modal */}
+      {payingInvoice && (() => {
+        const subtotal = payingInvoice.items.reduce((s, i) => s + i.qty * i.rate, 0);
+        const sc = payingInvoice.serviceChargePercent ? subtotal * (payingInvoice.serviceChargePercent / 100) : 0;
+        const total = subtotal + sc;
+        return (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPayingInvoice(null)}>
+            <div className="glass-card rounded-2xl p-6 max-w-sm w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Record Payment</h3>
+                <button onClick={() => setPayingInvoice(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">{payingInvoice.number} · {payingInvoice.customerName}</p>
+              <p className="text-2xl font-bold text-foreground mb-4">{formatCurrency(total)}</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {(["cash", "card", "mobile", "transfer"] as const).map(m => (
+                  <button key={m} onClick={() => setPaymentMethod(m)} className={`px-3 py-2 rounded-lg border text-xs font-medium capitalize ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{m}</button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-3">Recording payment will mark this invoice paid, create a sales receipt, and deduct stock in base units for any matched inventory items.</p>
+              <button onClick={() => processPayment(payingInvoice, paymentMethod)} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 inline-flex items-center justify-center gap-2">
+                <Check className="w-4 h-4" />Confirm & Convert to Receipt
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </AppLayout>
   );
 }
