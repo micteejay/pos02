@@ -294,6 +294,24 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [packSize, setPackSize] = useState((item.packSize || 1).toString());
   const [units, setUnits] = useState<ItemUnit[]>(item.units || []);
 
+  /**
+   * When the base unit changes, keep additional units consistent: the *factor*
+   * of each additional unit is expressed in base units, so renaming the base
+   * doesn't change numbers — but we surface a confirmation so the user can
+   * review/reprice. Quantities and prices are NOT rescaled automatically
+   * because semantics of the new base may differ (kg vs pcs).
+   */
+  const handleBaseUnitChange = (newUnit: string) => {
+    if (newUnit === baseUnit) return;
+    if (units.length > 0) {
+      const ok = window.confirm(
+        `Changing base unit from "${baseUnit}" to "${newUnit}" will keep existing factors (1 ${units[0]?.name || "unit"} = ${units[0]?.factor || 1} ${newUnit}). Verify each additional unit's price is still correct. Continue?`
+      );
+      if (!ok) return;
+    }
+    setBaseUnit(newUnit);
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -327,7 +345,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
-          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <select value={baseUnit} onChange={(e) => handleBaseUnitChange(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
             {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
@@ -339,7 +357,13 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => {
+          const ps = parseInt(packSize) || 1;
+          const cleanUnits = units.filter(u => u.name.trim());
+          const err = validateUnits(baseUnit, ps, cleanUnits);
+          if (err) { toast.error(err); return; }
+          onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: ps, units: cleanUnits });
+        }} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
