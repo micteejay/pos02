@@ -23,6 +23,33 @@ type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 const BASE_UNIT_OPTIONS = ["pcs", "kg", "g", "ltr", "ml", "m", "cm", "box", "pack", "bottle", "can", "bag", "pair", "set"];
 
+/**
+ * Validate units + pack size. Returns an error message or null if valid.
+ * Rules:
+ *  - pack size must be ≥ 1
+ *  - every additional unit must have a name, factor ≥ 1 (integer), and price ≥ 0
+ *  - factors and names must be unique
+ *  - additional unit name cannot equal base unit name
+ */
+function validateUnits(baseUnit: string, packSize: number, units: ItemUnit[]): string | null {
+  if (!Number.isFinite(packSize) || packSize < 1) return "Pack size must be at least 1";
+  const seenNames = new Set<string>([baseUnit.trim().toLowerCase()]);
+  const seenFactors = new Set<number>([1]);
+  for (const u of units) {
+    const name = u.name.trim();
+    if (!name) return "Every additional unit needs a name";
+    if (!Number.isFinite(u.factor) || u.factor < 1 || !Number.isInteger(u.factor))
+      return `Unit "${name}" factor must be a whole number ≥ 1`;
+    if (u.factor === 1) return `Unit "${name}" factor of 1 conflicts with the base unit`;
+    if (!Number.isFinite(u.price) || u.price < 0) return `Unit "${name}" price cannot be negative`;
+    const key = name.toLowerCase();
+    if (seenNames.has(key)) return `Duplicate unit name "${name}"`;
+    if (seenFactors.has(u.factor)) return `Duplicate factor ${u.factor} for unit "${name}"`;
+    seenNames.add(key); seenFactors.add(u.factor);
+  }
+  return null;
+}
+
 interface Transfer {
   id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
