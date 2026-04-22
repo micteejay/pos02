@@ -367,9 +367,14 @@ export default function SupplyPage() {
                 if (data.items.length > 0) {
                   await supabase.from("purchase_order_items").insert(
                     data.items.map((i: any) => ({
-                      purchase_order_id: po.id, name: i.name, qty: i.qty,
-                      unit_price: i.unitPrice, total: i.qty * i.unitPrice,
+                      purchase_order_id: po.id, name: i.name,
+                      qty: (i.qty || 0) * (i.unitFactor || 1), // store qty in BASE units so receive-trigger increments stock correctly
+                      unit_price: (i.unitPrice || 0) / (i.unitFactor || 1), // base-unit price
+                      total: i.qty * i.unitPrice,
                       inventory_item_id: i.inventory_item_id || null,
+                      unit_name: i.unitName || null,
+                      unit_factor: i.unitFactor || 1,
+                      base_qty: (i.qty || 0) * (i.unitFactor || 1),
                     }))
                   );
                 }
