@@ -1,8 +1,8 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import InvoiceTemplate, { InvoiceData, InvoiceItem } from "@/components/InvoiceTemplate";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check, Loader2, Edit2, CreditCard, Receipt } from "lucide-react";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,6 +13,7 @@ interface SavedInvoice extends InvoiceData {
   id: string;
   dbId: string;
   status: "draft" | "sent" | "paid" | "cancelled";
+  paymentMethod?: string;
 }
 
 export default function InvoicePage() {
@@ -38,6 +39,11 @@ export default function InvoicePage() {
   const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingDbId, setEditingDbId] = useState<string | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<SavedInvoice | null>(null);
+  const [payingInvoice, setPayingInvoice] = useState<SavedInvoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mobile" | "transfer">("cash");
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Fetch invoices from DB
   useEffect(() => {
