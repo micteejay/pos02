@@ -323,6 +323,9 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
   const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState(inventoryCategories[0] || "Uncategorized");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [baseUnit, setBaseUnit] = useState("pcs");
+  const [packSize, setPackSize] = useState("1");
+  const [units, setUnits] = useState<ItemUnit[]>([]);
 
   const generateBarcode = () => {
     const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join("");
@@ -362,13 +365,26 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
         <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
+          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Pack Size (base units / pack)</label>
+          <Input type="number" min={1} value={packSize} onChange={(e) => setPackSize(e.target.value)} className="mt-1" />
+        </div>
+      </div>
+      <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
         <button disabled={!name || !sku || !qty || !price}
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>
