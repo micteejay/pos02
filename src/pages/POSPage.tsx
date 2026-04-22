@@ -324,8 +324,8 @@ export default function POSPage() {
               <div className="flex justify-between text-muted-foreground"><span>Customer: {completedSale.customer}</span></div>
               <div className="border-t border-dashed border-border my-2" />
               {completedSale.items.map((item) => (
-                <div key={item.sku} className="flex justify-between text-foreground">
-                  <span>{item.name} ×{item.qty}</span><span>{formatCurrency(item.price * item.qty)}</span>
+                <div key={item.lineKey} className="flex justify-between text-foreground">
+                  <span>{item.name} ×{item.qty} {item.unitName}</span><span>{formatCurrency(item.price * item.qty)}</span>
                 </div>
               ))}
               <div className="border-t border-dashed border-border my-2" />
