@@ -260,6 +260,9 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [costPrice, setCostPrice] = useState((item.costPrice || 0).toString());
   const [price, setPrice] = useState(item.price.toString());
   const [barcode, setBarcode] = useState(item.barcode || "");
+  const [baseUnit, setBaseUnit] = useState(item.baseUnit || "pcs");
+  const [packSize, setPackSize] = useState((item.packSize || 1).toString());
+  const [units, setUnits] = useState<ItemUnit[]>(item.units || []);
 
   return (
     <div className="space-y-3">
@@ -291,9 +294,22 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
         <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
+          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Pack Size (base units / pack)</label>
+          <Input type="number" min={1} value={packSize} onChange={(e) => setPackSize(e.target.value)} className="mt-1" />
+        </div>
+      </div>
+      <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
