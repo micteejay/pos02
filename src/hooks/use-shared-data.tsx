@@ -2,12 +2,29 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
+export interface ItemUnit {
+  /** Unit name e.g. "Box", "Carton", "Pack" */
+  name: string;
+  /** How many base units in 1 of this unit (e.g. 1 box = 12 base) */
+  factor: number;
+  /** Selling price for 1 of this unit */
+  price: number;
+  /** Whether this unit can be used for selling (POS/invoice). Defaults true */
+  sellable?: boolean;
+}
+
 export interface InventoryItem {
   id?: string;
   sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
   warehouseId?: string;
   categoryId?: string;
   barcode?: string;
+  /** Smallest unit (the unit `qty` and `price` are expressed in) */
+  baseUnit?: string;
+  /** Quick "units per pack" shortcut. 1 = no pack. */
+  packSize?: number;
+  /** Additional selling units with their own price & conversion */
+  units?: ItemUnit[];
 }
 
 export interface SaleRecord {
