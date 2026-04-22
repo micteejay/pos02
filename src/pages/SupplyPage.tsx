@@ -66,7 +66,14 @@ export default function SupplyPage() {
           po_number: po.po_number,
           supplier_id: po.supplier_id,
           supplier_name: po.suppliers?.name || "Unknown",
-          items: (po.purchase_order_items || []).map((i: any) => ({ name: i.name, qty: i.qty, unitPrice: i.unit_price, inventory_item_id: i.inventory_item_id })),
+          items: (po.purchase_order_items || []).map((i: any) => ({
+            name: i.name,
+            qty: i.qty,
+            unitPrice: i.unit_price,
+            inventory_item_id: i.inventory_item_id,
+            unitName: i.unit_name || undefined,
+            unitFactor: Number(i.unit_factor) || 1,
+          })),
           status: po.status as POStatus,
           created: new Date(po.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
           expectedDelivery: po.expected_date ? new Date(po.expected_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—",
@@ -269,9 +276,24 @@ export default function SupplyPage() {
                           </tr></thead>
                           <tbody>{po.items.map((item, i) => (
                             <tr key={i} className="border-b border-border/50">
-                              <td className="px-4 py-2 text-foreground">{item.name}</td>
-                              <td className="px-4 py-2 text-right text-muted-foreground">{item.qty}</td>
-                              <td className="px-4 py-2 text-right text-muted-foreground">{formatCurrency(item.unitPrice)}</td>
+                              <td className="px-4 py-2 text-foreground">
+                                {item.name}
+                                {item.unitName && (item.unitFactor || 1) > 1 && (
+                                  <span className="block text-[10px] text-muted-foreground">
+                                    Ordered as {item.unitName} (1 {item.unitName} = {item.unitFactor} base)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right text-muted-foreground">
+                                {(item.unitFactor || 1) > 1
+                                  ? `${(item.qty / (item.unitFactor || 1)).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${item.unitName}`
+                                  : item.qty}
+                              </td>
+                              <td className="px-4 py-2 text-right text-muted-foreground">
+                                {(item.unitFactor || 1) > 1
+                                  ? `${formatCurrency(item.unitPrice * (item.unitFactor || 1))} / ${item.unitName}`
+                                  : formatCurrency(item.unitPrice)}
+                              </td>
                               <td className="px-4 py-2 text-right font-medium text-foreground">{formatCurrency(item.qty * item.unitPrice)}</td>
                             </tr>
                           ))}</tbody>

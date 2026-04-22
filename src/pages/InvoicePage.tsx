@@ -1,8 +1,8 @@
-import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import AppLayout from "@/components/AppLayout";
 import InvoiceTemplate, { InvoiceData, InvoiceItem } from "@/components/InvoiceTemplate";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check, Loader2 } from "lucide-react";
+import { Plus, Trash2, Printer, Eye, X, Search, Package, ShoppingCart, Check, Loader2, Edit2, CreditCard, Receipt } from "lucide-react";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
@@ -13,6 +13,7 @@ interface SavedInvoice extends InvoiceData {
   id: string;
   dbId: string;
   status: "draft" | "sent" | "paid" | "cancelled";
+  paymentMethod?: string;
 }
 
 export default function InvoicePage() {
@@ -38,6 +39,11 @@ export default function InvoicePage() {
   const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([]);
   const [showSaved, setShowSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingDbId, setEditingDbId] = useState<string | null>(null);
+  const [previewInvoice, setPreviewInvoice] = useState<SavedInvoice | null>(null);
+  const [payingInvoice, setPayingInvoice] = useState<SavedInvoice | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mobile" | "transfer">("cash");
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Fetch invoices from DB
   useEffect(() => {
@@ -62,6 +68,8 @@ export default function InvoicePage() {
             description: item.description,
             qty: Number(item.qty),
             rate: Number(item.rate),
+            unitName: item.unit_name || undefined,
+            unitFactor: Number(item.unit_factor) || 1,
           })),
           serviceChargePercent: Number(inv.service_charge_percent) || 0,
           notes: inv.notes || "",
@@ -92,9 +100,28 @@ export default function InvoicePage() {
   };
 
   const selectProduct = (index: number, product: typeof inventory[0]) => {
-    updateItem(index, { description: product.name, rate: product.price, qty: 1 });
+    updateItem(index, {
+      description: product.name,
+      rate: product.price,
+      qty: 1,
+      unitName: product.baseUnit || "pcs",
+      unitFactor: 1,
+    });
     setShowProductPicker(null);
     setProductSearch("");
+  };
+
+  /** Switch a line to a different selling unit of the same product. */
+  const selectUnit = (index: number, unitName: string) => {
+    const line = form.items[index];
+    const product = inventory.find(p => p.name.toLowerCase() === line.description.toLowerCase());
+    if (!product) return;
+    if (unitName === (product.baseUnit || "pcs")) {
+      updateItem(index, { unitName, unitFactor: 1, rate: product.price });
+      return;
+    }
+    const u = (product.units || []).find(x => x.name === unitName);
+    if (u) updateItem(index, { unitName, unitFactor: u.factor, rate: u.price });
   };
 
   const handlePrint = () => {
@@ -115,8 +142,8 @@ export default function InvoicePage() {
       return;
     }
 
-    // Save invoice to DB
-    const { data: newInv, error } = await supabase.from("invoices").insert({
+    const isEdit = !!editingDbId;
+    const payload = {
       number: form.number,
       type: form.type as any,
       customer_name: form.customerName,
@@ -124,69 +151,41 @@ export default function InvoicePage() {
       date: new Date().toISOString().split("T")[0],
       notes: form.notes || null,
       service_charge_percent: form.serviceChargePercent || 0,
-      status: "draft" as any,
       created_by: user?.id || null,
       company_id: user?.companyId || null,
-    }).select().single();
+    };
 
-    if (!newInv || error) {
-      toast.error("Failed to save invoice: " + (error?.message || "Unknown error"));
-      return;
+    let dbId = editingDbId;
+    if (isEdit) {
+      const { error } = await supabase.from("invoices").update(payload).eq("id", editingDbId!);
+      if (error) { toast.error("Failed to update invoice: " + error.message); return; }
+      // Replace line items
+      await supabase.from("invoice_items").delete().eq("invoice_id", editingDbId!);
+    } else {
+      const { data: newInv, error } = await supabase.from("invoices").insert({ ...payload, status: "draft" as any }).select().single();
+      if (!newInv || error) { toast.error("Failed to save invoice: " + (error?.message || "Unknown")); return; }
+      dbId = newInv.id;
     }
 
-    // Insert line items
+    // Insert line items (with units)
     const lineItems = form.items.filter(i => i.description).map(i => {
       const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
       return {
-        invoice_id: newInv.id,
+        invoice_id: dbId!,
         description: i.description,
         qty: i.qty,
         rate: i.rate,
         inventory_item_id: invItem?.id || null,
+        unit_name: i.unitName || null,
+        unit_factor: i.unitFactor || 1,
       };
     });
+    if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    if (lineItems.length > 0) {
-      await supabase.from("invoice_items").insert(lineItems);
-    }
-
-    // Add to local state
-    setSavedInvoices(prev => [{
-      ...form, id: form.number, dbId: newInv.id, status: "draft",
-    }, ...prev]);
-
-    // If invoice type, record as a sale and deduct inventory
-    if (form.type === "invoice") {
-      const saleItems = form.items.filter(i => i.description).map(i => {
-        const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
-        return { name: i.description, sku: invItem?.sku || "CUSTOM", qty: i.qty, price: i.rate };
-      });
-
-      const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);
-      const serviceCharge = form.serviceChargePercent ? subtotal * (form.serviceChargePercent / 100) : 0;
-
-      addSale({
-        items: saleItems,
-        total: subtotal + serviceCharge,
-        customer: form.customerName,
-        method: "Invoice",
-        store: "Invoice",
-        createdBy: user?.name || "System",
-        createdByRole: user?.role || "",
-      });
-
-      form.items.forEach(item => {
-        const invItem = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
-        if (invItem) adjustInventoryQty(invItem.sku, -item.qty);
-      });
-
-      // Update invoice status
-      await supabase.from("invoices").update({ status: "sent" as any, sale_id: null }).eq("id", newInv.id);
-
-      toast.success(`Invoice ${form.number} saved and recorded as a sale.`);
-    } else {
-      toast.success(`Quote ${form.number} saved as draft.`);
-    }
+    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft" };
+    setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
+    toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
+    setEditingDbId(null);
 
     // Reset form
     setForm({
@@ -199,22 +198,78 @@ export default function InvoicePage() {
     });
   };
 
-  const convertQuoteToInvoice = async (index: number) => {
-    const inv = savedInvoices[index];
-    if (!inv) return;
+  const convertQuoteToInvoice = async (inv: SavedInvoice) => {
     const newNum = `INV-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
-    
-    await supabase.from("invoices").update({
-      type: "invoice" as any,
-      number: newNum,
-      status: "sent" as any,
-    }).eq("id", inv.dbId);
-
-    setSavedInvoices(prev => prev.map((item, i) => {
-      if (i !== index) return item;
-      return { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const };
-    }));
+    await supabase.from("invoices").update({ type: "invoice" as any, number: newNum, status: "sent" as any }).eq("id", inv.dbId);
+    setSavedInvoices(prev => prev.map(item => item.dbId === inv.dbId ? { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const } : item));
     toast.success("Quote converted to invoice.");
+  };
+
+  /** Load a saved invoice into the form for editing. */
+  const loadForEdit = (inv: SavedInvoice) => {
+    setForm({
+      type: inv.type, number: inv.number, date: inv.date,
+      customerName: inv.customerName, customerAddress: inv.customerAddress || "",
+      items: inv.items.length ? inv.items : [{ description: "", qty: 1, rate: 0 }],
+      serviceChargePercent: inv.serviceChargePercent || 0,
+      notes: inv.notes || "",
+    });
+    setEditingDbId(inv.dbId);
+    setShowSaved(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.info(`Editing ${inv.number}`);
+  };
+
+  /**
+   * Mark invoice paid + convert to a sale receipt:
+   *  - records a sale via shared data (so it appears in Sales/Reports)
+   *  - deducts stock in BASE units (qty × unitFactor) for each linked product
+   *  - flips invoice status to "paid"
+   */
+  const processPayment = async (inv: SavedInvoice, method: string) => {
+    const subtotal = inv.items.reduce((s, i) => s + i.qty * i.rate, 0);
+    const serviceCharge = inv.serviceChargePercent ? subtotal * (inv.serviceChargePercent / 100) : 0;
+    const total = subtotal + serviceCharge;
+
+    // Record sale (this also persists in DB via shared data hook)
+    addSale({
+      items: inv.items.filter(i => i.description).map(i => {
+        const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
+        return { name: i.unitName ? `${i.description} (${i.unitName})` : i.description, sku: invItem?.sku || "CUSTOM", qty: i.qty, price: i.rate };
+      }),
+      total,
+      customer: inv.customerName,
+      method,
+      store: "Invoice",
+      createdBy: user?.name || "System",
+      createdByRole: user?.role || "",
+    });
+
+    // Deduct stock in BASE units
+    inv.items.forEach(item => {
+      const invItem = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
+      if (invItem) adjustInventoryQty(invItem.sku, -(item.qty * (item.unitFactor || 1)));
+    });
+
+    await supabase.from("invoices").update({ status: "paid" as any }).eq("id", inv.dbId);
+    setSavedInvoices(prev => prev.map(s => s.dbId === inv.dbId ? { ...s, status: "paid", paymentMethod: method } : s));
+    setPayingInvoice(null);
+    toast.success(`Payment recorded — ${inv.number} is now paid and stock updated.`);
+  };
+
+  /** Print a saved invoice as a receipt (uses preview render). */
+  const printSaved = (inv: SavedInvoice) => {
+    setPreviewInvoice(inv);
+    // Wait for next tick to ensure preview ref is populated
+    setTimeout(() => {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow || !previewRef.current) return;
+      printWindow.document.write(`<html><head><title>${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}</title>
+        <style>* { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }</style>
+        </head><body>${previewRef.current.innerHTML}</body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }, 100);
   };
 
   const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);
@@ -254,17 +309,25 @@ export default function InvoicePage() {
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {savedInvoices.map((inv, idx) => (
-                  <div key={inv.dbId} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div>
+                  <div key={inv.dbId} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/30 flex-wrap">
+                    <div className="min-w-0 flex-1">
                       <span className="text-sm font-medium text-foreground">{inv.number}</span>
                       <span className="text-xs text-muted-foreground ml-2">{inv.customerName} · {formatCurrency(inv.items.reduce((s, i) => s + i.qty * i.rate, 0))}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 flex-wrap">
                       <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${inv.status === "paid" ? "bg-success/10 text-success" : inv.status === "sent" ? "bg-info/10 text-info" : inv.type === "invoice" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
                         {inv.status} · {inv.type}
                       </span>
+                      <button onClick={() => setPreviewInvoice(inv)} className="text-xs px-2 py-1 rounded bg-info/10 text-info hover:bg-info/20 inline-flex items-center gap-1"><Eye className="w-3 h-3" />Preview</button>
+                      <button onClick={() => loadForEdit(inv)} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning hover:bg-warning/20 inline-flex items-center gap-1"><Edit2 className="w-3 h-3" />Edit</button>
                       {inv.type === "quote" && inv.status === "draft" && (
-                        <button onClick={() => convertQuoteToInvoice(idx)} className="text-xs text-primary hover:underline">Convert to Invoice</button>
+                        <button onClick={() => convertQuoteToInvoice(inv)} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20">Convert to Invoice</button>
+                      )}
+                      {inv.type === "invoice" && inv.status !== "paid" && inv.status !== "cancelled" && (
+                        <button onClick={() => { setPayingInvoice(inv); setPaymentMethod("cash"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success hover:bg-success/20 inline-flex items-center gap-1"><CreditCard className="w-3 h-3" />Pay</button>
+                      )}
+                      {inv.status === "paid" && (
+                        <button onClick={() => printSaved(inv)} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary hover:bg-primary/20 inline-flex items-center gap-1"><Receipt className="w-3 h-3" />Print Receipt</button>
                       )}
                     </div>
                   </div>
@@ -347,6 +410,20 @@ export default function InvoicePage() {
                     <div className="w-28 flex items-center justify-end"><span className="text-sm font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</span></div>
                     <button onClick={() => removeItem(i)} disabled={form.items.length === 1} className="p-2 rounded hover:bg-destructive/10 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                   </div>
+                  {(() => {
+                    const product = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
+                    if (!product) return null;
+                    const opts = [{ name: product.baseUnit || "pcs", factor: 1, price: product.price }, ...(product.units || [])];
+                    if (opts.length <= 1) return null;
+                    return (
+                      <div className="flex items-center gap-2 pl-1">
+                        <span className="text-[10px] text-muted-foreground">Unit:</span>
+                        <select value={item.unitName || (product.baseUnit || "pcs")} onChange={(e) => selectUnit(i, e.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+                          {opts.map(u => <option key={u.name} value={u.name}>{u.name} (1 = {u.factor} {product.baseUnit || "pcs"})</option>)}
+                        </select>
+                      </div>
+                    );
+                  })()}
 
                   {showProductPicker === i && (
                     <div className="border border-border rounded-lg bg-card shadow-lg p-3 space-y-2 max-h-48 overflow-y-auto">
@@ -411,6 +488,47 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+
+      {/* Saved invoice preview modal */}
+      {previewInvoice && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={() => setPreviewInvoice(null)}>
+          <div className="max-w-3xl w-full animate-fade-in my-8" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end gap-2 mb-3">
+              <button onClick={() => printSaved(previewInvoice)} className="px-3 py-2 rounded-lg bg-primary text-primary-foreground text-sm hover:bg-primary/90 inline-flex items-center gap-1"><Printer className="w-4 h-4" />Print</button>
+              <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-lg bg-card border border-border hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <InvoiceTemplate ref={previewRef} data={previewInvoice} />
+          </div>
+        </div>
+      )}
+
+      {/* Payment modal */}
+      {payingInvoice && (() => {
+        const subtotal = payingInvoice.items.reduce((s, i) => s + i.qty * i.rate, 0);
+        const sc = payingInvoice.serviceChargePercent ? subtotal * (payingInvoice.serviceChargePercent / 100) : 0;
+        const total = subtotal + sc;
+        return (
+          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPayingInvoice(null)}>
+            <div className="glass-card rounded-2xl p-6 max-w-sm w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-foreground">Record Payment</h3>
+                <button onClick={() => setPayingInvoice(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-1">{payingInvoice.number} · {payingInvoice.customerName}</p>
+              <p className="text-2xl font-bold text-foreground mb-4">{formatCurrency(total)}</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {(["cash", "card", "mobile", "transfer"] as const).map(m => (
+                  <button key={m} onClick={() => setPaymentMethod(m)} className={`px-3 py-2 rounded-lg border text-xs font-medium capitalize ${paymentMethod === m ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>{m}</button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground mb-3">Recording payment will mark this invoice paid, create a sales receipt, and deduct stock in base units for any matched inventory items.</p>
+              <button onClick={() => processPayment(payingInvoice, paymentMethod)} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 inline-flex items-center justify-center gap-2">
+                <Check className="w-4 h-4" />Confirm & Convert to Receipt
+              </button>
+            </div>
+          </div>
+        );
+      })()}
     </AppLayout>
   );
 }

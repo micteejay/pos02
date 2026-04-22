@@ -23,6 +23,33 @@ type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 const BASE_UNIT_OPTIONS = ["pcs", "kg", "g", "ltr", "ml", "m", "cm", "box", "pack", "bottle", "can", "bag", "pair", "set"];
 
+/**
+ * Validate units + pack size. Returns an error message or null if valid.
+ * Rules:
+ *  - pack size must be ≥ 1
+ *  - every additional unit must have a name, factor ≥ 1 (integer), and price ≥ 0
+ *  - factors and names must be unique
+ *  - additional unit name cannot equal base unit name
+ */
+function validateUnits(baseUnit: string, packSize: number, units: ItemUnit[]): string | null {
+  if (!Number.isFinite(packSize) || packSize < 1) return "Pack size must be at least 1";
+  const seenNames = new Set<string>([baseUnit.trim().toLowerCase()]);
+  const seenFactors = new Set<number>([1]);
+  for (const u of units) {
+    const name = u.name.trim();
+    if (!name) return "Every additional unit needs a name";
+    if (!Number.isFinite(u.factor) || u.factor < 1 || !Number.isInteger(u.factor))
+      return `Unit "${name}" factor must be a whole number ≥ 1`;
+    if (u.factor === 1) return `Unit "${name}" factor of 1 conflicts with the base unit`;
+    if (!Number.isFinite(u.price) || u.price < 0) return `Unit "${name}" price cannot be negative`;
+    const key = name.toLowerCase();
+    if (seenNames.has(key)) return `Duplicate unit name "${name}"`;
+    if (seenFactors.has(u.factor)) return `Duplicate factor ${u.factor} for unit "${name}"`;
+    seenNames.add(key); seenFactors.add(u.factor);
+  }
+  return null;
+}
+
 interface Transfer {
   id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
 }
@@ -267,6 +294,24 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [packSize, setPackSize] = useState((item.packSize || 1).toString());
   const [units, setUnits] = useState<ItemUnit[]>(item.units || []);
 
+  /**
+   * When the base unit changes, keep additional units consistent: the *factor*
+   * of each additional unit is expressed in base units, so renaming the base
+   * doesn't change numbers — but we surface a confirmation so the user can
+   * review/reprice. Quantities and prices are NOT rescaled automatically
+   * because semantics of the new base may differ (kg vs pcs).
+   */
+  const handleBaseUnitChange = (newUnit: string) => {
+    if (newUnit === baseUnit) return;
+    if (units.length > 0) {
+      const ok = window.confirm(
+        `Changing base unit from "${baseUnit}" to "${newUnit}" will keep existing factors (1 ${units[0]?.name || "unit"} = ${units[0]?.factor || 1} ${newUnit}). Verify each additional unit's price is still correct. Continue?`
+      );
+      if (!ok) return;
+    }
+    setBaseUnit(newUnit);
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
@@ -300,7 +345,7 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
-          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <select value={baseUnit} onChange={(e) => handleBaseUnitChange(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
             {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
@@ -312,7 +357,13 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
       <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => {
+          const ps = parseInt(packSize) || 1;
+          const cleanUnits = units.filter(u => u.name.trim());
+          const err = validateUnits(baseUnit, ps, cleanUnits);
+          if (err) { toast.error(err); return; }
+          onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: ps, units: cleanUnits });
+        }} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
@@ -383,8 +434,12 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
         <button disabled={!name || !sku || !qty || !price}
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
+            const ps = parseInt(packSize) || 1;
+            const cleanUnits = units.filter(u => u.name.trim());
+            const err = validateUnits(baseUnit, ps, cleanUnits);
+            if (err) { toast.error(err); return; }
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: ps, units: cleanUnits });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>

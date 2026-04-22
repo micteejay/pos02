@@ -6,6 +6,10 @@ export interface InvoiceItem {
   description: string;
   qty: number;
   rate: number;
+  /** Optional selling unit name (e.g. "Box") */
+  unitName?: string;
+  /** Base units per 1 selling unit. Defaults to 1. */
+  unitFactor?: number;
 }
 
 export interface InvoiceData {
@@ -101,9 +105,20 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
             {data.items.map((item, i) => (
               <tr key={i} className="border-b border-border/50">
                 <td className="py-3 px-3 text-muted-foreground text-center">{i + 1}</td>
-                <td className="py-3 px-3 text-foreground">{item.description}</td>
-                <td className="py-3 px-3 text-center text-muted-foreground">{item.qty.toFixed(2)}</td>
-                <td className="py-3 px-3 text-right text-muted-foreground">{formatCurrency(item.rate)}</td>
+                <td className="py-3 px-3 text-foreground">
+                  {item.description}
+                  {item.unitName && (item.unitFactor || 1) > 1 && (
+                    <div className="text-[10px] text-muted-foreground">
+                      Sold as {item.unitName} · 1 {item.unitName} = {item.unitFactor} base
+                    </div>
+                  )}
+                </td>
+                <td className="py-3 px-3 text-center text-muted-foreground">
+                  {item.qty.toFixed(2)}{item.unitName ? ` ${item.unitName}` : ""}
+                </td>
+                <td className="py-3 px-3 text-right text-muted-foreground">
+                  {formatCurrency(item.rate)}{item.unitName ? ` / ${item.unitName}` : ""}
+                </td>
                 <td className="py-3 px-3 text-right font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</td>
               </tr>
             ))}
