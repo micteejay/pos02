@@ -410,6 +410,20 @@ export default function InvoicePage() {
                     <div className="w-28 flex items-center justify-end"><span className="text-sm font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</span></div>
                     <button onClick={() => removeItem(i)} disabled={form.items.length === 1} className="p-2 rounded hover:bg-destructive/10 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                   </div>
+                  {(() => {
+                    const product = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
+                    if (!product) return null;
+                    const opts = [{ name: product.baseUnit || "pcs", factor: 1, price: product.price }, ...(product.units || [])];
+                    if (opts.length <= 1) return null;
+                    return (
+                      <div className="flex items-center gap-2 pl-1">
+                        <span className="text-[10px] text-muted-foreground">Unit:</span>
+                        <select value={item.unitName || (product.baseUnit || "pcs")} onChange={(e) => selectUnit(i, e.target.value)} className="h-7 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+                          {opts.map(u => <option key={u.name} value={u.name}>{u.name} (1 = {u.factor} {product.baseUnit || "pcs"})</option>)}
+                        </select>
+                      </div>
+                    );
+                  })()}
 
                   {showProductPicker === i && (
                     <div className="border border-border rounded-lg bg-card shadow-lg p-3 space-y-2 max-h-48 overflow-y-auto">
