@@ -17,7 +17,7 @@ type Tab = "orders" | "suppliers";
 type POStatus = "draft" | "submitted" | "approved" | "shipped" | "received" | "cancelled";
 
 interface PurchaseOrder {
-  id: string; po_number: string; supplier_id: string | null; supplier_name: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string }[];
+  id: string; po_number: string; supplier_id: string | null; supplier_name: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string; unitName?: string; unitFactor?: number }[];
   status: POStatus; created: string; expectedDelivery: string; total: number; warehouse: string; warehouse_id: string | null; notes: string; approvedBy: string | null;
 }
 
