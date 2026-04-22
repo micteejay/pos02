@@ -268,12 +268,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       warehouse_id: whId, qty: item.qty, reorder_point: item.reorder,
       cost_price: item.costPrice, price: item.price,
       barcode: item.barcode || null,
+      base_unit: item.baseUnit || "pcs",
+      pack_size: item.packSize || 1,
+      units: (item.units || []) as any,
+      unit: item.baseUnit || "pcs",
       company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setInventory(prev => [{ ...item, id: data.id, warehouseId: whId || undefined }, ...prev]);
     }
-  }, [warehouses]);
+  }, [warehouses, user]);
 
   const updateInventoryItem = useCallback(async (sku: string, updates: Partial<InventoryItem>) => {
     const existing = inventory.find(i => i.sku === sku);
@@ -287,6 +291,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     if (updates.costPrice !== undefined) payload.cost_price = updates.costPrice;
     if (updates.price !== undefined) payload.price = updates.price;
     if (updates.barcode !== undefined) payload.barcode = updates.barcode || null;
+    if (updates.baseUnit !== undefined) { payload.base_unit = updates.baseUnit; payload.unit = updates.baseUnit; }
+    if (updates.packSize !== undefined) payload.pack_size = updates.packSize;
+    if (updates.units !== undefined) payload.units = updates.units as any;
     if (whId !== undefined) payload.warehouse_id = whId;
 
     await supabase.from("inventory_items").update(payload).eq("id", existing.id);
