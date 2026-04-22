@@ -2,12 +2,29 @@ import { createContext, useContext, useState, useCallback, useEffect, ReactNode 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 
+export interface ItemUnit {
+  /** Unit name e.g. "Box", "Carton", "Pack" */
+  name: string;
+  /** How many base units in 1 of this unit (e.g. 1 box = 12 base) */
+  factor: number;
+  /** Selling price for 1 of this unit */
+  price: number;
+  /** Whether this unit can be used for selling (POS/invoice). Defaults true */
+  sellable?: boolean;
+}
+
 export interface InventoryItem {
   id?: string;
   sku: string; name: string; category: string; warehouse: string; qty: number; reorder: number; costPrice: number; price: number; status: "critical" | "low" | "ok";
   warehouseId?: string;
   categoryId?: string;
   barcode?: string;
+  /** Smallest unit (the unit `qty` and `price` are expressed in) */
+  baseUnit?: string;
+  /** Quick "units per pack" shortcut. 1 = no pack. */
+  packSize?: number;
+  /** Additional selling units with their own price & conversion */
+  units?: ItemUnit[];
 }
 
 export interface SaleRecord {
@@ -136,6 +153,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           price: Number(i.price), status: i.status as InventoryItem["status"],
           warehouseId: i.warehouse_id || undefined, categoryId: i.category_id || undefined,
           barcode: i.barcode || undefined,
+          baseUnit: (i as any).base_unit || i.unit || "pcs",
+          packSize: (i as any).pack_size || 1,
+          units: Array.isArray((i as any).units) ? (i as any).units as ItemUnit[] : [],
         })));
       }
 
@@ -248,12 +268,16 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       warehouse_id: whId, qty: item.qty, reorder_point: item.reorder,
       cost_price: item.costPrice, price: item.price,
       barcode: item.barcode || null,
+      base_unit: item.baseUnit || "pcs",
+      pack_size: item.packSize || 1,
+      units: (item.units || []) as any,
+      unit: item.baseUnit || "pcs",
       company_id: user?.companyId || null,
     }).select().single();
     if (data && !error) {
       setInventory(prev => [{ ...item, id: data.id, warehouseId: whId || undefined }, ...prev]);
     }
-  }, [warehouses]);
+  }, [warehouses, user]);
 
   const updateInventoryItem = useCallback(async (sku: string, updates: Partial<InventoryItem>) => {
     const existing = inventory.find(i => i.sku === sku);
@@ -267,6 +291,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     if (updates.costPrice !== undefined) payload.cost_price = updates.costPrice;
     if (updates.price !== undefined) payload.price = updates.price;
     if (updates.barcode !== undefined) payload.barcode = updates.barcode || null;
+    if (updates.baseUnit !== undefined) { payload.base_unit = updates.baseUnit; payload.unit = updates.baseUnit; }
+    if (updates.packSize !== undefined) payload.pack_size = updates.packSize;
+    if (updates.units !== undefined) payload.units = updates.units as any;
     if (whId !== undefined) payload.warehouse_id = whId;
 
     await supabase.from("inventory_items").update(payload).eq("id", existing.id);

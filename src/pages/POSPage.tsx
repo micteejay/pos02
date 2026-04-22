@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { useSharedData } from "@/hooks/use-shared-data";
+import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
@@ -13,7 +13,21 @@ import {
 } from "lucide-react";
 
 interface CartItem {
-  sku: string; name: string; price: number; qty: number; discount: number; stock: number;
+  /** Unique line key = sku + unit name */
+  lineKey: string;
+  sku: string;
+  name: string;
+  /** Price per 1 of `unitName` */
+  price: number;
+  /** Number of selling units (e.g. 2 boxes) */
+  qty: number;
+  discount: number;
+  /** Stock remaining in BASE units */
+  stock: number;
+  /** Selling unit name (e.g. "pcs", "Box", "Carton") */
+  unitName: string;
+  /** Base units per 1 selling unit */
+  unitFactor: number;
 }
 
 const defaultCategories = ["All"];
@@ -43,14 +57,26 @@ export default function POSPage() {
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
-  const addToCart = useCallback((item: typeof inventory[0]) => {
+  /**
+   * Add an item to the cart in a specific unit. Defaults to the item's base unit.
+   */
+  const addToCart = useCallback((item: InventoryItem, unit?: ItemUnit) => {
+    const unitName = unit?.name || item.baseUnit || "pcs";
+    const unitFactor = unit?.factor || 1;
+    const price = unit?.price ?? item.price;
+    const lineKey = `${item.sku}::${unitName}`;
     setCart((prev) => {
-      const existing = prev.find((i) => i.sku === item.sku);
-      if (existing) {
-        if (existing.qty >= item.qty) return prev;
-        return prev.map((i) => i.sku === item.sku ? { ...i, qty: i.qty + 1 } : i);
+      const existing = prev.find((i) => i.lineKey === lineKey);
+      // total base units already in cart for this sku across all unit lines
+      const baseInCart = prev.filter(i => i.sku === item.sku).reduce((s, i) => s + i.qty * i.unitFactor, 0);
+      if (baseInCart + unitFactor > item.qty) {
+        toast.error(`Not enough stock (${item.qty} ${item.baseUnit || "pcs"} available)`);
+        return prev;
       }
-      return [...prev, { sku: item.sku, name: item.name, price: item.price, qty: 1, discount: 0, stock: item.qty }];
+      if (existing) {
+        return prev.map((i) => i.lineKey === lineKey ? { ...i, qty: i.qty + 1 } : i);
+      }
+      return [...prev, { lineKey, sku: item.sku, name: item.name, price, qty: 1, discount: 0, stock: item.qty, unitName, unitFactor }];
     });
   }, []);
 
@@ -78,17 +104,24 @@ export default function POSPage() {
 
 
 
-  const updateQty = useCallback((sku: string, delta: number) => {
-    setCart((prev) => prev.map((i) => {
-      if (i.sku !== sku) return i;
-      const newQty = i.qty + delta;
-      if (newQty <= 0 || newQty > i.stock) return i;
-      return { ...i, qty: newQty };
-    }));
+  const updateQty = useCallback((lineKey: string, delta: number) => {
+    setCart((prev) => {
+      const line = prev.find(i => i.lineKey === lineKey);
+      if (!line) return prev;
+      const newQty = line.qty + delta;
+      if (newQty <= 0) return prev.filter(i => i.lineKey !== lineKey);
+      const baseInCart = prev.filter(i => i.sku === line.sku && i.lineKey !== lineKey)
+        .reduce((s, i) => s + i.qty * i.unitFactor, 0);
+      if (baseInCart + newQty * line.unitFactor > line.stock) {
+        toast.error(`Not enough stock`);
+        return prev;
+      }
+      return prev.map(i => i.lineKey === lineKey ? { ...i, qty: newQty } : i);
+    });
   }, []);
 
-  const removeFromCart = useCallback((sku: string) => {
-    setCart((prev) => prev.filter((i) => i.sku !== sku));
+  const removeFromCart = useCallback((lineKey: string) => {
+    setCart((prev) => prev.filter((i) => i.lineKey !== lineKey));
   }, []);
 
   const subtotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.qty * (1 - i.discount / 100), 0), [cart]);
@@ -109,14 +142,14 @@ export default function POSPage() {
   };
 
   const completeSale = () => {
-    // Deduct from inventory
+    // Deduct from inventory in BASE units (qty × factor)
     cart.forEach(item => {
-      adjustInventoryQty(item.sku, -item.qty);
+      adjustInventoryQty(item.sku, -(item.qty * item.unitFactor));
     });
 
-    // Record sale
+    // Record sale (qty stored in selling units; consumer shows label with unit name)
     addSale({
-      items: cart.map(i => ({ name: i.name, sku: i.sku, qty: i.qty, price: i.price })),
+      items: cart.map(i => ({ name: `${i.name} (${i.unitName})`, sku: i.sku, qty: i.qty, price: i.price })),
       total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
       createdBy: user?.name || "System", createdByRole: user?.role || "",
     });
@@ -166,19 +199,40 @@ export default function POSPage() {
           <div className="flex-1 overflow-y-auto p-4">
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredProducts.map((p) => {
-                const inCart = cart.find((i) => i.sku === p.sku);
+                const inCartLines = cart.filter((i) => i.sku === p.sku);
+                const totalInCartBase = inCartLines.reduce((s, i) => s + i.qty * i.unitFactor, 0);
+                const sellableUnits: ItemUnit[] = [
+                  { name: p.baseUnit || "pcs", factor: 1, price: p.price },
+                  ...((p.units || []).filter(u => (u.sellable ?? true) && u.name.trim())),
+                ];
                 return (
-                  <button key={p.sku} onClick={() => addToCart(p)} disabled={p.qty === 0}
-                    className={`glass-card rounded-xl p-4 text-left transition-all hover:border-primary/30 hover:shadow-md disabled:opacity-40 relative group ${inCart ? "border-primary/40 bg-primary/5" : ""}`}>
-                    <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-3"><Package className="w-5 h-5 text-muted-foreground" /></div>
-                    <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono">{p.sku}</p>
-                    <div className="flex items-center justify-between mt-3">
-                      <span className="text-base font-bold text-primary">{formatCurrency(p.price)}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${p.qty < 15 ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>{p.qty} left</span>
-                    </div>
-                    {inCart && <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">{inCart.qty}</div>}
-                  </button>
+                  <div key={p.sku} className={`glass-card rounded-xl p-4 text-left transition-all hover:border-primary/30 hover:shadow-md relative ${totalInCartBase > 0 ? "border-primary/40 bg-primary/5" : ""} ${p.qty === 0 ? "opacity-40" : ""}`}>
+                    <button onClick={() => addToCart(p)} disabled={p.qty === 0} className="w-full text-left">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-3"><Package className="w-5 h-5 text-muted-foreground" /></div>
+                      <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{p.sku}</p>
+                      <div className="flex items-center justify-between mt-3">
+                        <span className="text-base font-bold text-primary">{formatCurrency(p.price)}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${p.qty < 15 ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>{p.qty} {p.baseUnit || "pcs"}</span>
+                      </div>
+                    </button>
+                    {sellableUnits.length > 1 && (
+                      <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border/50">
+                        {sellableUnits.map((u) => (
+                          <button
+                            key={u.name}
+                            disabled={p.qty < u.factor}
+                            onClick={(e) => { e.stopPropagation(); addToCart(p, u); }}
+                            className="text-[10px] px-2 py-0.5 rounded-full bg-muted hover:bg-primary/15 hover:text-primary text-muted-foreground font-medium disabled:opacity-40"
+                            title={`Sell as ${u.name} (${u.factor} ${p.baseUnit || "pcs"} = ${formatCurrency(u.price)})`}
+                          >
+                            {u.name} · {formatCurrency(u.price)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {totalInCartBase > 0 && <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">{totalInCartBase}</div>}
+                  </div>
                 );
               })}
             </div>
@@ -209,18 +263,21 @@ export default function POSPage() {
                 <ShoppingCart className="w-12 h-12 mb-3 opacity-20" /><p className="text-sm">Cart is empty</p><p className="text-xs mt-1">Click products to add them</p>
               </div>
             ) : cart.map((item) => (
-              <div key={item.sku} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group">
+              <div key={item.lineKey} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatCurrency(item.price)} each</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(item.price)} / {item.unitName}
+                    {item.unitFactor > 1 && <span className="ml-1 opacity-70">({item.unitFactor} base)</span>}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => updateQty(item.sku, -1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Minus className="w-3 h-3" /></button>
+                  <button onClick={() => updateQty(item.lineKey, -1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Minus className="w-3 h-3" /></button>
                   <span className="w-8 text-center text-sm font-semibold text-foreground">{item.qty}</span>
-                  <button onClick={() => updateQty(item.sku, 1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Plus className="w-3 h-3" /></button>
+                  <button onClick={() => updateQty(item.lineKey, 1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Plus className="w-3 h-3" /></button>
                 </div>
                 <p className="text-sm font-semibold text-foreground w-16 text-right">{formatCurrency(item.price * item.qty)}</p>
-                <button onClick={() => removeFromCart(item.sku)} className="p-1 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5 text-destructive" /></button>
+                <button onClick={() => removeFromCart(item.lineKey)} className="p-1 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5 text-destructive" /></button>
               </div>
             ))}
           </div>
@@ -267,8 +324,8 @@ export default function POSPage() {
               <div className="flex justify-between text-muted-foreground"><span>Customer: {completedSale.customer}</span></div>
               <div className="border-t border-dashed border-border my-2" />
               {completedSale.items.map((item) => (
-                <div key={item.sku} className="flex justify-between text-foreground">
-                  <span>{item.name} ×{item.qty}</span><span>{formatCurrency(item.price * item.qty)}</span>
+                <div key={item.lineKey} className="flex justify-between text-foreground">
+                  <span>{item.name} ×{item.qty} {item.unitName}</span><span>{formatCurrency(item.price * item.qty)}</span>
                 </div>
               ))}
               <div className="border-t border-dashed border-border my-2" />

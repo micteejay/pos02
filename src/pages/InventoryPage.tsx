@@ -9,7 +9,8 @@ import {
 import BarcodeDisplay from "@/components/BarcodeDisplay";
 import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import { useSharedData, InventoryItem, CategoryType } from "@/hooks/use-shared-data";
+import { useSharedData, InventoryItem, CategoryType, ItemUnit } from "@/hooks/use-shared-data";
+import { UnitsEditor } from "@/components/UnitsEditor";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,6 +20,8 @@ import { toast } from "sonner";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
+
+const BASE_UNIT_OPTIONS = ["pcs", "kg", "g", "ltr", "ml", "m", "cm", "box", "pack", "bottle", "can", "bag", "pair", "set"];
 
 interface Transfer {
   id: string; dbId: string; items: string; from: string; to: string; fromId: string | null; toId: string | null; initiated: string; eta: string; status: "in_transit" | "pending" | "delivered"; requester: string;
@@ -260,6 +263,9 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
   const [costPrice, setCostPrice] = useState((item.costPrice || 0).toString());
   const [price, setPrice] = useState(item.price.toString());
   const [barcode, setBarcode] = useState(item.barcode || "");
+  const [baseUnit, setBaseUnit] = useState(item.baseUnit || "pcs");
+  const [packSize, setPackSize] = useState((item.packSize || 1).toString());
+  const [units, setUnits] = useState<ItemUnit[]>(item.units || []);
 
   return (
     <div className="space-y-3">
@@ -291,9 +297,22 @@ function EditItemForm({ item, onSave, onCancel }: { item: InventoryItem; onSave:
         <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
+          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Pack Size (base units / pack)</label>
+          <Input type="number" min={1} value={packSize} onChange={(e) => setPackSize(e.target.value)} className="mt-1" />
+        </div>
+      </div>
+      <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
-        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
+        <button onClick={() => onSave({ name, category, warehouse, qty: parseInt(qty), reorder: parseInt(reorder), costPrice: parseFloat(costPrice), price: parseFloat(price), barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Save</button>
       </div>
     </div>
   );
@@ -304,6 +323,9 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
   const [name, setName] = useState(""); const [sku, setSku] = useState(""); const [category, setCategory] = useState(inventoryCategories[0] || "Uncategorized");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || ""); const [qty, setQty] = useState(""); const [reorder, setReorder] = useState("50"); const [costPrice, setCostPrice] = useState(""); const [price, setPrice] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [baseUnit, setBaseUnit] = useState("pcs");
+  const [packSize, setPackSize] = useState("1");
+  const [units, setUnits] = useState<ItemUnit[]>([]);
 
   const generateBarcode = () => {
     const digits = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join("");
@@ -343,13 +365,26 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
         <div><label className="text-xs font-medium text-muted-foreground">Cost Price</label><Input type="number" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="mt-1" /></div>
         <div><label className="text-xs font-medium text-muted-foreground">Selling Price</label><Input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="mt-1" /></div>
       </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Base Unit</label>
+          <select value={baseUnit} onChange={(e) => setBaseUnit(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+            {BASE_UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">Pack Size (base units / pack)</label>
+          <Input type="number" min={1} value={packSize} onChange={(e) => setPackSize(e.target.value)} className="mt-1" />
+        </div>
+      </div>
+      <UnitsEditor baseUnit={baseUnit} units={units} onChange={setUnits} />
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">Cancel</button>
         <button disabled={!name || !sku || !qty || !price}
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>

@@ -17,7 +17,7 @@ type Tab = "orders" | "suppliers";
 type POStatus = "draft" | "submitted" | "approved" | "shipped" | "received" | "cancelled";
 
 interface PurchaseOrder {
-  id: string; po_number: string; supplier_id: string | null; supplier_name: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string }[];
+  id: string; po_number: string; supplier_id: string | null; supplier_name: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string; unitName?: string; unitFactor?: number }[];
   status: POStatus; created: string; expectedDelivery: string; total: number; warehouse: string; warehouse_id: string | null; notes: string; approvedBy: string | null;
 }
 
@@ -367,9 +367,14 @@ export default function SupplyPage() {
                 if (data.items.length > 0) {
                   await supabase.from("purchase_order_items").insert(
                     data.items.map((i: any) => ({
-                      purchase_order_id: po.id, name: i.name, qty: i.qty,
-                      unit_price: i.unitPrice, total: i.qty * i.unitPrice,
+                      purchase_order_id: po.id, name: i.name,
+                      qty: (i.qty || 0) * (i.unitFactor || 1), // store qty in BASE units so receive-trigger increments stock correctly
+                      unit_price: (i.unitPrice || 0) / (i.unitFactor || 1), // base-unit price
+                      total: i.qty * i.unitPrice,
                       inventory_item_id: i.inventory_item_id || null,
+                      unit_name: i.unitName || null,
+                      unit_factor: i.unitFactor || 1,
+                      base_qty: (i.qty || 0) * (i.unitFactor || 1),
                     }))
                   );
                 }
@@ -445,18 +450,29 @@ export default function SupplyPage() {
 function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
   const [supplier, setSupplier] = useState(suppliers[0]?.id || "");
   const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
-  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "", inventory_item_id: "" }]);
+  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
   const [notes, setNotes] = useState("");
 
-  const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "", inventory_item_id: "" }]);
+  const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
-  const updateItem = (i: number, field: string, value: string) => setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+  const updateItem = (i: number, field: string, value: any) => setItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
 
   const selectInventoryItem = (i: number, sku: string) => {
     const inv = inventoryItems.find(item => item.sku === sku);
     if (inv) {
-      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString(), inventory_item_id: inv.id } : item));
+      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString(), inventory_item_id: inv.id, unitName: inv.baseUnit || "pcs", unitFactor: 1 } : item));
     }
+  };
+
+  const selectUnit = (i: number, unitName: string) => {
+    const item = items[i];
+    const inv = inventoryItems.find(it => it.id === item.inventory_item_id);
+    if (!inv) return;
+    if (unitName === (inv.baseUnit || "pcs")) {
+      updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", 1); updateItem(i, "unitPrice", inv.price.toString()); return;
+    }
+    const u = (inv.units || []).find((x: any) => x.name === unitName);
+    if (u) { updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", u.factor); updateItem(i, "unitPrice", u.price.toString()); }
   };
 
   const total = items.reduce((s, i) => s + (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0), 0);
@@ -486,6 +502,16 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
               </select>
               {items.length > 1 && <button onClick={() => removeItem(i)} className="p-1 rounded hover:bg-destructive/10"><X className="w-3.5 h-3.5 text-destructive" /></button>}
             </div>
+            {item.inventory_item_id && (() => {
+              const inv = inventoryItems.find((x: any) => x.id === item.inventory_item_id);
+              const opts = inv ? [{ name: inv.baseUnit || "pcs", factor: 1, price: inv.price }, ...(inv.units || [])] : [];
+              if (opts.length <= 1) return null;
+              return (
+                <select value={item.unitName} onChange={(e) => selectUnit(i, e.target.value)} className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground">
+                  {opts.map((u: any) => <option key={u.name} value={u.name}>Order as {u.name} (= {u.factor} {inv.baseUnit || "pcs"})</option>)}
+                </select>
+              );
+            })()}
             <div className="grid grid-cols-7 gap-2">
               <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Or type item name" className="col-span-3 h-8 text-xs" />
               <Input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder="Qty" className="col-span-1 h-8 text-xs" />
@@ -502,7 +528,7 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
         <button onClick={() => onSubmit({
           supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
           warehouse_name: warehouse, warehouse_id: null,
-          items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined })),
+          items: items.filter(i => i.name).map(i => ({ name: i.unitName && i.unitFactor > 1 ? `${i.name} (${i.unitName})` : i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
           total, notes,
         })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
       </div>

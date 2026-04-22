@@ -904,6 +904,7 @@ export type Database = {
       inventory_items: {
         Row: {
           barcode: string | null
+          base_unit: string | null
           category: string | null
           category_id: string | null
           company_id: string | null
@@ -913,17 +914,20 @@ export type Database = {
           id: string
           image_url: string | null
           name: string
+          pack_size: number | null
           price: number
           qty: number
           reorder_point: number
           sku: string
           status: Database["public"]["Enums"]["inventory_status"]
           unit: string | null
+          units: Json | null
           updated_at: string
           warehouse_id: string | null
         }
         Insert: {
           barcode?: string | null
+          base_unit?: string | null
           category?: string | null
           category_id?: string | null
           company_id?: string | null
@@ -933,17 +937,20 @@ export type Database = {
           id?: string
           image_url?: string | null
           name: string
+          pack_size?: number | null
           price?: number
           qty?: number
           reorder_point?: number
           sku: string
           status?: Database["public"]["Enums"]["inventory_status"]
           unit?: string | null
+          units?: Json | null
           updated_at?: string
           warehouse_id?: string | null
         }
         Update: {
           barcode?: string | null
+          base_unit?: string | null
           category?: string | null
           category_id?: string | null
           company_id?: string | null
@@ -953,12 +960,14 @@ export type Database = {
           id?: string
           image_url?: string | null
           name?: string
+          pack_size?: number | null
           price?: number
           qty?: number
           reorder_point?: number
           sku?: string
           status?: Database["public"]["Enums"]["inventory_status"]
           unit?: string | null
+          units?: Json | null
           updated_at?: string
           warehouse_id?: string | null
         }
@@ -995,6 +1004,8 @@ export type Database = {
           invoice_id: string
           qty: number
           rate: number
+          unit_factor: number | null
+          unit_name: string | null
         }
         Insert: {
           created_at?: string
@@ -1004,6 +1015,8 @@ export type Database = {
           invoice_id: string
           qty?: number
           rate?: number
+          unit_factor?: number | null
+          unit_name?: string | null
         }
         Update: {
           created_at?: string
@@ -1013,6 +1026,8 @@ export type Database = {
           invoice_id?: string
           qty?: number
           rate?: number
+          unit_factor?: number | null
+          unit_name?: string | null
         }
         Relationships: [
           {
@@ -1216,6 +1231,7 @@ export type Database = {
       }
       purchase_order_items: {
         Row: {
+          base_qty: number | null
           id: string
           inventory_item_id: string | null
           name: string
@@ -1224,9 +1240,12 @@ export type Database = {
           received_qty: number | null
           sku: string | null
           total: number
+          unit_factor: number | null
+          unit_name: string | null
           unit_price: number
         }
         Insert: {
+          base_qty?: number | null
           id?: string
           inventory_item_id?: string | null
           name: string
@@ -1235,9 +1254,12 @@ export type Database = {
           received_qty?: number | null
           sku?: string | null
           total?: number
+          unit_factor?: number | null
+          unit_name?: string | null
           unit_price?: number
         }
         Update: {
+          base_qty?: number | null
           id?: string
           inventory_item_id?: string | null
           name?: string
@@ -1246,6 +1268,8 @@ export type Database = {
           received_qty?: number | null
           sku?: string | null
           total?: number
+          unit_factor?: number | null
+          unit_name?: string | null
           unit_price?: number
         }
         Relationships: [
@@ -1518,6 +1542,7 @@ export type Database = {
       }
       sales_transaction_items: {
         Row: {
+          base_qty: number | null
           discount: number | null
           id: string
           inventory_item_id: string | null
@@ -1527,8 +1552,11 @@ export type Database = {
           sku: string | null
           total: number
           transaction_id: string
+          unit_factor: number | null
+          unit_name: string | null
         }
         Insert: {
+          base_qty?: number | null
           discount?: number | null
           id?: string
           inventory_item_id?: string | null
@@ -1538,8 +1566,11 @@ export type Database = {
           sku?: string | null
           total?: number
           transaction_id: string
+          unit_factor?: number | null
+          unit_name?: string | null
         }
         Update: {
+          base_qty?: number | null
           discount?: number | null
           id?: string
           inventory_item_id?: string | null
@@ -1549,6 +1580,8 @@ export type Database = {
           sku?: string | null
           total?: number
           transaction_id?: string
+          unit_factor?: number | null
+          unit_name?: string | null
         }
         Relationships: [
           {
