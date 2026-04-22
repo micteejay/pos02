@@ -153,6 +153,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
           price: Number(i.price), status: i.status as InventoryItem["status"],
           warehouseId: i.warehouse_id || undefined, categoryId: i.category_id || undefined,
           barcode: i.barcode || undefined,
+          baseUnit: (i as any).base_unit || i.unit || "pcs",
+          packSize: (i as any).pack_size || 1,
+          units: Array.isArray((i as any).units) ? (i as any).units as ItemUnit[] : [],
         })));
       }
 
