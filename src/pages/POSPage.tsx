@@ -325,7 +325,15 @@ export default function POSPage() {
               <div className="border-t border-dashed border-border my-2" />
               {completedSale.items.map((item) => (
                 <div key={item.lineKey} className="flex justify-between text-foreground">
-                  <span>{item.name} ×{item.qty} {item.unitName}</span><span>{formatCurrency(item.price * item.qty)}</span>
+                  <div className="flex-1 pr-2">
+                    <div>{item.name} ×{item.qty} {item.unitName}</div>
+                    {item.unitFactor > 1 && (
+                      <div className="text-[9px] text-muted-foreground">
+                        1 {item.unitName} = {item.unitFactor} base · total {item.qty * item.unitFactor} base units · {formatCurrency(item.price)} / {item.unitName}
+                      </div>
+                    )}
+                  </div>
+                  <span>{formatCurrency(item.price * item.qty)}</span>
                 </div>
               ))}
               <div className="border-t border-dashed border-border my-2" />
