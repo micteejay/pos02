@@ -434,8 +434,12 @@ function AddItemForm({ onAdd, onCancel }: { onAdd: (item: InventoryItem) => void
         <button disabled={!name || !sku || !qty || !price}
           onClick={() => {
             const q = parseInt(qty); const r = parseInt(reorder);
+            const ps = parseInt(packSize) || 1;
+            const cleanUnits = units.filter(u => u.name.trim());
+            const err = validateUnits(baseUnit, ps, cleanUnits);
+            if (err) { toast.error(err); return; }
             const status: InventoryItem["status"] = q <= r * 0.3 ? "critical" : q <= r ? "low" : "ok";
-            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: parseInt(packSize) || 1, units: units.filter(u => u.name.trim()) });
+            onAdd({ name, sku, category, warehouse, qty: q, reorder: r, costPrice: parseFloat(costPrice || "0"), price: parseFloat(price), status, barcode: barcode || undefined, baseUnit, packSize: ps, units: cleanUnits });
           }}
           className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">Add Item</button>
       </div>
