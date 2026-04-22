@@ -100,9 +100,28 @@ export default function InvoicePage() {
   };
 
   const selectProduct = (index: number, product: typeof inventory[0]) => {
-    updateItem(index, { description: product.name, rate: product.price, qty: 1 });
+    updateItem(index, {
+      description: product.name,
+      rate: product.price,
+      qty: 1,
+      unitName: product.baseUnit || "pcs",
+      unitFactor: 1,
+    });
     setShowProductPicker(null);
     setProductSearch("");
+  };
+
+  /** Switch a line to a different selling unit of the same product. */
+  const selectUnit = (index: number, unitName: string) => {
+    const line = form.items[index];
+    const product = inventory.find(p => p.name.toLowerCase() === line.description.toLowerCase());
+    if (!product) return;
+    if (unitName === (product.baseUnit || "pcs")) {
+      updateItem(index, { unitName, unitFactor: 1, rate: product.price });
+      return;
+    }
+    const u = (product.units || []).find(x => x.name === unitName);
+    if (u) updateItem(index, { unitName, unitFactor: u.factor, rate: u.price });
   };
 
   const handlePrint = () => {
