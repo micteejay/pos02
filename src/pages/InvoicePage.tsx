@@ -142,8 +142,8 @@ export default function InvoicePage() {
       return;
     }
 
-    // Save invoice to DB
-    const { data: newInv, error } = await supabase.from("invoices").insert({
+    const isEdit = !!editingDbId;
+    const payload = {
       number: form.number,
       type: form.type as any,
       customer_name: form.customerName,
@@ -151,69 +151,41 @@ export default function InvoicePage() {
       date: new Date().toISOString().split("T")[0],
       notes: form.notes || null,
       service_charge_percent: form.serviceChargePercent || 0,
-      status: "draft" as any,
       created_by: user?.id || null,
       company_id: user?.companyId || null,
-    }).select().single();
+    };
 
-    if (!newInv || error) {
-      toast.error("Failed to save invoice: " + (error?.message || "Unknown error"));
-      return;
+    let dbId = editingDbId;
+    if (isEdit) {
+      const { error } = await supabase.from("invoices").update(payload).eq("id", editingDbId!);
+      if (error) { toast.error("Failed to update invoice: " + error.message); return; }
+      // Replace line items
+      await supabase.from("invoice_items").delete().eq("invoice_id", editingDbId!);
+    } else {
+      const { data: newInv, error } = await supabase.from("invoices").insert({ ...payload, status: "draft" as any }).select().single();
+      if (!newInv || error) { toast.error("Failed to save invoice: " + (error?.message || "Unknown")); return; }
+      dbId = newInv.id;
     }
 
-    // Insert line items
+    // Insert line items (with units)
     const lineItems = form.items.filter(i => i.description).map(i => {
       const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
       return {
-        invoice_id: newInv.id,
+        invoice_id: dbId!,
         description: i.description,
         qty: i.qty,
         rate: i.rate,
         inventory_item_id: invItem?.id || null,
+        unit_name: i.unitName || null,
+        unit_factor: i.unitFactor || 1,
       };
     });
+    if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    if (lineItems.length > 0) {
-      await supabase.from("invoice_items").insert(lineItems);
-    }
-
-    // Add to local state
-    setSavedInvoices(prev => [{
-      ...form, id: form.number, dbId: newInv.id, status: "draft",
-    }, ...prev]);
-
-    // If invoice type, record as a sale and deduct inventory
-    if (form.type === "invoice") {
-      const saleItems = form.items.filter(i => i.description).map(i => {
-        const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
-        return { name: i.description, sku: invItem?.sku || "CUSTOM", qty: i.qty, price: i.rate };
-      });
-
-      const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);
-      const serviceCharge = form.serviceChargePercent ? subtotal * (form.serviceChargePercent / 100) : 0;
-
-      addSale({
-        items: saleItems,
-        total: subtotal + serviceCharge,
-        customer: form.customerName,
-        method: "Invoice",
-        store: "Invoice",
-        createdBy: user?.name || "System",
-        createdByRole: user?.role || "",
-      });
-
-      form.items.forEach(item => {
-        const invItem = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
-        if (invItem) adjustInventoryQty(invItem.sku, -item.qty);
-      });
-
-      // Update invoice status
-      await supabase.from("invoices").update({ status: "sent" as any, sale_id: null }).eq("id", newInv.id);
-
-      toast.success(`Invoice ${form.number} saved and recorded as a sale.`);
-    } else {
-      toast.success(`Quote ${form.number} saved as draft.`);
-    }
+    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft" };
+    setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
+    toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
+    setEditingDbId(null);
 
     // Reset form
     setForm({
@@ -226,22 +198,78 @@ export default function InvoicePage() {
     });
   };
 
-  const convertQuoteToInvoice = async (index: number) => {
-    const inv = savedInvoices[index];
-    if (!inv) return;
+  const convertQuoteToInvoice = async (inv: SavedInvoice) => {
     const newNum = `INV-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
-    
-    await supabase.from("invoices").update({
-      type: "invoice" as any,
-      number: newNum,
-      status: "sent" as any,
-    }).eq("id", inv.dbId);
-
-    setSavedInvoices(prev => prev.map((item, i) => {
-      if (i !== index) return item;
-      return { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const };
-    }));
+    await supabase.from("invoices").update({ type: "invoice" as any, number: newNum, status: "sent" as any }).eq("id", inv.dbId);
+    setSavedInvoices(prev => prev.map(item => item.dbId === inv.dbId ? { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const } : item));
     toast.success("Quote converted to invoice.");
+  };
+
+  /** Load a saved invoice into the form for editing. */
+  const loadForEdit = (inv: SavedInvoice) => {
+    setForm({
+      type: inv.type, number: inv.number, date: inv.date,
+      customerName: inv.customerName, customerAddress: inv.customerAddress || "",
+      items: inv.items.length ? inv.items : [{ description: "", qty: 1, rate: 0 }],
+      serviceChargePercent: inv.serviceChargePercent || 0,
+      notes: inv.notes || "",
+    });
+    setEditingDbId(inv.dbId);
+    setShowSaved(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.info(`Editing ${inv.number}`);
+  };
+
+  /**
+   * Mark invoice paid + convert to a sale receipt:
+   *  - records a sale via shared data (so it appears in Sales/Reports)
+   *  - deducts stock in BASE units (qty × unitFactor) for each linked product
+   *  - flips invoice status to "paid"
+   */
+  const processPayment = async (inv: SavedInvoice, method: string) => {
+    const subtotal = inv.items.reduce((s, i) => s + i.qty * i.rate, 0);
+    const serviceCharge = inv.serviceChargePercent ? subtotal * (inv.serviceChargePercent / 100) : 0;
+    const total = subtotal + serviceCharge;
+
+    // Record sale (this also persists in DB via shared data hook)
+    addSale({
+      items: inv.items.filter(i => i.description).map(i => {
+        const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
+        return { name: i.unitName ? `${i.description} (${i.unitName})` : i.description, sku: invItem?.sku || "CUSTOM", qty: i.qty, price: i.rate };
+      }),
+      total,
+      customer: inv.customerName,
+      method,
+      store: "Invoice",
+      createdBy: user?.name || "System",
+      createdByRole: user?.role || "",
+    });
+
+    // Deduct stock in BASE units
+    inv.items.forEach(item => {
+      const invItem = inventory.find(p => p.name.toLowerCase() === item.description.toLowerCase());
+      if (invItem) adjustInventoryQty(invItem.sku, -(item.qty * (item.unitFactor || 1)));
+    });
+
+    await supabase.from("invoices").update({ status: "paid" as any }).eq("id", inv.dbId);
+    setSavedInvoices(prev => prev.map(s => s.dbId === inv.dbId ? { ...s, status: "paid", paymentMethod: method } : s));
+    setPayingInvoice(null);
+    toast.success(`Payment recorded — ${inv.number} is now paid and stock updated.`);
+  };
+
+  /** Print a saved invoice as a receipt (uses preview render). */
+  const printSaved = (inv: SavedInvoice) => {
+    setPreviewInvoice(inv);
+    // Wait for next tick to ensure preview ref is populated
+    setTimeout(() => {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow || !previewRef.current) return;
+      printWindow.document.write(`<html><head><title>${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}</title>
+        <style>* { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }</style>
+        </head><body>${previewRef.current.innerHTML}</body></html>`);
+      printWindow.document.close();
+      printWindow.print();
+    }, 100);
   };
 
   const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);
