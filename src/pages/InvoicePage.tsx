@@ -68,6 +68,8 @@ export default function InvoicePage() {
             description: item.description,
             qty: Number(item.qty),
             rate: Number(item.rate),
+            unitName: item.unit_name || undefined,
+            unitFactor: Number(item.unit_factor) || 1,
           })),
           serviceChargePercent: Number(inv.service_charge_percent) || 0,
           notes: inv.notes || "",
