@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock, ShoppingCart, Package,
 } from "lucide-react";
 
 type WFStatus = "active" | "completed" | "paused" | "cancelled";
@@ -30,6 +30,17 @@ interface Workflow {
   requester: string;
   created: string;
   amount: string;
+  sourceType?: string | null;
+  sourceId?: string | null;
+}
+
+interface PoLineItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  total: number;
+  unit_name?: string | null;
+  unit_factor?: number | null;
 }
 
 const statusConfig = {
@@ -66,6 +77,8 @@ export default function WorkflowsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewWF, setShowNewWF] = useState(false);
+  const [poItems, setPoItems] = useState<Record<string, PoLineItem[]>>({});
+  const [poMeta, setPoMeta] = useState<Record<string, { po_number: string; total: number; supplier?: string }>>({});
 
   // Check if current user can approve a workflow step
   const canApproveStep = (wf: Workflow) => {
@@ -113,6 +126,8 @@ export default function WorkflowsPage() {
             requester: wf.created_by ? (profileMap.get(wf.created_by) || "Unknown") : "System",
             created: new Date(wf.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             amount: wf.description || "",
+            sourceType: wf.source_type || null,
+            sourceId: wf.source_id || null,
           };
         }));
       }
@@ -120,6 +135,22 @@ export default function WorkflowsPage() {
     };
     fetchWorkflows();
   }, []);
+
+  // Lazy-fetch PO items when a workflow tied to a purchase_order is expanded.
+  useEffect(() => {
+    if (!expandedId) return;
+    const wf = workflows.find(w => w.id === expandedId);
+    if (!wf || wf.sourceType !== "purchase_order" || !wf.sourceId) return;
+    if (poItems[wf.sourceId]) return;
+    (async () => {
+      const [{ data: items }, { data: po }] = await Promise.all([
+        supabase.from("purchase_order_items").select("name, qty, unit_price, total, unit_name, unit_factor").eq("purchase_order_id", wf.sourceId),
+        supabase.from("purchase_orders").select("po_number, total, suppliers(name)").eq("id", wf.sourceId).single(),
+      ]);
+      if (items) setPoItems(prev => ({ ...prev, [wf.sourceId!]: items as any }));
+      if (po) setPoMeta(prev => ({ ...prev, [wf.sourceId!]: { po_number: po.po_number, total: Number(po.total) || 0, supplier: (po as any).suppliers?.name } }));
+    })();
+  }, [expandedId, workflows, poItems]);
 
   const filtered = workflows.filter((wf) => {
     const matchSearch = !search || wf.title.toLowerCase().includes(search.toLowerCase()) || wf.id.toLowerCase().includes(search.toLowerCase());
@@ -157,6 +188,11 @@ export default function WorkflowsPage() {
       action: "approved",
       acted_by: user?.id || null,
     });
+
+    // If the workflow is linked to a PO and now fully approved, sync PO status.
+    if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
+      await supabase.from("purchase_orders").update({ status: "approved", approved_by: user?.id || null }).eq("id", wf.sourceId);
+    }
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
@@ -206,6 +242,11 @@ export default function WorkflowsPage() {
       action: "rejected",
       acted_by: user?.id || null,
     });
+
+    // Mirror cancel onto linked PO
+    if (wf.sourceType === "purchase_order" && wf.sourceId) {
+      await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", wf.sourceId);
+    }
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
