@@ -475,11 +475,21 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
-  const [supplier, setSupplier] = useState(suppliers[0]?.id || "");
-  const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
-  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
-  const [notes, setNotes] = useState("");
+function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel, initial, submitLabel = "Create PO" }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void; initial?: { supplier_id?: string | null; warehouse?: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string; unitName?: string; unitFactor?: number }[]; notes?: string }; submitLabel?: string }) {
+  const [supplier, setSupplier] = useState(initial?.supplier_id || suppliers[0]?.id || "");
+  const [warehouse, setWarehouse] = useState(initial?.warehouse || warehouseNames[0] || "");
+  const [items, setItems] = useState(initial?.items?.length
+    ? initial.items.map(i => ({
+        name: i.name,
+        // NewPOForm works in selected-unit qty/price; convert from base when factor>1
+        qty: String((i.qty || 0) / (i.unitFactor || 1)),
+        unitPrice: String((i.unitPrice || 0) * (i.unitFactor || 1)),
+        inventory_item_id: i.inventory_item_id || "",
+        unitName: i.unitName || "",
+        unitFactor: i.unitFactor || 1,
+      }))
+    : [{ name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
+  const [notes, setNotes] = useState(initial?.notes || "");
 
   const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
@@ -556,9 +566,9 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
         <button onClick={() => onSubmit({
           supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
           warehouse_name: warehouse, warehouse_id: null,
-          items: items.filter(i => i.name).map(i => ({ name: i.unitName && i.unitFactor > 1 ? `${i.name} (${i.unitName})` : i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
+          items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
           total, notes,
-        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
+        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">{submitLabel}</button>
       </div>
     </div>
   );
