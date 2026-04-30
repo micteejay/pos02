@@ -27,12 +27,13 @@ export default function LoginPage() {
     setLoading(true);
     const result = await login(email, password);
     setLoading(false);
-    if (result === true || (typeof result === "object" && result.ok)) {
+    const ok = typeof result === "boolean" ? result : !!result?.ok;
+    if (ok) {
       navigate("/");
       return;
     }
     // Map common auth errors to friendly messages
-    const msg = (typeof result === "object" && result.message) || "";
+    const msg = (typeof result === "object" && result?.message) || "";
     if (/invalid login|invalid credentials/i.test(msg)) {
       setError("Wrong username or password. Please try again.");
     } else if (/email not confirmed|not confirmed/i.test(msg)) {
