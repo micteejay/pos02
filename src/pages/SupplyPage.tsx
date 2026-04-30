@@ -422,6 +422,77 @@ export default function SupplyPage() {
         </div>
       )}
 
+      {/* Edit PO Modal */}
+      {editingPO && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingPO(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Edit {editingPO.po_number}</h3>
+              <button onClick={() => setEditingPO(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <NewPOForm
+              suppliers={suppliers.filter(s => s.status === "active" || s.id === editingPO.supplier_id)}
+              formatCurrency={formatCurrency}
+              inventoryItems={inventory}
+              warehouseNames={warehouseNames}
+              submitLabel="Save changes"
+              initial={{
+                supplier_id: editingPO.supplier_id,
+                warehouse: editingPO.warehouse,
+                items: editingPO.items,
+                notes: editingPO.notes,
+              }}
+              onSubmit={async (data) => {
+                // Update header
+                const { error: hErr } = await supabase.from("purchase_orders").update({
+                  supplier_id: data.supplier_id || null,
+                  notes: data.notes,
+                  subtotal: data.total,
+                  total: data.total,
+                }).eq("id", editingPO.id);
+                if (hErr) { toast.error("Failed to update PO"); return; }
+
+                // Replace items
+                await supabase.from("purchase_order_items").delete().eq("purchase_order_id", editingPO.id);
+                if (data.items.length > 0) {
+                  await supabase.from("purchase_order_items").insert(
+                    data.items.map((i: any) => ({
+                      purchase_order_id: editingPO.id, name: i.name,
+                      qty: (i.qty || 0) * (i.unitFactor || 1),
+                      unit_price: (i.unitPrice || 0) / (i.unitFactor || 1),
+                      total: i.qty * i.unitPrice,
+                      inventory_item_id: i.inventory_item_id || null,
+                      unit_name: i.unitName || null,
+                      unit_factor: i.unitFactor || 1,
+                      base_qty: (i.qty || 0) * (i.unitFactor || 1),
+                    }))
+                  );
+                }
+
+                // Mirror updates to any linked workflow row's description
+                const itemsSummary = data.items.map((i: any) => `${i.name} ×${i.qty}${i.unitName && (i.unitFactor || 1) > 1 ? ` ${i.unitName}` : ""}`).join(", ");
+                await supabase.from("workflows")
+                  .update({ description: `${itemsSummary} — ${formatCurrency(data.total)}` })
+                  .eq("source_type", "purchase_order")
+                  .eq("source_id", editingPO.id);
+
+                setOrders(prev => prev.map(o => o.id === editingPO.id ? {
+                  ...o,
+                  supplier_id: data.supplier_id || null,
+                  supplier_name: data.supplier_name || o.supplier_name,
+                  items: data.items,
+                  notes: data.notes,
+                  total: data.total,
+                } : o));
+                setEditingPO(null);
+                toast.success("Purchase order updated");
+              }}
+              onCancel={() => setEditingPO(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* New Supplier Modal */}
       {showNewSupplier && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNewSupplier(false)}>
