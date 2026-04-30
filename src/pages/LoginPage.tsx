@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
-import { LogIn, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { LogIn, Eye, EyeOff, AlertCircle, Mail, ArrowLeft, X } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -12,18 +14,57 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!email.trim()) { setError("Please enter your username or email."); return; }
+    if (!password) { setError("Please enter your password."); return; }
     setLoading(true);
-    const success = await login(email, password);
+    const result = await login(email, password);
     setLoading(false);
-    if (success) {
+    if (result.ok) {
+      // Surface organization context as soon as we land on the app.
+      // The actual company name is loaded by the auth provider; show a
+      // generic toast here and the AppLayout chip will reflect the company.
+      toast.success("Signed in. Loading your organization…");
       navigate("/");
-    } else {
-      setError("Invalid credentials. Please try again.");
+      return;
     }
+    const msg = result.message || "";
+    if (/invalid login|invalid credentials/i.test(msg)) {
+      setError("Wrong username or password. Please try again.");
+    } else if (/email not confirmed|not confirmed/i.test(msg)) {
+      setError("Your email is not yet confirmed. Please check your inbox.");
+    } else if (/rate limit|too many/i.test(msg)) {
+      setError("Too many attempts. Please wait a moment and try again.");
+    } else if (/network|fetch/i.test(msg)) {
+      setError("Network error. Check your connection and retry.");
+    } else {
+      setError("Could not sign in. Please check your credentials.");
+    }
+  };
+
+  const handleSendReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim() || !resetEmail.includes("@")) {
+      toast.error("Enter the email address linked to your account.");
+      return;
+    }
+    setResetSending(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    setResetSending(false);
+    if (error) {
+      toast.error(error.message || "Could not send reset email.");
+      return;
+    }
+    setResetSent(true);
   };
 
   return (
@@ -110,6 +151,16 @@ export default function LoginPage() {
             </button>
           </form>
 
+          <div className="mt-3 text-right">
+            <button
+              type="button"
+              onClick={() => { setShowForgot(true); setResetSent(false); setResetEmail(email.includes("@") ? email : ""); }}
+              className="text-xs text-primary hover:underline"
+            >
+              Forgot your password?
+            </button>
+          </div>
+
           <p className="text-center text-sm text-muted-foreground mt-6">
             Don't have an account?{" "}
             <Link to="/signup" className="text-primary font-medium hover:underline">
@@ -124,6 +175,61 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* Forgot password modal */}
+      {showForgot && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowForgot(false)}>
+          <div className="bg-card border border-border rounded-2xl p-6 max-w-md w-full animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground">Reset your password</h3>
+              <button onClick={() => setShowForgot(false)} className="p-1.5 rounded-lg hover:bg-muted">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {resetSent ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-success/10 text-success text-sm">
+                  We've sent a password reset link to <strong>{resetEmail}</strong>. Check your inbox (and spam folder) and click the link to set a new password.
+                </div>
+                <button onClick={() => setShowForgot(false)} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
+                  Back to sign in
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSendReset} className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter the email associated with your account. We'll email you a secure link to choose a new password.
+                </p>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Email</label>
+                  <div className="relative mt-1">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="pl-9"
+                      autoFocus
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Note: staff accounts created with a username only (no email) cannot self-reset. Ask an admin to reset your password.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowForgot(false)} className="flex-1 py-2.5 rounded-lg border border-border text-sm font-medium hover:bg-muted">
+                    <ArrowLeft className="w-4 h-4 inline mr-1" /> Back
+                  </button>
+                  <button type="submit" disabled={resetSending} className="flex-1 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
+                    {resetSending ? "Sending..." : "Send reset link"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

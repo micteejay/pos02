@@ -35,7 +35,7 @@ interface AuthContextType {
   companyProfile: CompanyProfile | null;
   hasCompanyProfile: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
   signup: (email: string, password: string, name: string) => Promise<boolean>;
   logout: () => void;
   saveCompanyProfile: (profile: CompanyProfile) => void;
@@ -164,13 +164,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [fetchUserProfile]);
 
-  const login = useCallback(async (identifier: string, password: string): Promise<boolean> => {
+  const login = useCallback(async (identifier: string, password: string): Promise<{ ok: boolean; message?: string }> => {
     let email = identifier;
     if (!identifier.includes("@")) {
       // Try synthetic email pattern first (used by create-user edge function)
       const syntheticEmail = `${identifier.toLowerCase().replace(/\s+/g, ".")}@staff.internal`;
       const { error: syntheticError } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password });
-      if (!syntheticError) return true;
+      if (!syntheticError) return { ok: true };
 
       // Fallback: look up by display name in profiles
       const { data } = await supabase
@@ -181,12 +181,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single();
       if (data?.email) {
         const { error } = await supabase.auth.signInWithPassword({ email: data.email, password });
-        return !error;
+        return error ? { ok: false, message: error.message } : { ok: true };
       }
-      return false;
+      return { ok: false, message: syntheticError?.message || "Invalid login credentials" };
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return !error;
+    return error ? { ok: false, message: error.message } : { ok: true };
   }, []);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<boolean> => {

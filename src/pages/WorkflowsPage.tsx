@@ -3,11 +3,12 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock, ShoppingCart, Package,
 } from "lucide-react";
 
 type WFStatus = "active" | "completed" | "paused" | "cancelled";
@@ -30,6 +31,17 @@ interface Workflow {
   requester: string;
   created: string;
   amount: string;
+  sourceType?: string | null;
+  sourceId?: string | null;
+}
+
+interface PoLineItem {
+  name: string;
+  qty: number;
+  unit_price: number;
+  total: number;
+  unit_name?: string | null;
+  unit_factor?: number | null;
 }
 
 const statusConfig = {
@@ -60,12 +72,15 @@ const roleNameToKey: Record<string, string> = {
 export default function WorkflowsPage() {
   const { addNotification, addApprovalItem, getStagesForType } = useAppEvents();
   const { user } = useAuth();
+  const { formatCurrency } = useAppSettings();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showNewWF, setShowNewWF] = useState(false);
+  const [poItems, setPoItems] = useState<Record<string, PoLineItem[]>>({});
+  const [poMeta, setPoMeta] = useState<Record<string, { po_number: string; total: number; supplier?: string }>>({});
 
   // Check if current user can approve a workflow step
   const canApproveStep = (wf: Workflow) => {
@@ -113,6 +128,8 @@ export default function WorkflowsPage() {
             requester: wf.created_by ? (profileMap.get(wf.created_by) || "Unknown") : "System",
             created: new Date(wf.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             amount: wf.description || "",
+            sourceType: wf.source_type || null,
+            sourceId: wf.source_id || null,
           };
         }));
       }
@@ -120,6 +137,22 @@ export default function WorkflowsPage() {
     };
     fetchWorkflows();
   }, []);
+
+  // Lazy-fetch PO items when a workflow tied to a purchase_order is expanded.
+  useEffect(() => {
+    if (!expandedId) return;
+    const wf = workflows.find(w => w.id === expandedId);
+    if (!wf || wf.sourceType !== "purchase_order" || !wf.sourceId) return;
+    if (poItems[wf.sourceId]) return;
+    (async () => {
+      const [{ data: items }, { data: po }] = await Promise.all([
+        supabase.from("purchase_order_items").select("name, qty, unit_price, total, unit_name, unit_factor").eq("purchase_order_id", wf.sourceId),
+        supabase.from("purchase_orders").select("po_number, total, suppliers(name)").eq("id", wf.sourceId).single(),
+      ]);
+      if (items) setPoItems(prev => ({ ...prev, [wf.sourceId!]: items as any }));
+      if (po) setPoMeta(prev => ({ ...prev, [wf.sourceId!]: { po_number: po.po_number, total: Number(po.total) || 0, supplier: (po as any).suppliers?.name } }));
+    })();
+  }, [expandedId, workflows, poItems]);
 
   const filtered = workflows.filter((wf) => {
     const matchSearch = !search || wf.title.toLowerCase().includes(search.toLowerCase()) || wf.id.toLowerCase().includes(search.toLowerCase());
@@ -157,6 +190,11 @@ export default function WorkflowsPage() {
       action: "approved",
       acted_by: user?.id || null,
     });
+
+    // If the workflow is linked to a PO and now fully approved, sync PO status.
+    if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
+      await supabase.from("purchase_orders").update({ status: "approved", approved_by: user?.id || null }).eq("id", wf.sourceId);
+    }
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
@@ -206,6 +244,11 @@ export default function WorkflowsPage() {
       action: "rejected",
       acted_by: user?.id || null,
     });
+
+    // Mirror cancel onto linked PO
+    if (wf.sourceType === "purchase_order" && wf.sourceId) {
+      await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", wf.sourceId);
+    }
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
@@ -350,6 +393,74 @@ export default function WorkflowsPage() {
 
                   {isExpanded && (
                     <div className="px-5 pb-5 animate-fade-in">
+                      {wf.sourceType === "purchase_order" && wf.sourceId && (
+                        <div className="mb-4 glass-card rounded-lg overflow-hidden">
+                          <div className="px-4 py-2 bg-muted/40 flex items-center gap-2 text-xs font-medium text-foreground">
+                            <ShoppingCart className="w-3.5 h-3.5 text-primary" />
+                            Purchase Order
+                            {poMeta[wf.sourceId]?.po_number && (
+                              <span className="font-mono text-primary">{poMeta[wf.sourceId].po_number}</span>
+                            )}
+                            {poMeta[wf.sourceId]?.supplier && (
+                              <span className="text-muted-foreground font-normal">· {poMeta[wf.sourceId].supplier}</span>
+                            )}
+                          </div>
+                          {poItems[wf.sourceId] ? (
+                            poItems[wf.sourceId].length === 0 ? (
+                              <div className="px-4 py-3 text-xs text-muted-foreground">No items on this PO.</div>
+                            ) : (
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border">
+                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Item</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Unit Price</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {poItems[wf.sourceId].map((it, i) => {
+                                    const factor = Number(it.unit_factor) || 1;
+                                    const displayQty = factor > 1 ? (Number(it.qty) / factor) : Number(it.qty);
+                                    const displayPrice = factor > 1 ? Number(it.unit_price) * factor : Number(it.unit_price);
+                                    return (
+                                      <tr key={i} className="border-b border-border/50">
+                                        <td className="px-4 py-2 text-foreground">
+                                          {it.name}
+                                          {it.unit_name && factor > 1 && (
+                                            <span className="block text-[10px] text-muted-foreground">1 {it.unit_name} = {factor} base</span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                          {displayQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}{it.unit_name ? ` ${it.unit_name}` : ""}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                          {formatCurrency(displayPrice)}
+                                        </td>
+                                        <td className="px-4 py-2 text-right font-medium text-foreground">
+                                          {formatCurrency(Number(it.total))}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                                <tfoot>
+                                  <tr>
+                                    <td colSpan={3} className="px-4 py-2 text-right text-muted-foreground">Total</td>
+                                    <td className="px-4 py-2 text-right font-semibold text-foreground">
+                                      {formatCurrency(poMeta[wf.sourceId]?.total ?? poItems[wf.sourceId].reduce((s, x) => s + Number(x.total), 0))}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            )
+                          ) : (
+                            <div className="px-4 py-3 text-xs text-muted-foreground flex items-center gap-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading PO items…
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";

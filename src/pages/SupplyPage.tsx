@@ -38,7 +38,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { user } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
-  const { addApprovalItem, addNotification } = useAppEvents();
+  const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -49,6 +49,7 @@ export default function SupplyPage() {
   const [showNewPO, setShowNewPO] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch POs and suppliers from backend
@@ -128,6 +129,30 @@ export default function SupplyPage() {
       if (newStatus === "submitted") {
         addApprovalItem({ title: `${o.po_number}: ${o.supplier_name}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")}`, priority: "medium" });
         addNotification({ type: "supply", title: `PO ${o.po_number} submitted for approval`, message: `${o.supplier_name} order for ${formatCurrency(o.total)}`, link: "/approvals" });
+        // Also create a linked Workflow row so the PO appears under /workflows
+        (async () => {
+          const stages = getStagesForType("purchase_order");
+          const steps = (stages.length ? stages : [
+            { name: "Manager Review", role: "manager" },
+            { name: "Admin Approval", role: "admin" },
+          ]).map((s: any) => ({ name: s.name, role: s.role, status: "pending", assignee: "Auto-assigned" }));
+          const itemsSummary = o.items.map(i => `${i.name} ×${i.qty}${i.unitName && (i.unitFactor || 1) > 1 ? ` ${i.unitName}` : ""}`).join(", ");
+          // Avoid duplicates: skip if a workflow already exists for this PO
+          const { data: existing } = await supabase.from("workflows").select("id").eq("source_type", "purchase_order").eq("source_id", o.id).limit(1).maybeSingle();
+          if (existing) return;
+          await supabase.from("workflows").insert({
+            title: `${o.po_number}: ${o.supplier_name}`,
+            type: "Purchase Order Approval",
+            description: `${itemsSummary} — ${formatCurrency(o.total)}`,
+            status: "active",
+            current_step: 0,
+            steps: steps as any,
+            source_type: "purchase_order",
+            source_id: o.id,
+            created_by: user?.id || null,
+            company_id: user?.companyId || null,
+          });
+        })();
       }
       if (newStatus === "received") {
         addStockFromPO(o.items, o.warehouse);
@@ -136,7 +161,7 @@ export default function SupplyPage() {
       return updated;
     }));
     toast.success(`PO status updated to ${newStatus}`);
-  }, [formatCurrency, addApprovalItem, addNotification, addStockFromPO]);
+  }, [formatCurrency, addApprovalItem, addNotification, addStockFromPO, getStagesForType, user]);
 
   const deleteOrder = useCallback(async (id: string) => {
     const { error } = await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);
@@ -308,6 +333,11 @@ export default function SupplyPage() {
                         </>}
                         {po.status === "approved" && <button onClick={() => updateOrderStatus(po.id, "shipped")} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20"><Truck className="w-3.5 h-3.5" />Mark Shipped</button>}
                         {po.status === "shipped" && <button onClick={() => updateOrderStatus(po.id, "received")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><Package className="w-3.5 h-3.5" />Mark Received</button>}
+                        {["draft", "submitted"].includes(po.status) && (
+                          <button onClick={() => setEditingPO(po)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-foreground hover:bg-muted">
+                            <Edit2 className="w-3.5 h-3.5" />Edit
+                          </button>
+                        )}
                         {["draft", "cancelled"].includes(po.status) && <button onClick={() => deleteOrder(po.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>}
                       </div>
                     </div>
@@ -416,6 +446,77 @@ export default function SupplyPage() {
         </div>
       )}
 
+      {/* Edit PO Modal */}
+      {editingPO && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingPO(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-lg font-semibold text-foreground">Edit {editingPO.po_number}</h3>
+              <button onClick={() => setEditingPO(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <NewPOForm
+              suppliers={suppliers.filter(s => s.status === "active" || s.id === editingPO.supplier_id)}
+              formatCurrency={formatCurrency}
+              inventoryItems={inventory}
+              warehouseNames={warehouseNames}
+              submitLabel="Save changes"
+              initial={{
+                supplier_id: editingPO.supplier_id,
+                warehouse: editingPO.warehouse,
+                items: editingPO.items,
+                notes: editingPO.notes,
+              }}
+              onSubmit={async (data) => {
+                // Update header
+                const { error: hErr } = await supabase.from("purchase_orders").update({
+                  supplier_id: data.supplier_id || null,
+                  notes: data.notes,
+                  subtotal: data.total,
+                  total: data.total,
+                }).eq("id", editingPO.id);
+                if (hErr) { toast.error("Failed to update PO"); return; }
+
+                // Replace items
+                await supabase.from("purchase_order_items").delete().eq("purchase_order_id", editingPO.id);
+                if (data.items.length > 0) {
+                  await supabase.from("purchase_order_items").insert(
+                    data.items.map((i: any) => ({
+                      purchase_order_id: editingPO.id, name: i.name,
+                      qty: (i.qty || 0) * (i.unitFactor || 1),
+                      unit_price: (i.unitPrice || 0) / (i.unitFactor || 1),
+                      total: i.qty * i.unitPrice,
+                      inventory_item_id: i.inventory_item_id || null,
+                      unit_name: i.unitName || null,
+                      unit_factor: i.unitFactor || 1,
+                      base_qty: (i.qty || 0) * (i.unitFactor || 1),
+                    }))
+                  );
+                }
+
+                // Mirror updates to any linked workflow row's description
+                const itemsSummary = data.items.map((i: any) => `${i.name} ×${i.qty}${i.unitName && (i.unitFactor || 1) > 1 ? ` ${i.unitName}` : ""}`).join(", ");
+                await supabase.from("workflows")
+                  .update({ description: `${itemsSummary} — ${formatCurrency(data.total)}` })
+                  .eq("source_type", "purchase_order")
+                  .eq("source_id", editingPO.id);
+
+                setOrders(prev => prev.map(o => o.id === editingPO.id ? {
+                  ...o,
+                  supplier_id: data.supplier_id || null,
+                  supplier_name: data.supplier_name || o.supplier_name,
+                  items: data.items,
+                  notes: data.notes,
+                  total: data.total,
+                } : o));
+                setEditingPO(null);
+                toast.success("Purchase order updated");
+              }}
+              onCancel={() => setEditingPO(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {/* New Supplier Modal */}
       {showNewSupplier && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNewSupplier(false)}>
@@ -469,11 +570,21 @@ export default function SupplyPage() {
   );
 }
 
-function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void }) {
-  const [supplier, setSupplier] = useState(suppliers[0]?.id || "");
-  const [warehouse, setWarehouse] = useState(warehouseNames[0] || "");
-  const [items, setItems] = useState([{ name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
-  const [notes, setNotes] = useState("");
+function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, onSubmit, onCancel, initial, submitLabel = "Create PO" }: { suppliers: Supplier[]; formatCurrency: (n: number) => string; inventoryItems: any[]; warehouseNames: string[]; onSubmit: (data: any) => void; onCancel: () => void; initial?: { supplier_id?: string | null; warehouse?: string; items: { name: string; qty: number; unitPrice: number; inventory_item_id?: string; unitName?: string; unitFactor?: number }[]; notes?: string }; submitLabel?: string }) {
+  const [supplier, setSupplier] = useState(initial?.supplier_id || suppliers[0]?.id || "");
+  const [warehouse, setWarehouse] = useState(initial?.warehouse || warehouseNames[0] || "");
+  const [items, setItems] = useState(initial?.items?.length
+    ? initial.items.map(i => ({
+        name: i.name,
+        // NewPOForm works in selected-unit qty/price; convert from base when factor>1
+        qty: String((i.qty || 0) / (i.unitFactor || 1)),
+        unitPrice: String((i.unitPrice || 0) * (i.unitFactor || 1)),
+        inventory_item_id: i.inventory_item_id || "",
+        unitName: i.unitName || "",
+        unitFactor: i.unitFactor || 1,
+      }))
+    : [{ name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
+  const [notes, setNotes] = useState(initial?.notes || "");
 
   const addItem = () => setItems(prev => [...prev, { name: "", qty: "1", unitPrice: "", inventory_item_id: "", unitName: "", unitFactor: 1 }]);
   const removeItem = (i: number) => setItems(prev => prev.filter((_, idx) => idx !== i));
@@ -550,9 +661,9 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
         <button onClick={() => onSubmit({
           supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
           warehouse_name: warehouse, warehouse_id: null,
-          items: items.filter(i => i.name).map(i => ({ name: i.unitName && i.unitFactor > 1 ? `${i.name} (${i.unitName})` : i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
+          items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
           total, notes,
-        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">Create PO</button>
+        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">{submitLabel}</button>
       </div>
     </div>
   );
