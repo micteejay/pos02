@@ -3,6 +3,7 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppSettings } from "@/hooks/use-app-settings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -71,6 +72,7 @@ const roleNameToKey: Record<string, string> = {
 export default function WorkflowsPage() {
   const { addNotification, addApprovalItem, getStagesForType } = useAppEvents();
   const { user } = useAuth();
+  const { formatCurrency } = useAppSettings();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
