@@ -38,8 +38,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { user } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
-  const { addApprovalItem, addNotification } = useAppEvents();
-  const { getStagesForType } = useAppEvents();
+  const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
