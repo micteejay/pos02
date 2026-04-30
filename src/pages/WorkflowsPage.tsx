@@ -391,6 +391,74 @@ export default function WorkflowsPage() {
 
                   {isExpanded && (
                     <div className="px-5 pb-5 animate-fade-in">
+                      {wf.sourceType === "purchase_order" && wf.sourceId && (
+                        <div className="mb-4 glass-card rounded-lg overflow-hidden">
+                          <div className="px-4 py-2 bg-muted/40 flex items-center gap-2 text-xs font-medium text-foreground">
+                            <ShoppingCart className="w-3.5 h-3.5 text-primary" />
+                            Purchase Order
+                            {poMeta[wf.sourceId]?.po_number && (
+                              <span className="font-mono text-primary">{poMeta[wf.sourceId].po_number}</span>
+                            )}
+                            {poMeta[wf.sourceId]?.supplier && (
+                              <span className="text-muted-foreground font-normal">· {poMeta[wf.sourceId].supplier}</span>
+                            )}
+                          </div>
+                          {poItems[wf.sourceId] ? (
+                            poItems[wf.sourceId].length === 0 ? (
+                              <div className="px-4 py-3 text-xs text-muted-foreground">No items on this PO.</div>
+                            ) : (
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-border">
+                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Item</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Unit Price</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {poItems[wf.sourceId].map((it, i) => {
+                                    const factor = Number(it.unit_factor) || 1;
+                                    const displayQty = factor > 1 ? (Number(it.qty) / factor) : Number(it.qty);
+                                    const displayPrice = factor > 1 ? Number(it.unit_price) * factor : Number(it.unit_price);
+                                    return (
+                                      <tr key={i} className="border-b border-border/50">
+                                        <td className="px-4 py-2 text-foreground">
+                                          {it.name}
+                                          {it.unit_name && factor > 1 && (
+                                            <span className="block text-[10px] text-muted-foreground">1 {it.unit_name} = {factor} base</span>
+                                          )}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                          {displayQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}{it.unit_name ? ` ${it.unit_name}` : ""}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-muted-foreground">
+                                          {displayPrice.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-4 py-2 text-right font-medium text-foreground">
+                                          {Number(it.total).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                                <tfoot>
+                                  <tr>
+                                    <td colSpan={3} className="px-4 py-2 text-right text-muted-foreground">Total</td>
+                                    <td className="px-4 py-2 text-right font-semibold text-foreground">
+                                      {(poMeta[wf.sourceId]?.total ?? poItems[wf.sourceId].reduce((s, x) => s + Number(x.total), 0)).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            )
+                          ) : (
+                            <div className="px-4 py-3 text-xs text-muted-foreground flex items-center gap-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading PO items…
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";
