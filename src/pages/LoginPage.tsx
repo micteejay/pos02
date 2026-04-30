@@ -28,6 +28,10 @@ export default function LoginPage() {
     const result = await login(email, password);
     setLoading(false);
     if (result.ok) {
+      // Surface organization context as soon as we land on the app.
+      // The actual company name is loaded by the auth provider; show a
+      // generic toast here and the AppLayout chip will reflect the company.
+      toast.success("Signed in. Loading your organization…");
       navigate("/");
       return;
     }
