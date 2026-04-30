@@ -49,6 +49,7 @@ export default function SupplyPage() {
   const [showNewPO, setShowNewPO] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch POs and suppliers from backend
@@ -308,6 +309,11 @@ export default function SupplyPage() {
                         </>}
                         {po.status === "approved" && <button onClick={() => updateOrderStatus(po.id, "shipped")} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20"><Truck className="w-3.5 h-3.5" />Mark Shipped</button>}
                         {po.status === "shipped" && <button onClick={() => updateOrderStatus(po.id, "received")} className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 text-success rounded-lg text-xs font-medium hover:bg-success/20"><Package className="w-3.5 h-3.5" />Mark Received</button>}
+                        {["draft", "submitted"].includes(po.status) && (
+                          <button onClick={() => setEditingPO(po)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-foreground hover:bg-muted">
+                            <Edit2 className="w-3.5 h-3.5" />Edit
+                          </button>
+                        )}
                         {["draft", "cancelled"].includes(po.status) && <button onClick={() => deleteOrder(po.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>}
                       </div>
                     </div>
