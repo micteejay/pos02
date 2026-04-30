@@ -435,10 +435,10 @@ export default function WorkflowsPage() {
                                           {displayQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}{it.unit_name ? ` ${it.unit_name}` : ""}
                                         </td>
                                         <td className="px-4 py-2 text-right text-muted-foreground">
-                                          {displayPrice.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                          {formatCurrency(displayPrice)}
                                         </td>
                                         <td className="px-4 py-2 text-right font-medium text-foreground">
-                                          {Number(it.total).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                          {formatCurrency(Number(it.total))}
                                         </td>
                                       </tr>
                                     );
@@ -448,7 +448,7 @@ export default function WorkflowsPage() {
                                   <tr>
                                     <td colSpan={3} className="px-4 py-2 text-right text-muted-foreground">Total</td>
                                     <td className="px-4 py-2 text-right font-semibold text-foreground">
-                                      {(poMeta[wf.sourceId]?.total ?? poItems[wf.sourceId].reduce((s, x) => s + Number(x.total), 0)).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 })}
+                                      {formatCurrency(poMeta[wf.sourceId]?.total ?? poItems[wf.sourceId].reduce((s, x) => s + Number(x.total), 0))}
                                     </td>
                                   </tr>
                                 </tfoot>
