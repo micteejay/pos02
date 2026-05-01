@@ -99,6 +99,25 @@ export default function SupplyPage() {
     fetchData();
   }, []);
 
+  // Listen for workflow → PO status sync events fired from Workflows page
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent).detail as { poId: string; status: POStatus; workflowId?: string };
+      if (!detail?.poId) return;
+      setOrders(prev => prev.map(o => o.id === detail.poId ? { ...o, status: detail.status, approvedBy: detail.status === "approved" ? (user?.name || "Workflow") : o.approvedBy } : o));
+      const po = orders.find(o => o.id === detail.poId);
+      if (detail.status === "approved") {
+        toast.success(`PO ${po?.po_number || ""} approved via workflow`);
+      } else if (detail.status === "cancelled") {
+        toast.error(`PO ${po?.po_number || ""} cancelled via workflow`);
+      } else {
+        toast(`PO status synced: ${detail.status}`);
+      }
+    };
+    window.addEventListener("po-status-synced", handler);
+    return () => window.removeEventListener("po-status-synced", handler);
+  }, [orders, user]);
+
   const stats = useMemo(() => {
     const active = orders.filter(o => !["received", "cancelled"].includes(o.status)).length;
     const inTransit = orders.filter(o => o.status === "shipped").length;
