@@ -500,6 +500,42 @@ export default function WorkflowsPage() {
                           )}
                         </div>
                       )}
+                      {/* Audit trail */}
+                      <div className="mb-4 glass-card rounded-lg overflow-hidden">
+                        <div className="px-4 py-2 bg-muted/40 flex items-center gap-2 text-xs font-medium text-foreground">
+                          <History className="w-3.5 h-3.5 text-primary" />
+                          Audit Trail
+                        </div>
+                        {history[wf.dbId] === undefined ? (
+                          <div className="px-4 py-3 text-xs text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading history…
+                          </div>
+                        ) : history[wf.dbId].length === 0 ? (
+                          <div className="px-4 py-3 text-xs text-muted-foreground">No actions recorded yet.</div>
+                        ) : (
+                          <ul className="divide-y divide-border/50">
+                            {history[wf.dbId].map((h, idx) => (
+                              <li key={idx} className="px-4 py-2 flex items-center gap-3 text-xs">
+                                {h.action === "approved" ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+                                ) : h.action === "rejected" ? (
+                                  <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                ) : (
+                                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="font-medium text-foreground">{h.step_name}</span>
+                                <span className={h.action === "rejected" ? "text-destructive" : "text-success"}>
+                                  {h.action}
+                                </span>
+                                <span className="text-muted-foreground">by {h.actor}</span>
+                                <span className="ml-auto text-muted-foreground">
+                                  {new Date(h.created_at).toLocaleString()}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";
