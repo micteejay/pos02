@@ -10,7 +10,7 @@ interface Props {
 }
 
 /** Each target field on InventoryItem we accept from CSV. */
-const TARGET_FIELDS = [
+const TARGET_FIELDS: { key: string; label: string; required: boolean; aliases: string[] }[] = [
   { key: "name", label: "Name", required: true, aliases: ["name", "product", "title", "item"] },
   { key: "sku", label: "SKU", required: true, aliases: ["sku", "code", "product_code", "item_code"] },
   { key: "category", label: "Category", required: false, aliases: ["category", "type", "group"] },
@@ -22,9 +22,9 @@ const TARGET_FIELDS = [
   { key: "baseUnit", label: "Base Unit", required: false, aliases: ["unit", "base_unit", "uom"] },
   { key: "packSize", label: "Pack Size", required: false, aliases: ["pack_size", "pack", "units_per_pack"] },
   { key: "warehouse", label: "Warehouse", required: false, aliases: ["warehouse", "location", "store"] },
-] as const;
+];
 
-type FieldKey = (typeof TARGET_FIELDS)[number]["key"];
+type FieldKey = string;
 
 interface ParsedRow {
   raw: Record<string, string>;
