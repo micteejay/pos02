@@ -677,12 +677,28 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
       {total > 0 && <p className="text-sm font-semibold text-foreground">Total: {formatCurrency(total)}</p>}
       <div className="flex gap-2 mt-4">
         <button onClick={onCancel} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Cancel</button>
-        <button onClick={() => onSubmit({
-          supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
-          warehouse_name: warehouse, warehouse_id: null,
-          items: items.filter(i => i.name).map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: i.unitFactor || 1 })),
-          total, notes,
-        })} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">{submitLabel}</button>
+        <button onClick={() => {
+          // Validation: each item needs valid qty (>0 integer), price (>=0), unitFactor (>0)
+          const cleaned = items.filter(i => i.name);
+          if (cleaned.length === 0) { toast.error("Add at least one item"); return; }
+          for (const i of cleaned) {
+            const qty = parseInt(i.qty);
+            const price = parseFloat(i.unitPrice);
+            const factor = Number(i.unitFactor) || 1;
+            if (!Number.isFinite(qty) || qty <= 0) { toast.error(`Invalid quantity for "${i.name}" — must be a positive whole number`); return; }
+            if (!Number.isFinite(price) || price < 0) { toast.error(`Invalid price for "${i.name}"`); return; }
+            if (!Number.isFinite(factor) || factor <= 0) { toast.error(`Invalid unit factor for "${i.name}" — must be greater than zero`); return; }
+            // Base-quantity must be a whole number to match inventory base units
+            const baseQty = qty * factor;
+            if (!Number.isInteger(baseQty)) { toast.error(`Base quantity for "${i.name}" must be a whole number (got ${baseQty})`); return; }
+          }
+          onSubmit({
+            supplier_id: supplier, supplier_name: selectedSupplier?.name || "",
+            warehouse_name: warehouse, warehouse_id: null,
+            items: cleaned.map(i => ({ name: i.name, qty: parseInt(i.qty), unitPrice: parseFloat(i.unitPrice), inventory_item_id: i.inventory_item_id || undefined, unitName: i.unitName || undefined, unitFactor: Number(i.unitFactor) || 1 })),
+            total, notes,
+          });
+        }} disabled={!items.some(i => i.name && i.unitPrice)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50">{submitLabel}</button>
       </div>
     </div>
   );
