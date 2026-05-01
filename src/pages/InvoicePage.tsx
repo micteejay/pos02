@@ -8,6 +8,7 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { printNode } from "@/lib/print";
 
 interface SavedInvoice extends InvoiceData {
   id: string;
@@ -125,15 +126,7 @@ export default function InvoicePage() {
   };
 
   const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow || !printRef.current) return;
-    printWindow.document.write(`
-      <html><head><title>${form.type === "quote" ? "Quote" : "Invoice"} ${form.number}</title>
-      <style>* { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }</style>
-      </head><body>${printRef.current.innerHTML}</body></html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
+    printNode(printRef.current, `${form.type === "quote" ? "Quote" : "Invoice"} ${form.number}`);
   };
 
   const handleSaveAndRecord = async () => {
@@ -260,16 +253,7 @@ export default function InvoicePage() {
   /** Print a saved invoice as a receipt (uses preview render). */
   const printSaved = (inv: SavedInvoice) => {
     setPreviewInvoice(inv);
-    // Wait for next tick to ensure preview ref is populated
-    setTimeout(() => {
-      const printWindow = window.open("", "_blank");
-      if (!printWindow || !previewRef.current) return;
-      printWindow.document.write(`<html><head><title>${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}</title>
-        <style>* { margin: 0; padding: 0; box-sizing: border-box; font-family: system-ui, sans-serif; }</style>
-        </head><body>${previewRef.current.innerHTML}</body></html>`);
-      printWindow.document.close();
-      printWindow.print();
-    }, 100);
+    setTimeout(() => printNode(previewRef.current, `${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}`), 200);
   };
 
   const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);

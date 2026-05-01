@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useSharedData, InventoryItem, CategoryType, ItemUnit } from "@/hooks/use-shared-data";
 import { UnitsEditor } from "@/components/UnitsEditor";
+import { InventoryCsvImport } from "@/components/InventoryCsvImport";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
@@ -77,6 +78,7 @@ export default function InventoryPage() {
   const [transfers, setTransfers] = useState<Transfer[]>([]);
   const [transfersLoading, setTransfersLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   // Fetch transfers from DB
@@ -189,10 +191,21 @@ export default function InventoryPage() {
             <h1 className="text-2xl font-bold text-foreground">Inventory</h1>
             <p className="text-sm text-muted-foreground mt-1">Track stock levels, manage warehouses, and monitor transfers.</p>
           </div>
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-            <Plus className="w-4 h-4" />
-            {tab === "stock" ? "Add Item" : tab === "warehouses" ? "Add Warehouse" : "New Transfer"}
-          </button>
+          <div className="flex items-center gap-2">
+            {tab === "stock" && (
+              <button
+                onClick={() => setShowCsvImport(true)}
+                className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              >
+                <Box className="w-4 h-4" />
+                Import CSV
+              </button>
+            )}
+            <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+              <Plus className="w-4 h-4" />
+              {tab === "stock" ? "Add Item" : tab === "warehouses" ? "Add Warehouse" : "New Transfer"}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
