@@ -8,7 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   GitBranch, Clock, CheckCircle2, XCircle, Plus, Search, Filter, ChevronRight,
-  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock, ShoppingCart, Package,
+  X, Trash2, ArrowRight, Edit2, AlertTriangle, Loader2, Lock, ShoppingCart, Package, History,
 } from "lucide-react";
 
 type WFStatus = "active" | "completed" | "paused" | "cancelled";
@@ -81,6 +81,7 @@ export default function WorkflowsPage() {
   const [showNewWF, setShowNewWF] = useState(false);
   const [poItems, setPoItems] = useState<Record<string, PoLineItem[]>>({});
   const [poMeta, setPoMeta] = useState<Record<string, { po_number: string; total: number; supplier?: string }>>({});
+  const [history, setHistory] = useState<Record<string, { step_index: number; step_name: string; action: string; created_at: string; actor: string }[]>>({});
 
   // Check if current user can approve a workflow step
   const canApproveStep = (wf: Workflow) => {
@@ -154,6 +155,37 @@ export default function WorkflowsPage() {
     })();
   }, [expandedId, workflows, poItems]);
 
+  // Lazy-fetch step-history audit trail when a workflow is expanded
+  useEffect(() => {
+    if (!expandedId) return;
+    const wf = workflows.find(w => w.id === expandedId);
+    if (!wf || history[wf.dbId]) return;
+    (async () => {
+      const { data } = await supabase
+        .from("workflow_step_history")
+        .select("step_index, step_name, action, created_at, acted_by")
+        .eq("workflow_id", wf.dbId)
+        .order("created_at", { ascending: true });
+      if (!data) return;
+      const userIds = Array.from(new Set(data.map((r: any) => r.acted_by).filter(Boolean)));
+      const profileMap = new Map<string, string>();
+      if (userIds.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, name").in("id", userIds as string[]);
+        (profs || []).forEach((p: any) => profileMap.set(p.id, p.name || "Unknown"));
+      }
+      setHistory(prev => ({
+        ...prev,
+        [wf.dbId]: data.map((r: any) => ({
+          step_index: r.step_index,
+          step_name: r.step_name,
+          action: r.action,
+          created_at: r.created_at,
+          actor: r.acted_by ? (profileMap.get(r.acted_by) || "Unknown") : "System",
+        })),
+      }));
+    })();
+  }, [expandedId, workflows, history]);
+
   const filtered = workflows.filter((wf) => {
     const matchSearch = !search || wf.title.toLowerCase().includes(search.toLowerCase()) || wf.id.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || wf.status === statusFilter;
@@ -194,7 +226,11 @@ export default function WorkflowsPage() {
     // If the workflow is linked to a PO and now fully approved, sync PO status.
     if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
       await supabase.from("purchase_orders").update({ status: "approved", approved_by: user?.id || null }).eq("id", wf.sourceId);
+      window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "approved", workflowId: wf.id } }));
     }
+
+    // Refresh history cache for this workflow
+    setHistory(prev => { const c = { ...prev }; delete c[wf.dbId]; return c; });
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
@@ -248,7 +284,10 @@ export default function WorkflowsPage() {
     // Mirror cancel onto linked PO
     if (wf.sourceType === "purchase_order" && wf.sourceId) {
       await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", wf.sourceId);
+      window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "cancelled", workflowId: wf.id } }));
     }
+
+    setHistory(prev => { const c = { ...prev }; delete c[wf.dbId]; return c; });
 
     setWorkflows(prev => prev.map(w => {
       if (w.id !== id) return w;
@@ -461,6 +500,42 @@ export default function WorkflowsPage() {
                           )}
                         </div>
                       )}
+                      {/* Audit trail */}
+                      <div className="mb-4 glass-card rounded-lg overflow-hidden">
+                        <div className="px-4 py-2 bg-muted/40 flex items-center gap-2 text-xs font-medium text-foreground">
+                          <History className="w-3.5 h-3.5 text-primary" />
+                          Audit Trail
+                        </div>
+                        {history[wf.dbId] === undefined ? (
+                          <div className="px-4 py-3 text-xs text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading history…
+                          </div>
+                        ) : history[wf.dbId].length === 0 ? (
+                          <div className="px-4 py-3 text-xs text-muted-foreground">No actions recorded yet.</div>
+                        ) : (
+                          <ul className="divide-y divide-border/50">
+                            {history[wf.dbId].map((h, idx) => (
+                              <li key={idx} className="px-4 py-2 flex items-center gap-3 text-xs">
+                                {h.action === "approved" ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />
+                                ) : h.action === "rejected" ? (
+                                  <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                                ) : (
+                                  <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                )}
+                                <span className="font-medium text-foreground">{h.step_name}</span>
+                                <span className={h.action === "rejected" ? "text-destructive" : "text-success"}>
+                                  {h.action}
+                                </span>
+                                <span className="text-muted-foreground">by {h.actor}</span>
+                                <span className="ml-auto text-muted-foreground">
+                                  {new Date(h.created_at).toLocaleString()}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
                       <div className="relative pl-6 space-y-3 border-l-2 border-border ml-2 mb-4">
                         {wf.steps.map((step, i) => {
                           const isActive = i === wf.currentStep && wf.status === "active";
