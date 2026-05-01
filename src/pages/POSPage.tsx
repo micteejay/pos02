@@ -1,9 +1,12 @@
 import { useState, useMemo, useCallback } from "react";
+import { useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
+import { useCustomers } from "@/hooks/use-customers";
+import { printNode } from "@/lib/print";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
@@ -40,7 +43,10 @@ const paymentMethods = [
 export default function POSPage() {
   const { formatCurrency, settings } = useAppSettings();
   const { inventory, adjustInventoryQty, addSale, storeNames } = useSharedData();
+  const { customers, findOrCreate } = useCustomers();
+  const { companyProfile } = useAuth();
   const { user } = useAuth();
+  const receiptRef = useRef<HTMLDivElement>(null);
   const activeStore = storeNames[0] || "Default Store";
   const categories = useMemo(() => {
     const cats = [...new Set(inventory.map(i => i.category))];
@@ -142,6 +148,8 @@ export default function POSPage() {
   };
 
   const completeSale = () => {
+    // Find / create customer in background (auto-attach)
+    findOrCreate({ name: customerName || "Walk-in" }).catch(() => {});
     // Deduct from inventory in BASE units (qty × factor)
     cart.forEach(item => {
       adjustInventoryQty(item.sku, -(item.qty * item.unitFactor));
@@ -314,11 +322,16 @@ export default function POSPage() {
             <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4"><Check className="w-8 h-8 text-success" /></div>
             <h3 className="text-xl font-bold text-foreground text-center">Sale Complete!</h3>
             <p className="text-sm text-muted-foreground text-center mt-1">{completedSale.id}</p>
-            <div className="mt-4 border border-border rounded-lg p-4 font-mono text-[10px] bg-card">
+            <div ref={receiptRef} className="mt-4 border border-border rounded-lg p-4 font-mono text-[10px] bg-card">
               {settings.receiptStyle === "modern" || settings.receiptStyle === "branded" ? <div className="h-1 rounded-full bg-primary mb-2" /> : null}
               <div className="text-center mb-2">
-                <p className="font-bold text-xs text-foreground">{settings.receiptHeader || settings.appName}</p>
-                <p className="text-muted-foreground">123 Main St · (555) 123-4567</p>
+                <p className="font-bold text-xs text-foreground">{companyProfile?.name || settings.receiptHeader || settings.appName}</p>
+                {companyProfile && (
+                  <p className="text-muted-foreground">
+                    {[companyProfile.address, companyProfile.city].filter(Boolean).join(", ")}
+                    {companyProfile.phone ? ` · ${companyProfile.phone}` : ""}
+                  </p>
+                )}
               </div>
               <div className="border-t border-dashed border-border my-2" />
               <div className="flex justify-between text-muted-foreground"><span>Customer: {completedSale.customer}</span></div>
@@ -346,7 +359,12 @@ export default function POSPage() {
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setCompletedSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">New Sale</button>
-              <button className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"><Printer className="w-4 h-4" /> Print</button>
+              <button
+                onClick={() => printNode(receiptRef.current, `Receipt ${completedSale.id}`)}
+                className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
+              >
+                <Printer className="w-4 h-4" /> Print
+              </button>
             </div>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   LayoutDashboard, MessageSquare, FileText, GitBranch, Bell, Users, Shield, Settings,
   ChevronLeft, ChevronRight, Search, Building2, Package, BarChart3, ClipboardCheck,
-  ShoppingCart, PieChart, Truck, Receipt, LogOut, UserCircle,
+  ShoppingCart, PieChart, Truck, Receipt, LogOut, UserCircle, Contact,
 } from "lucide-react";
 
 interface NavItem {
@@ -25,6 +25,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     { label: "POS", icon: ShoppingCart, path: "/pos" },
     { label: "Inventory", icon: Package, path: "/inventory" },
     { label: "Sales", icon: BarChart3, path: "/sales" },
+    { label: "Customers", icon: Contact, path: "/customers" },
     { label: "Supply Chain", icon: Truck, path: "/supply" },
     { label: "Workflows", icon: GitBranch, path: "/workflows" },
     { label: "Approvals", icon: ClipboardCheck, path: "/approvals", badgeKey: "approvals" },

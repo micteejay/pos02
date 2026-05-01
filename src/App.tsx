@@ -31,6 +31,7 @@ const AuditLogPage = lazy(() => import("./pages/AuditLogPage"));
 const OrganizationPage = lazy(() => import("./pages/OrganizationPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const InvoicePage = lazy(() => import("./pages/InvoicePage"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
 const CompanySetupPage = lazy(() => import("./pages/CompanySetupPage"));
@@ -93,6 +94,7 @@ function AppRoutes() {
         <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/invoices" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
+        <Route path="/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

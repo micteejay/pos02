@@ -476,6 +476,57 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          address: string | null
+          city: string | null
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          last_purchase_at: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          total_orders: number
+          total_spend: number
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          total_orders?: number
+          total_spend?: number
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          total_orders?: number
+          total_spend?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           budget: number | null
@@ -1052,6 +1103,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           customer_address: string | null
+          customer_id: string | null
           customer_name: string
           date: string
           id: string
@@ -1068,6 +1120,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
+          customer_id?: string | null
           customer_name: string
           date?: string
           id?: string
@@ -1084,6 +1137,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           customer_address?: string | null
+          customer_id?: string | null
           customer_name?: string
           date?: string
           id?: string
@@ -1608,6 +1662,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           customer_email: string | null
+          customer_id: string | null
           customer_name: string | null
           customer_phone: string | null
           discount: number | null
@@ -1630,6 +1685,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           discount?: number | null
@@ -1652,6 +1708,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           customer_email?: string | null
+          customer_id?: string | null
           customer_name?: string | null
           customer_phone?: string | null
           discount?: number | null
