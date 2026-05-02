@@ -39,6 +39,8 @@ export interface AppSettings {
   requireApprovalAbove: number;
   defaultPaymentMethod: string;
   allowNegativeStock: boolean;
+  // Hardware / printing
+  selectedPrinter: string;
   // Data management
   auditRetentionDays: number;
   autoBackupEnabled: boolean;
@@ -166,6 +168,7 @@ const defaultSettings: AppSettings = {
   defaultPaymentMethod: "cash", allowNegativeStock: false,
   auditRetentionDays: 365, autoBackupEnabled: false, backupFrequency: "daily",
   dataExportFormat: "csv",
+  selectedPrinter: "",
 };
 
 const defaultIntegrations: IntegrationConfig[] = [
@@ -198,8 +201,8 @@ interface AppSettingsContextType {
   allPermissions: Permission[];
   formatCurrency: (amount: number) => string;
   integrations: IntegrationConfig[];
-  connectIntegration: (name: string, configValues: Record<string, string>) => void;
-  disconnectIntegration: (name: string) => void;
+  connectIntegration: (name: string, configValues: Record<string, string>) => Promise<void>;
+  disconnectIntegration: (name: string) => Promise<void>;
   isIntegrationConnected: (name: string) => boolean;
   getIntegrationConfig: (name: string) => IntegrationConfig | undefined;
 }
@@ -208,7 +211,10 @@ const AppSettingsContext = createContext<AppSettingsContextType>(null!);
 
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth();
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    const saved = typeof window !== "undefined" ? localStorage.getItem("pos_selected_printer") : "";
+    return { ...defaultSettings, selectedPrinter: saved || "" };
+  });
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationConfig[]>(defaultIntegrations);
@@ -402,6 +408,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       persistCategory(notificationKeys, "notifications");
       persistCategory(businessKeys, "business_rules");
       persistCategory(dataKeys, "data_management");
+
+      // Persist hardware settings to localStorage for fast access
+      if (updates.selectedPrinter !== undefined) {
+        try { localStorage.setItem("pos_selected_printer", updates.selectedPrinter); } catch {}
+      }
+
       return next;
     });
   }, [authUser]);

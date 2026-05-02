@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useNavigate, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { UserPlus, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 export default function SignupPage() {
   const { signup } = useAuth();
@@ -27,12 +28,16 @@ export default function SignupPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    const success = await signup(email, password, name);
+    const { ok, message, needsEmailConfirmation } = await signup(email, password, name);
     setLoading(false);
-    if (success) {
-      navigate("/setup-company");
+    if (ok) {
+      if (needsEmailConfirmation) {
+        toast.success("Account created! Please check your email to confirm.");
+      } else {
+        toast.success("Account created successfully!");
+      }
     } else {
-      setError("An account with this email already exists.");
+      setError(message || "An account with this email already exists.");
     }
   };
 

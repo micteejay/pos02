@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +9,7 @@ import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
 import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, Plus, Trash2, ArrowUp, ArrowDown,
-  Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi,
+  Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi, Printer, RefreshCw, CheckCircle2,
 } from "lucide-react";
 
 type Tab = "general" | "business" | "receipt" | "integrations" | "security" | "data" | "workflows";
@@ -145,6 +145,62 @@ export default function SettingsPage() {
   const { companyProfile, user: authUser } = useAuth();
   const { logAction } = useAudit();
   const [saved, setSaved] = useState(false);
+
+  // Printer state
+  const [availablePrinters, setAvailablePrinters] = useState<{ name: string; isDefault: boolean }[]>([]);
+  const [printersLoading, setPrintersLoading] = useState(false);
+  const [printersError, setPrintersError] = useState("");
+
+  const loadPrinters = useCallback(async () => {
+    setPrintersLoading(true);
+    setPrintersError("");
+    try {
+      const { getPrinters } = await import("tauri-plugin-printer-v2");
+      const raw = await getPrinters();
+      console.log("[Printers] Raw response:", raw);
+
+      // getPrinters() returns a JSON string — parse it
+      let list: any[] = [];
+      if (typeof raw === "string") {
+        try { list = JSON.parse(raw); } catch { list = []; }
+      } else if (Array.isArray(raw)) {
+        list = raw;
+      }
+
+      console.log("[Printers] Parsed list:", list);
+
+      if (!Array.isArray(list) || list.length === 0) {
+        setPrintersError("No printers found on this system. Make sure at least one printer is installed in Windows Settings → Printers & Scanners.");
+        setAvailablePrinters([]);
+        return;
+      }
+
+      const mapped = list.map((p: any) => ({
+        name: p.name || p.printer_name || p.Name || p.PrinterName || (typeof p === "string" ? p : String(p)),
+        isDefault: !!(p.is_default || p.isDefault || p.IsDefault),
+      }));
+
+      console.log("[Printers] Mapped printers:", mapped);
+      setAvailablePrinters(mapped);
+      toast.success(`Found ${mapped.length} printer${mapped.length > 1 ? "s" : ""}`);
+    } catch (err: any) {
+      console.error("[Printers] Failed to load:", err);
+      setPrintersError(
+        err?.message?.includes("invoke")
+          ? "Printer plugin not available. Make sure the app is running as a Tauri desktop app (not in a browser)."
+          : `Could not load printers: ${err?.message || String(err)}`
+      );
+    } finally {
+      setPrintersLoading(false);
+    }
+  }, []);
+
+  // Load printers whenever the receipt/hardware tab is opened
+  useEffect(() => {
+    if (activeTab === "receipt") {
+      loadPrinters();
+    }
+  }, [activeTab, loadPrinters]);
 
   const handleSave = () => {
     setSaved(true);
@@ -627,6 +683,62 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+            {/* Hardware & Printer Selection */}
+            <div className="glass-card rounded-xl p-6 lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Printer className="w-4 h-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Hardware &amp; Printing</h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Thermal</span>
+                </div>
+                <button onClick={loadPrinters} disabled={printersLoading} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+                  <RefreshCw className={`w-3.5 h-3.5 ${printersLoading ? 'animate-spin' : ''}`} />
+                  {printersLoading ? 'Detecting...' : 'Refresh Printers'}
+                </button>
+              </div>
+              {printersError && <div className="mb-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">{printersError}</div>}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Select Receipt / Thermal Printer</label>
+                  <p className="text-[10px] text-muted-foreground mb-2 mt-0.5">When selected, all print jobs go silently to this printer with no dialog.</p>
+                  <select
+                    value={settings.selectedPrinter}
+                    onChange={(e) => {
+                      updateSettings({ selectedPrinter: e.target.value });
+                      toast.success(e.target.value ? `Silent printing set to "${e.target.value}"` : 'Reverted to standard print dialog');
+                      logAction('settings.update', 'Settings', 'printer', `Printer: ${e.target.value || '(none)'}`);
+                    }}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                  >
+                    <option value="">— Use Standard Print Dialog —</option>
+                    {availablePrinters.map((p) => (<option key={p.name} value={p.name}>{p.name}{p.isDefault ? ' Default' : ''}</option>))}
+                  </select>
+                  {availablePrinters.length === 0 && !printersLoading && !printersError && <p className="text-[10px] text-muted-foreground mt-1">No printers detected. Click Refresh Printers.</p>}
+                </div>
+                <div className="flex flex-col justify-center">
+                  {settings.selectedPrinter ? (
+                    <div className="p-4 rounded-xl bg-success/10 border border-success/20">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-success mt-0.5 shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-success">Silent Printing Active</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">All receipts and reports go directly to:</p>
+                          <p className="text-sm font-bold text-foreground mt-1 truncate">{settings.selectedPrinter}</p>
+                          <button onClick={() => { updateSettings({ selectedPrinter: '' }); toast.success('Reverted to print dialog'); }} className="mt-2 text-[10px] text-destructive hover:underline">Clear selection</button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-muted/30 border border-border text-center">
+                      <Printer className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                      <p className="text-xs text-muted-foreground">No printer selected</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">Standard OS print dialog will be used</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             </div>
           </div>
         )}

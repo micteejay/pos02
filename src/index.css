@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @layer base {
   :root {
@@ -131,5 +131,20 @@
 
   .sidebar-glow {
     box-shadow: inset -1px 0 0 hsl(var(--sidebar-border));
+  }
+}
+
+@media print {
+  body.print-mode > *:not(#print-container) {
+    display: none !important;
+  }
+  #print-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
   }
 }

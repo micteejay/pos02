@@ -69,14 +69,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Desktop org chip */}
       {companyProfile?.name && (
-        <div className="hidden lg:flex fixed top-4 right-6 z-40 items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur border border-border shadow-sm">
+        <div className="hidden lg:flex fixed top-4 left-1/2 -translate-x-1/2 z-40 items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur border border-border shadow-sm">
           <Building2 className="w-3.5 h-3.5 text-primary" />
           <span className="text-xs font-medium text-foreground max-w-[200px] truncate">{companyProfile.name}</span>
           {user?.role && <span className="text-[10px] text-muted-foreground border-l border-border pl-2 ml-1">{user.role}</span>}
         </div>
       )}
 
-      <main className="lg:ml-[260px] transition-all duration-300 pt-14 lg:pt-0 p-4 sm:p-6 lg:p-8">
+      <main className="lg:ml-[260px] transition-all duration-300 p-4 pt-16 sm:p-6 sm:pt-20 lg:p-8 lg:pt-16">
         {children}
       </main>
     </div>

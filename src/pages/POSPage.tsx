@@ -169,7 +169,7 @@ export default function POSPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-2rem)] -m-4 sm:-m-6 lg:-m-8 gap-0">
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)] -mx-4 -mb-4 -mt-2 sm:-mx-6 sm:-mb-6 sm:-mt-6 lg:-mx-8 lg:-mb-8 lg:-mt-2 gap-0">
         <div className="flex-1 flex flex-col min-w-0 border-r border-border">
           <div className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">

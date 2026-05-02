@@ -51,20 +51,22 @@ const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hasCompanyProfile } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!hasCompanyProfile) return <Navigate to="/setup-company" replace />;
   return <>{children}</>;
 }
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  const { isAuthenticated, hasCompanyProfile } = useAuth();
+  if (isAuthenticated) return <Navigate to={hasCompanyProfile ? "/" : "/setup-company"} replace />;
   return <>{children}</>;
 }
 
 function SetupRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, hasCompanyProfile } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (hasCompanyProfile) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 

@@ -36,7 +36,7 @@ interface AuthContextType {
   hasCompanyProfile: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
-  signup: (email: string, password: string, name: string) => Promise<boolean>;
+  signup: (email: string, password: string, name: string) => Promise<{ ok: boolean; message?: string; needsEmailConfirmation?: boolean }>;
   logout: () => void;
   saveCompanyProfile: (profile: CompanyProfile) => void;
 }
@@ -189,8 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? { ok: false, message: error.message } : { ok: true };
   }, []);
 
-  const signup = useCallback(async (email: string, password: string, name: string): Promise<boolean> => {
-    const { error } = await supabase.auth.signUp({
+  const signup = useCallback(async (email: string, password: string, name: string): Promise<{ ok: boolean; message?: string; needsEmailConfirmation?: boolean }> => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -198,7 +198,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: window.location.origin,
       },
     });
-    return !error;
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, needsEmailConfirmation: !data.session };
   }, []);
 
   const logout = useCallback(async () => {
