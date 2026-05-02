@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,10 +7,12 @@ import { useAppEvents } from "@/hooks/use-app-events";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { printNode } from "@/lib/print";
+import POPrintTemplate, { type POPrintData } from "@/components/POPrintTemplate";
 import {
   Truck, Package, Search, Plus, Clock, CheckCircle2, XCircle,
   FileText, Send, Building2, DollarSign, ChevronRight, MapPin, Phone, Mail, Star,
-  Users, TrendingUp, TrendingDown, X, Edit2, Trash2, RefreshCw, Loader2,
+  Users, TrendingUp, TrendingDown, X, Edit2, Trash2, RefreshCw, Loader2, Printer,
 } from "lucide-react";
 
 type Tab = "orders" | "suppliers";
@@ -37,6 +39,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 
 export default function SupplyPage() {
   const { user } = useAuth();
+  const { companyProfile } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
@@ -51,6 +54,8 @@ export default function SupplyPage() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const [loading, setLoading] = useState(true);
+  const [printingPO, setPrintingPO] = useState<PurchaseOrder | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Fetch POs and suppliers from backend
   useEffect(() => {
@@ -99,24 +104,42 @@ export default function SupplyPage() {
     fetchData();
   }, []);
 
-  // Listen for workflow → PO status sync events fired from Workflows page
+  // Realtime: subscribe to PO and workflow changes so the page reflects sync
+  // automatically when a linked workflow finalizes (no window events needed).
   useEffect(() => {
-    const handler = async (e: Event) => {
-      const detail = (e as CustomEvent).detail as { poId: string; status: POStatus; workflowId?: string };
-      if (!detail?.poId) return;
-      setOrders(prev => prev.map(o => o.id === detail.poId ? { ...o, status: detail.status, approvedBy: detail.status === "approved" ? (user?.name || "Workflow") : o.approvedBy } : o));
-      const po = orders.find(o => o.id === detail.poId);
-      if (detail.status === "approved") {
-        toast.success(`PO ${po?.po_number || ""} approved via workflow`);
-      } else if (detail.status === "cancelled") {
-        toast.error(`PO ${po?.po_number || ""} cancelled via workflow`);
-      } else {
-        toast(`PO status synced: ${detail.status}`);
-      }
-    };
-    window.addEventListener("po-status-synced", handler);
-    return () => window.removeEventListener("po-status-synced", handler);
-  }, [orders, user]);
+    if (!user?.companyId) return;
+    const channel = supabase
+      .channel("supply-realtime")
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "purchase_orders", filter: `company_id=eq.${user.companyId}` },
+        (payload) => {
+          const next = payload.new as any;
+          setOrders((prev) => prev.map((o) => {
+            if (o.id !== next.id) return o;
+            if (o.status === next.status) return o;
+            // Toast only on workflow-driven transitions (approved/cancelled)
+            if (next.status === "approved") toast.success(`PO ${o.po_number} approved`);
+            else if (next.status === "cancelled") toast.error(`PO ${o.po_number} cancelled`);
+            return { ...o, status: next.status as POStatus, total: Number(next.total) };
+          }));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "workflows", filter: `company_id=eq.${user.companyId}` },
+        (payload) => {
+          const wf = payload.new as any;
+          if (wf.source_type !== "purchase_order" || !wf.source_id) return;
+          // workflow row updated — let the PO update event drive the status toast
+          if (wf.status === "completed" || wf.status === "cancelled") {
+            toast(`Workflow for PO updated: ${wf.status}`);
+          }
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.companyId]);
 
   const stats = useMemo(() => {
     const active = orders.filter(o => !["received", "cancelled"].includes(o.status)).length;
@@ -358,6 +381,9 @@ export default function SupplyPage() {
                           </button>
                         )}
                         {["draft", "cancelled"].includes(po.status) && <button onClick={() => deleteOrder(po.id)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted ml-auto"><Trash2 className="w-3.5 h-3.5" />Delete</button>}
+                        <button onClick={() => setPrintingPO(po)} className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-foreground hover:bg-muted">
+                          <Printer className="w-3.5 h-3.5" />Print
+                        </button>
                       </div>
                     </div>
                   )}
