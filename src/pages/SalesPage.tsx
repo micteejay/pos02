@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useSharedData } from "@/hooks/use-shared-data";
@@ -6,10 +6,12 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { printNode } from "@/lib/print";
+import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
 import {
   DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
   Banknote, Search, Eye, ArrowUpRight, Clock, Star, Target, Plus, X, Check,
-  Trash2, Filter, ArrowUp, ArrowDown, Loader2,
+  Trash2, Filter, ArrowUp, ArrowDown, Loader2, Printer,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie,
@@ -49,12 +51,14 @@ const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
   const { users, hasPermission, formatCurrency } = useAppSettings();
-  const { user } = useAuth();
+  const { user, companyProfile } = useAuth();
   const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewSale, setShowNewSale] = useState(false);
+  const [reprintSale, setReprintSale] = useState<ReceiptData | null>(null);
+  const reprintRef = useRef<HTMLDivElement>(null);
 
   // Fetch from DB
   useEffect(() => {
@@ -131,6 +135,34 @@ export default function SalesPage() {
     toast.success(`Transaction ${id} deleted`);
   }, [transactions]);
 
+  const reprintTransaction = useCallback(async (id: string) => {
+    const txn = transactions.find(t => t.id === id);
+    if (!txn) return;
+    const { data, error } = await supabase
+      .from("sales_transactions")
+      .select("*, sales_transaction_items(*)")
+      .eq("id", txn.dbId)
+      .single();
+    if (error || !data) { toast.error("Could not load receipt"); return; }
+    setReprintSale({
+      id: data.transaction_number,
+      total: Number(data.total),
+      subtotal: Number(data.subtotal),
+      tax: Number(data.tax),
+      discount: Number(data.discount || 0),
+      customer: data.customer_name || "Walk-in",
+      method: data.payment_method,
+      date: new Date(data.created_at).toLocaleString(),
+      items: (data.sales_transaction_items || []).map((i: any) => ({
+        name: i.name,
+        qty: i.qty,
+        price: Number(i.price),
+        unitName: i.unit_name || undefined,
+        unitFactor: Number(i.unit_factor) || 1,
+      })),
+    });
+  }, [transactions]);
+
   const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
     { key: "transactions", label: "Transactions", icon: Receipt },
     { key: "analytics", label: "Analytics", icon: TrendingUp },
@@ -192,22 +224,47 @@ export default function SalesPage() {
         ) : (
           <>
             {tab === "transactions" && (
-              <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} storeFilters={dynamicStoreFilters} formatCurrency={formatCurrency} />
+              <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} onReprint={reprintTransaction} storeFilters={dynamicStoreFilters} formatCurrency={formatCurrency} />
             )}
             {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} formatCurrency={formatCurrency} />}
             {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
           </>
         )}
       </div>
+
+      {reprintSale && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReprintSale(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-foreground">Reprint Receipt</h3>
+              <button onClick={() => setReprintSale(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <ReceiptTemplate
+              ref={reprintRef}
+              sale={reprintSale}
+              company={companyProfile}
+              formatCurrency={formatCurrency}
+              footer="Reprinted copy"
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
+              <button onClick={() => printNode(reprintRef.current, `Receipt ${reprintSale.id}`)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
+                <Printer className="w-4 h-4" /> Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
 
 // --- Transactions Tab ---
-function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters, formatCurrency }: {
+function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, storeFilters, formatCurrency }: {
   transactions: Transaction[];
   onUpdateStatus: (id: string, status: Transaction["status"]) => void;
   onDelete: (id: string) => void;
+  onReprint: (id: string) => void;
   storeFilters: string[];
   formatCurrency: (n: number) => string;
 }) {
@@ -327,6 +384,9 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, storeFilters,
                             <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
                             <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
                             <div className="ml-auto flex gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 flex items-center gap-1">
+                                <Receipt className="w-3 h-3" /> Reprint
+                              </button>
                               {txn.status === "pending" && (
                                 <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Complete</button>
                               )}
