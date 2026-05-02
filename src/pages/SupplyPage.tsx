@@ -611,6 +611,47 @@ export default function SupplyPage() {
           </div>
         </div>
       )}
+
+      {/* Print PO Modal */}
+      {printingPO && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrintingPO(null)}>
+          <div className="glass-card rounded-2xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold text-foreground">Print PO {printingPO.po_number}</h3>
+              <button onClick={() => setPrintingPO(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <POPrintTemplate
+              ref={printRef}
+              po={{
+                po_number: printingPO.po_number,
+                supplier_name: printingPO.supplier_name,
+                warehouse: printingPO.warehouse,
+                notes: printingPO.notes,
+                status: printingPO.status,
+                created: printingPO.created,
+                expectedDelivery: printingPO.expectedDelivery,
+                total: printingPO.total,
+                approvedBy: printingPO.approvedBy,
+                items: printingPO.items.map((i) => ({
+                  name: i.name,
+                  qty: i.qty,
+                  unitPrice: i.unitPrice,
+                  unitName: i.unitName,
+                  unitFactor: i.unitFactor,
+                })),
+              }}
+              company={companyProfile}
+              formatCurrency={formatCurrency}
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setPrintingPO(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
+              <button onClick={() => printNode(printRef.current, `PO ${printingPO.po_number}`)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
+                <Printer className="w-4 h-4" /> Print
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
