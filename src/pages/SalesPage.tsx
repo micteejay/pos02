@@ -384,6 +384,9 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                             <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
                             <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
                             <div className="ml-auto flex gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 flex items-center gap-1">
+                                <Receipt className="w-3 h-3" /> Reprint
+                              </button>
                               {txn.status === "pending" && (
                                 <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Complete</button>
                               )}
