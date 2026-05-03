@@ -120,26 +120,9 @@ export async function printNode(
     }
   }
 
-  // --- Path 2: In-page CSS print dialog (fallback) ---
-  const originalTitle = document.title;
-  document.title = title;
-  document.body.classList.add("print-mode");
-
-  const printContainer = node.cloneNode(true) as HTMLElement;
-  printContainer.id = "print-container";
-  document.body.appendChild(printContainer);
-
-  try {
-    window.print();
-  } catch (e) {
-    console.error("Print dialog failed", e);
-  } finally {
-    if (document.body.contains(printContainer)) {
-      document.body.removeChild(printContainer);
-    }
-    document.body.classList.remove("print-mode");
-    document.title = originalTitle;
-  }
+  // --- Path 2: Fallback ---
+  const html = nodeToHtml(node, title);
+  await printHtmlString(html, title);
 }
 
 /**
@@ -163,21 +146,27 @@ export async function printText(
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     pre {
-      margin: 0; padding: 4px;
+      margin: 0; padding: 0;
       white-space: pre-wrap;
       word-wrap: break-word;
-      font-family: 'Courier New', Courier, ui-monospace, monospace !important;
-      font-size: 14px !important; /* Optimal size for 203 DPI */
+      font-family: Consolas, "Lucida Console", Monaco, monospace !important;
+      font-size: 13px !important; /* Slightly smaller to fit 32 chars in 58mm */
       line-height: 1.2 !important;
-      font-weight: bold !important; /* Thicker text for clearer thermal printing */
+      font-weight: normal !important; /* Removed bold to prevent double-strike ghosting */
       color: #000 !important;
       -webkit-font-smoothing: none !important;
-      text-rendering: optimizeLegibility !important;
+      text-rendering: optimizeSpeed !important;
+    }
+    @page {
+      margin: 0;
+      size: auto; /* Tell browser/modal to fit page to content height */
     }
   </style>
 </head>
 <body>
-  <pre>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+  <div style="width: 100%; display: flex; justify-content: flex-start;">
+    <pre>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, "&nbsp;")}</pre>
+  </div>
 </body>
 </html>`;
 
@@ -204,25 +193,41 @@ export async function printHtmlString(
     }
   }
 
-  // --- Path 2: In-page dialog fallback ---
-  const originalTitle = document.title;
-  document.title = title;
-  document.body.classList.add("print-mode");
+  // --- Path 2: Fallback using a hidden iframe ---
+  // Using an iframe ensures the full HTML document (with <head> and <style>) is parsed properly
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  document.body.appendChild(iframe);
 
-  const printContainer = document.createElement("div");
-  printContainer.id = "print-container";
-  printContainer.innerHTML = html;
-  document.body.appendChild(printContainer);
+  const doc = iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
 
-  try {
+    // Wait for styles/images to load before printing
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.error("Print dialog failed", e);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000); // allow time for the print dialog to close on some browsers
+      }
+    }, 250);
+  } else {
+    // Ultimate fallback if iframe fails
+    if (document.body.contains(iframe)) document.body.removeChild(iframe);
     window.print();
-  } catch (e) {
-    console.error("Print dialog failed", e);
-  } finally {
-    if (document.body.contains(printContainer)) {
-      document.body.removeChild(printContainer);
-    }
-    document.body.classList.remove("print-mode");
-    document.title = originalTitle;
   }
 }
