@@ -6,7 +6,8 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { printNode } from "@/lib/print";
+import { printNode, printText } from "@/lib/print";
+import { generateReceiptText } from "@/lib/receipt-text";
 import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
 import {
   DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
@@ -248,7 +249,17 @@ export default function SalesPage() {
             />
             <div className="flex gap-2 mt-4">
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
-              <button onClick={() => printNode(reprintRef.current, `Receipt ${reprintSale.id}`)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
+              <button onClick={() => {
+                if (reprintSale) {
+                  const text = generateReceiptText(
+                    reprintSale,
+                    companyProfile,
+                    formatCurrency,
+                    "Reprinted copy"
+                  );
+                  printText(text, `Receipt ${reprintSale.id}`);
+                }
+              }} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
                 <Printer className="w-4 h-4" /> Print
               </button>
             </div>

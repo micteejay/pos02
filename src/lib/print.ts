@@ -55,11 +55,40 @@ function nodeToHtml(node: HTMLElement, title: string): string {
   <style>
     :root { ${cssVars.join(" ")} }
     html, body {
-      margin: 0; padding: 12px;
+      margin: 0; padding: 4px;
+      width: 100%; max-width: 100%;
       background: #fff !important; color: #000 !important;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
+    
+    /* Thermal Printer Anti-Blur Optimizations */
+    * {
+      color: #000 !important; /* Force pure black to prevent dithering */
+      border-color: #000 !important;
+      background-color: transparent !important;
+      -webkit-font-smoothing: none !important;
+      -moz-osx-font-smoothing: grayscale !important;
+      text-rendering: geometricPrecision !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+    
+    /* Ensure lines print sharp */
+    .border, .border-t, .border-b, .border-l, .border-r {
+      border-style: solid !important;
+      border-width: 1px !important;
+    }
+    .border-dashed {
+      border-style: dashed !important;
+    }
+    
+    /* Increase tiny text sizes for thermal clarity at 203 DPI */
+    .text-\\[9px\\] { font-size: 11px !important; line-height: 1.2 !important; }
+    .text-\\[10px\\] { font-size: 12px !important; line-height: 1.2 !important; }
+    .text-xs { font-size: 13px !important; line-height: 1.3 !important; }
+    .text-sm { font-size: 14px !important; line-height: 1.4 !important; }
+    
     @media print { .no-print { display: none !important; } }
   </style>
 </head>
@@ -111,6 +140,48 @@ export async function printNode(
     document.body.classList.remove("print-mode");
     document.title = originalTitle;
   }
+}
+
+/**
+ * Print a raw text string, optimized for high-quality thermal printer output.
+ * Bypasses complex HTML layouts and directly renders pure text in a sharp monospace font.
+ */
+export async function printText(
+  text: string,
+  title = "Print"
+): Promise<void> {
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; max-width: 100%;
+      background: #fff !important; color: #000 !important;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    pre {
+      margin: 0; padding: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: 'Courier New', Courier, ui-monospace, monospace !important;
+      font-size: 14px !important; /* Optimal size for 203 DPI */
+      line-height: 1.2 !important;
+      font-weight: bold !important; /* Thicker text for clearer thermal printing */
+      color: #000 !important;
+      -webkit-font-smoothing: none !important;
+      text-rendering: optimizeLegibility !important;
+    }
+  </style>
+</head>
+<body>
+  <pre>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+</body>
+</html>`;
+
+  await printHtmlString(html, title);
 }
 
 /**

@@ -6,7 +6,8 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomers } from "@/hooks/use-customers";
-import { printNode } from "@/lib/print";
+import { printNode, printText } from "@/lib/print";
+import { generateReceiptText } from "@/lib/receipt-text";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
@@ -57,7 +58,7 @@ export default function POSPage() {
   const [category, setCategory] = useState("All");
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("card");
-  const [completedSale, setCompletedSale] = useState<{ id: string; total: number; items: CartItem[]; customer: string; method: string } | null>(null);
+  const [completedSale, setCompletedSale] = useState<{ id: string; total: number; subtotal: number; tax: number; discount: number; items: CartItem[]; customer: string; method: string; date?: string } | null>(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [heldOrders, setHeldOrders] = useState<{ id: string; cart: CartItem[]; customer: string }[]>([]);
   const [showHeld, setShowHeld] = useState(false);
@@ -163,7 +164,8 @@ export default function POSPage() {
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
-    setCompletedSale({ id: saleId, total, items: [...cart], customer: customerName || "Walk-in", method: paymentMethod });
+    const dateStr = new Date().toLocaleString();
+    setCompletedSale({ id: saleId, total, subtotal, tax, discount: discountAmount, items: [...cart], customer: customerName || "Walk-in", method: paymentMethod, date: dateStr });
     setCart([]); setCustomerName(""); setDiscountPercent(0);
   };
 
@@ -360,7 +362,16 @@ export default function POSPage() {
             <div className="flex gap-2 mt-4">
               <button onClick={() => setCompletedSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">New Sale</button>
               <button
-                onClick={() => printNode(receiptRef.current, `Receipt ${completedSale.id}`)}
+                onClick={() => {
+                  const text = generateReceiptText(
+                    completedSale as any,
+                    companyProfile,
+                    formatCurrency,
+                    settings.receiptFooter,
+                    settings.receiptHeader || settings.appName
+                  );
+                  printText(text, `Receipt ${completedSale.id}`);
+                }}
                 className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
               >
                 <Printer className="w-4 h-4" /> Print
