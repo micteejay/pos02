@@ -36,7 +36,8 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
   const taxAmount = subtotal * (settings.taxRate / 100);
   const total = subtotal + serviceCharge;
 
-  const companyName = companyProfile?.name || settings.receiptHeader || settings.appName;
+  // Always prefer the Company Profile name (from Company Setup) so invoices reflect the legal/business name.
+  const companyName = companyProfile?.name || settings.appName;
   const companyAddress = companyProfile
     ? [companyProfile.address, companyProfile.city, companyProfile.country].filter(Boolean).join("\n")
     : "";
