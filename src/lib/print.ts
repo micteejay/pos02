@@ -145,27 +145,24 @@ export async function printText(
       background: #fff !important; color: #000 !important;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    pre {
-      margin: 0; padding: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
+    .receipt-text {
+      margin: 0; padding: 4px;
       font-family: Consolas, "Lucida Console", Monaco, monospace !important;
-      font-size: 13px !important; /* Slightly smaller to fit 32 chars in 58mm */
+      font-size: 13px !important;
       line-height: 1.2 !important;
-      font-weight: normal !important; /* Removed bold to prevent double-strike ghosting */
+      font-weight: normal !important;
       color: #000 !important;
       -webkit-font-smoothing: none !important;
-      text-rendering: optimizeSpeed !important;
     }
     @page {
       margin: 0;
-      size: auto; /* Tell browser/modal to fit page to content height */
+      size: auto;
     }
   </style>
 </head>
 <body>
-  <div style="width: 100%; display: flex; justify-content: flex-start;">
-    <pre>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, "&nbsp;")}</pre>
+  <div class="receipt-text">
+    ${text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/ /g, "&nbsp;").replace(/\n/g, "<br/>")}
   </div>
 </body>
 </html>`;
@@ -193,14 +190,13 @@ export async function printHtmlString(
     }
   }
 
-  // --- Path 2: Fallback using a hidden iframe ---
   // Using an iframe ensures the full HTML document (with <head> and <style>) is parsed properly
   const iframe = document.createElement("iframe");
   iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
+  iframe.style.top = "0";
+  iframe.style.left = "-10000px";
+  iframe.style.width = "400px";
+  iframe.style.height = "100vh";
   iframe.style.border = "none";
   document.body.appendChild(iframe);
 
