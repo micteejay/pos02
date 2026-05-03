@@ -37,13 +37,23 @@ function nodeToHtml(node: HTMLElement, title: string): string {
     }
   }
 
-  // Copy all stylesheet links so Tailwind classes resolve
+  // Inline ALL stylesheets (resolved to absolute URLs) so Tailwind/utility
+  // classes still apply inside the iframe/print window. Inline <style> blocks
+  // are copied verbatim; <link rel="stylesheet"> is rewritten with an absolute
+  // href so a sandboxed iframe (no base URL) can still fetch them.
+  const base = document.baseURI || window.location.href;
   const styleLinks = Array.from(
     document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
       'link[rel="stylesheet"], style'
     )
   )
-    .map((el) => el.outerHTML)
+    .map((el) => {
+      if (el instanceof HTMLLinkElement && el.href) {
+        const abs = new URL(el.getAttribute("href") || "", base).toString();
+        return `<link rel="stylesheet" href="${abs}" />`;
+      }
+      return el.outerHTML;
+    })
     .join("\n");
 
   return `<!DOCTYPE html>
@@ -51,6 +61,7 @@ function nodeToHtml(node: HTMLElement, title: string): string {
 <head>
   <meta charset="utf-8" />
   <title>${title}</title>
+  <base href="${base}" />
   ${styleLinks}
   <style>
     :root { ${cssVars.join(" ")} }
@@ -90,6 +101,7 @@ function nodeToHtml(node: HTMLElement, title: string): string {
     .text-sm { font-size: 14px !important; line-height: 1.4 !important; }
     
     @media print { .no-print { display: none !important; } }
+    @page { margin: 8mm; }
   </style>
 </head>
 <body>${node.outerHTML}</body>
@@ -200,30 +212,64 @@ export async function printHtmlString(
   iframe.style.border = "none";
   document.body.appendChild(iframe);
 
-  const doc = iframe.contentWindow?.document;
-  if (doc) {
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Wait for styles/images to load before printing
+  const cleanup = () => {
     setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (e) {
-        console.error("Print dialog failed", e);
-      } finally {
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-        }, 1000); // allow time for the print dialog to close on some browsers
-      }
-    }, 250);
-  } else {
-    // Ultimate fallback if iframe fails
-    if (document.body.contains(iframe)) document.body.removeChild(iframe);
-    window.print();
-  }
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
+    }, 1500);
+  };
+
+  const triggerPrint = async () => {
+    const win = iframe.contentWindow;
+    const doc = win?.document;
+    if (!win || !doc) {
+      cleanup();
+      window.print();
+      return;
+    }
+    // Wait for all stylesheets/images inside the iframe to finish loading
+    try {
+      const links = Array.from(doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'));
+      const imgs = Array.from(doc.images);
+      await Promise.all([
+        ...links.map(
+          (l) =>
+            new Promise<void>((res) => {
+              if ((l as any).sheet) return res();
+              l.addEventListener("load", () => res(), { once: true });
+              l.addEventListener("error", () => res(), { once: true });
+              setTimeout(() => res(), 1500);
+            }),
+        ),
+        ...imgs.map(
+          (img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise<void>((res) => {
+                  img.addEventListener("load", () => res(), { once: true });
+                  img.addEventListener("error", () => res(), { once: true });
+                  setTimeout(() => res(), 1500);
+                }),
+        ),
+        (doc as any).fonts?.ready ?? Promise.resolve(),
+      ]);
+    } catch (e) {
+      console.warn("[print] resource wait failed", e);
+    }
+    try {
+      win.focus();
+      win.print();
+    } catch (e) {
+      console.error("Print dialog failed", e);
+    } finally {
+      cleanup();
+    }
+  };
+
+  iframe.addEventListener("load", () => {
+    void triggerPrint();
+  });
+
+  // Use srcdoc so the iframe gets a proper document with <base> applied
+  // before any resource resolution happens.
+  iframe.srcdoc = html;
 }
