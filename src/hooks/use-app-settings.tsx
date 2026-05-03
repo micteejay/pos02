@@ -268,8 +268,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const { data: perms } = await supabase.rpc("get_user_permissions", { _user_id: authUser.id });
       if (perms) setCurrentUserPermissions(perms as Permission[]);
 
-      // Fetch app settings
-      const { data: settingsData } = await supabase.from("app_settings").select("*");
+      // Fetch app settings (scoped to current company)
+      let settingsQuery = supabase.from("app_settings").select("*");
+      if (authUser.companyId) settingsQuery = settingsQuery.eq("company_id", authUser.companyId);
+      const { data: settingsData } = await settingsQuery;
       if (settingsData) {
         const parsed: any = {};
         settingsData.forEach((s: any) => {
@@ -398,7 +400,15 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
         if (Object.keys(updates).some(k => keys.includes(k))) {
           const val: any = {};
           keys.forEach(k => { val[k] = (next as any)[k]; });
-          supabase.from("app_settings").upsert({ key: dbKey, value: val, updated_by: authUser?.id || null, company_id: authUser?.companyId || null }, { onConflict: "key" });
+          supabase
+            .from("app_settings")
+            .upsert(
+              { key: dbKey, value: val, updated_by: authUser?.id || null, company_id: authUser?.companyId || null },
+              { onConflict: "key,company_id" }
+            )
+            .then(({ error }) => {
+              if (error) console.error("[settings] persist failed:", dbKey, error);
+            });
         }
       };
 
