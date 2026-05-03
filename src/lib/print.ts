@@ -112,7 +112,7 @@ export async function printNode(
   if (isTauri() && selectedPrinter) {
     try {
       const html = nodeToHtml(node, title);
-      await printHtml({ html, printer: selectedPrinter });
+      await printHtml({ id: `pos-${Date.now()}`, html, printer: selectedPrinter } as any);
       return; // done — completely silent
     } catch (err) {
       console.error("[printNode] Native print failed, falling back to dialog:", err);
@@ -183,7 +183,7 @@ export async function printHtmlString(
   // --- Path 1: Silent native print ---
   if (isTauri() && selectedPrinter) {
     try {
-      await printHtml({ html, printer: selectedPrinter });
+      await printHtml({ id: `pos-${Date.now()}`, html, printer: selectedPrinter } as any);
       return;
     } catch (err) {
       console.error("[printHtmlString] Native print failed, falling back to dialog:", err);
