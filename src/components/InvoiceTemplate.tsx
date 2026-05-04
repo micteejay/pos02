@@ -1,6 +1,7 @@
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { forwardRef } from "react";
+import PrintTheme from "./PrintTheme";
 
 export interface InvoiceItem {
   description: string;
@@ -36,48 +37,26 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
   const taxAmount = subtotal * (settings.taxRate / 100);
   const total = subtotal + serviceCharge;
 
-  // Always prefer the Company Profile name (from Company Setup) so invoices reflect the legal/business name.
-  const companyName = companyProfile?.name || settings.appName;
-  const companyAddress = companyProfile
-    ? [companyProfile.address, companyProfile.city, companyProfile.country].filter(Boolean).join("\n")
-    : "";
-  const companyPhone = companyProfile?.phone || "";
-  const companyEmail = companyProfile?.email || "";
+  // Always prefer the Company Profile (from Company Setup) so invoices reflect the legal/business name.
+  const company = {
+    name: companyProfile?.name || settings.appName,
+    address: companyProfile?.address || null,
+    city: [companyProfile?.city, companyProfile?.country].filter(Boolean).join(", ") || null,
+    phone: companyProfile?.phone || null,
+    email: companyProfile?.email || null,
+  };
+  const logoUrl = settings.logoUrl || companyProfile?.logoUrl || null;
 
   return (
-    <div ref={ref} className="bg-card border border-border rounded-xl overflow-hidden font-sans max-w-3xl mx-auto" style={{ fontSize: "13px" }}>
-      {/* Header Wave */}
-      <div className="relative h-16 overflow-hidden">
-        <svg viewBox="0 0 800 100" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-          <path d="M0 0 H800 V60 Q700 100 600 70 Q500 40 400 60 Q300 80 200 50 Q100 20 0 40 Z" fill="hsl(var(--primary))" />
-          <path d="M0 0 H800 V40 Q700 80 600 50 Q500 20 400 40 Q300 60 200 30 Q100 0 0 20 Z" fill="hsl(var(--primary))" opacity="0.6" />
-        </svg>
-      </div>
-
-      <div className="px-8 pb-8">
-        {/* Company Info + Doc Type */}
-        <div className="flex justify-between items-start -mt-4 mb-6">
-          <div className="flex items-start gap-4">
-            {(settings.logoUrl || companyProfile?.logoUrl) ? (
-              <img src={settings.logoUrl || companyProfile?.logoUrl} alt="Logo" className="w-16 h-16 rounded-xl object-contain border border-border bg-card" />
-            ) : (
-              <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center border border-border">
-                <span className="text-xl font-bold text-primary">{companyName.charAt(0)}</span>
-              </div>
-            )}
-            <div className="mt-2">
-              <h2 className="font-bold text-foreground text-base">{companyName}</h2>
-              {companyAddress && <p className="text-muted-foreground text-xs whitespace-pre-line leading-relaxed">{companyAddress}</p>}
-              {companyPhone && <p className="text-muted-foreground text-xs">{companyPhone}</p>}
-              {companyEmail && <p className="text-muted-foreground text-xs">{companyEmail}</p>}
-            </div>
-          </div>
-          <div className="text-right">
-            <h1 className="text-2xl font-bold text-foreground capitalize">{data.type}</h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1"># {data.number}</p>
-          </div>
-        </div>
-
+    <PrintTheme
+      ref={ref}
+      documentType={data.type === "quote" ? "Quote" : "Invoice"}
+      documentNumber={data.number}
+      company={company}
+      logoUrl={logoUrl}
+      footer={data.notes ? `Notes: ${data.notes}` : undefined}
+    >
+      <div>
         {/* Bill To + Date */}
         <div className="flex justify-between items-start mb-6 border-t border-border pt-4">
           <div>
@@ -154,7 +133,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
           </div>
         )}
       </div>
-    </div>
+    </PrintTheme>
   );
 });
 
