@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { CompanyInfo } from "./ReceiptTemplate";
+import PrintTheme from "./PrintTheme";
 
 export interface POItem {
   name: string;
@@ -38,24 +39,14 @@ const POPrintTemplate = forwardRef<HTMLDivElement, Props>(function POPrintTempla
   ref,
 ) {
   return (
-    <div ref={ref} className="bg-card text-foreground p-6 text-xs max-w-[800px] mx-auto">
-      <div className="flex items-start justify-between mb-6 pb-4 border-b border-border">
-        <div>
-          <h1 className="text-xl font-bold">{company?.name || "Purchase Order"}</h1>
-          {company && (
-            <p className="text-muted-foreground mt-1">
-              {[company.address, company.city].filter(Boolean).join(", ")}
-              {company.phone ? ` · ${company.phone}` : ""}
-              {company.email ? ` · ${company.email}` : ""}
-            </p>
-          )}
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-base font-bold text-primary">{po.po_number}</p>
-          <p className="text-muted-foreground capitalize">Status: {po.status}</p>
-        </div>
-      </div>
-
+    <PrintTheme
+      ref={ref}
+      documentType="Purchase Order"
+      documentNumber={po.po_number}
+      statusLabel={`Status: ${po.status}`}
+      company={company}
+      footer={po.approvedBy ? `Approved by: ${po.approvedBy}` : undefined}
+    >
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-muted-foreground">Supplier</p>
@@ -123,12 +114,7 @@ const POPrintTemplate = forwardRef<HTMLDivElement, Props>(function POPrintTempla
           <p>{po.notes}</p>
         </div>
       )}
-      {po.approvedBy && (
-        <p className="text-muted-foreground">
-          Approved by: <span className="font-medium text-foreground">{po.approvedBy}</span>
-        </p>
-      )}
-    </div>
+    </PrintTheme>
   );
 });
 
