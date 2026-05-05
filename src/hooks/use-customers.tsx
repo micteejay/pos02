@@ -50,6 +50,13 @@ export function useCustomers() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  // Listen for cross-component aggregate bumps (sales / invoice payments)
+  useEffect(() => {
+    const handler = () => fetchAll();
+    window.addEventListener("customer-stats-updated", handler);
+    return () => window.removeEventListener("customer-stats-updated", handler);
+  }, [fetchAll]);
+
   const addCustomer = useCallback(
     async (input: Partial<Customer> & { name: string }) => {
       const { data, error } = await supabase
@@ -96,6 +103,34 @@ export function useCustomers() {
     setCustomers((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
+  /** Recompute totals from sales_transactions for this company. Useful after backfilling links. */
+  const recomputeStats = useCallback(async () => {
+    if (!user?.companyId) return;
+    const { data: txs } = await supabase
+      .from("sales_transactions")
+      .select("customer_id,total,created_at")
+      .eq("company_id", user.companyId)
+      .not("customer_id", "is", null);
+    const agg = new Map<string, { spend: number; orders: number; last: string }>();
+    (txs || []).forEach((t: any) => {
+      const cur = agg.get(t.customer_id) || { spend: 0, orders: 0, last: "" };
+      cur.spend += Number(t.total) || 0;
+      cur.orders += 1;
+      if (!cur.last || t.created_at > cur.last) cur.last = t.created_at;
+      agg.set(t.customer_id, cur);
+    });
+    await Promise.all(
+      Array.from(agg.entries()).map(([id, v]) =>
+        supabase.from("customers").update({
+          total_spend: v.spend,
+          total_orders: v.orders,
+          last_purchase_at: v.last || null,
+        }).eq("id", id)
+      )
+    );
+    await fetchAll();
+  }, [user, fetchAll]);
+
   /**
    * Find an existing customer matching name/phone/email, or create one. Used by POS / Invoice.
    */
@@ -118,5 +153,7 @@ export function useCustomers() {
     [customers, addCustomer]
   );
 
-  return { customers, loading, addCustomer, updateCustomer, deleteCustomer, findOrCreate, refresh: fetchAll };
+  const getById = useCallback((id?: string | null) => customers.find((c) => c.id === id) || null, [customers]);
+
+  return { customers, loading, addCustomer, updateCustomer, deleteCustomer, findOrCreate, recomputeStats, getById, refresh: fetchAll };
 }
