@@ -3,11 +3,12 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useCustomers, type Customer } from "@/hooks/use-customers";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { Search, Plus, X, Edit2, Trash2, Mail, Phone, MapPin, User, Loader2, Users } from "lucide-react";
+import { Search, Plus, X, Edit2, Trash2, Mail, Phone, MapPin, User, Loader2, Users, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 export default function CustomersPage() {
-  const { customers, loading, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { customers, loading, addCustomer, updateCustomer, deleteCustomer, recomputeStats } = useCustomers();
+  const [recomputing, setRecomputing] = useState(false);
   const { formatCurrency } = useAppSettings();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -39,6 +40,21 @@ export default function CustomersPage() {
               Manage customer records, contact details, and lifetime value.
             </p>
           </div>
+          <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              setRecomputing(true);
+              await recomputeStats();
+              setRecomputing(false);
+              toast.success("Customer totals recomputed from sales");
+            }}
+            disabled={recomputing}
+            className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm font-medium hover:bg-muted disabled:opacity-50"
+            title="Recompute spend & order counts from sales history"
+          >
+            <RefreshCw className={`w-4 h-4 ${recomputing ? "animate-spin" : ""}`} />
+            Recompute
+          </button>
           <button
             onClick={() => { setEditing(null); setShowForm(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90"
@@ -46,6 +62,7 @@ export default function CustomersPage() {
             <Plus className="w-4 h-4" />
             New Customer
           </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">

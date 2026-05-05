@@ -29,6 +29,7 @@ export interface InventoryItem {
 
 export interface SaleRecord {
   id: string; items: { name: string; sku: string; qty: number; price: number }[]; total: number; customer: string; method: string; date: string; store: string; createdBy: string; createdByRole: string;
+  customerId?: string | null; customerEmail?: string | null; customerPhone?: string | null;
 }
 
 export interface SharedDocument {
@@ -341,6 +342,9 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.from("sales_transactions").insert({
       transaction_number: txnNumber,
       customer_name: sale.customer || "Walk-in",
+      customer_id: sale.customerId || null,
+      customer_email: sale.customerEmail || null,
+      customer_phone: sale.customerPhone || null,
       payment_method: sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method,
       subtotal: sale.total, tax: 0, total: sale.total,
       store_id: storeId, cashier_id: user?.id || null,
@@ -363,7 +367,30 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         customer: sale.customer, method: sale.method,
         date: new Date().toISOString(), store: sale.store,
         createdBy: sale.createdBy, createdByRole: sale.createdByRole,
+        customerId: sale.customerId || null,
+        customerEmail: sale.customerEmail || null,
+        customerPhone: sale.customerPhone || null,
       }, ...prev]);
+
+      // Bump customer aggregates if linked
+      if (sale.customerId) {
+        try {
+          const { data: cust } = await supabase
+            .from("customers")
+            .select("total_spend,total_orders")
+            .eq("id", sale.customerId)
+            .maybeSingle();
+          await supabase
+            .from("customers")
+            .update({
+              total_spend: (Number(cust?.total_spend) || 0) + Number(sale.total || 0),
+              total_orders: (Number(cust?.total_orders) || 0) + 1,
+              last_purchase_at: new Date().toISOString(),
+            })
+            .eq("id", sale.customerId);
+          window.dispatchEvent(new CustomEvent("customer-stats-updated", { detail: { id: sale.customerId } }));
+        } catch {}
+      }
     }
   }, [stores, user, inventory]);
 

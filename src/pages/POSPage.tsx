@@ -6,6 +6,7 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomers } from "@/hooks/use-customers";
+import CustomerPicker from "@/components/CustomerPicker";
 import { printNode, printText } from "@/lib/print";
 import { generateReceiptText } from "@/lib/receipt-text";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -13,7 +14,7 @@ import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
-  Trash2, Receipt, User, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
+  Trash2, Receipt, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
 } from "lucide-react";
 
 interface CartItem {
@@ -57,6 +58,9 @@ export default function POSPage() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [customerName, setCustomerName] = useState("");
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [completedSale, setCompletedSale] = useState<{ id: string; total: number; subtotal: number; tax: number; discount: number; items: CartItem[]; customer: string; method: string; date?: string } | null>(null);
   const [discountPercent, setDiscountPercent] = useState(0);
@@ -148,9 +152,16 @@ export default function POSPage() {
     if (order) { setCart(order.cart); setCustomerName(order.customer); setHeldOrders(prev => prev.filter(o => o.id !== id)); setShowHeld(false); }
   };
 
-  const completeSale = () => {
-    // Find / create customer in background (auto-attach)
-    findOrCreate({ name: customerName || "Walk-in" }).catch(() => {});
+  const completeSale = async () => {
+    // Resolve customer: explicit picker selection wins; otherwise look up / create by name
+    let resolvedId = customerId;
+    let resolvedName = customerName || "Walk-in";
+    let resolvedEmail = customerEmail;
+    let resolvedPhone = customerPhone;
+    if (!resolvedId && customerName.trim() && customerName.toLowerCase() !== "walk-in") {
+      const c = await findOrCreate({ name: customerName, email: customerEmail, phone: customerPhone }).catch(() => null);
+      if (c) { resolvedId = c.id; resolvedName = c.name; resolvedEmail = c.email || resolvedEmail; resolvedPhone = c.phone || resolvedPhone; }
+    }
     // Deduct from inventory in BASE units (qty × factor)
     cart.forEach(item => {
       adjustInventoryQty(item.sku, -(item.qty * item.unitFactor));
@@ -159,14 +170,17 @@ export default function POSPage() {
     // Record sale (qty stored in selling units; consumer shows label with unit name)
     addSale({
       items: cart.map(i => ({ name: `${i.name} (${i.unitName})`, sku: i.sku, qty: i.qty, price: i.price })),
-      total, customer: customerName || "Walk-in", method: paymentMethod, store: activeStore,
+      total, customer: resolvedName, method: paymentMethod, store: activeStore,
       createdBy: user?.name || "System", createdByRole: user?.role || "",
+      customerId: resolvedId,
+      customerEmail: resolvedEmail || null,
+      customerPhone: resolvedPhone || null,
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
     const dateStr = new Date().toLocaleString();
-    setCompletedSale({ id: saleId, total, subtotal, tax, discount: discountAmount, items: [...cart], customer: customerName || "Walk-in", method: paymentMethod, date: dateStr });
-    setCart([]); setCustomerName(""); setDiscountPercent(0);
+    setCompletedSale({ id: saleId, total, subtotal, tax, discount: discountAmount, items: [...cart], customer: resolvedName, method: paymentMethod, date: dateStr });
+    setCart([]); setCustomerName(""); setCustomerId(null); setCustomerEmail(""); setCustomerPhone(""); setDiscountPercent(0);
   };
 
   return (
@@ -262,9 +276,12 @@ export default function POSPage() {
                 {cart.length > 0 && <button onClick={() => setCart([])} className="text-xs text-destructive hover:underline">Clear</button>}
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-3">
-              <User className="w-4 h-4 text-muted-foreground" />
-              <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Walk-in Customer" className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border/50 pb-1" />
+            <div className="mt-3">
+              <CustomerPicker
+                compact
+                value={{ id: customerId, name: customerName, email: customerEmail, phone: customerPhone }}
+                onChange={(v) => { setCustomerId(v.id); setCustomerName(v.name); setCustomerEmail(v.email); setCustomerPhone(v.phone); }}
+              />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2">

@@ -9,18 +9,24 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { printNode } from "@/lib/print";
+import { useCustomers } from "@/hooks/use-customers";
+import CustomerPicker from "@/components/CustomerPicker";
 
 interface SavedInvoice extends InvoiceData {
   id: string;
   dbId: string;
   status: "draft" | "sent" | "paid" | "cancelled";
   paymentMethod?: string;
+  customerId?: string | null;
+  customerEmail?: string | null;
+  customerPhone?: string | null;
 }
 
 export default function InvoicePage() {
   const { formatCurrency, settings } = useAppSettings();
   const { inventory, sales, addSale, adjustInventoryQty } = useSharedData();
   const { user } = useAuth();
+  const { findOrCreate, getById } = useCustomers();
   const printRef = useRef<HTMLDivElement>(null);
 
   const [form, setForm] = useState<InvoiceData>({
@@ -33,6 +39,11 @@ export default function InvoicePage() {
     serviceChargePercent: 0,
     notes: "",
   });
+
+  // Customer picker state (kept alongside the form for back-compat)
+  const [customerId, setCustomerId] = useState<string | null>(null);
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
 
   const [showPreview, setShowPreview] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState<number | null>(null);
@@ -65,6 +76,7 @@ export default function InvoicePage() {
           date: new Date(inv.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
           customerName: inv.customer_name,
           customerAddress: inv.customer_address || "",
+          customerId: inv.customer_id || null,
           items: (inv.invoice_items || []).map((item: any) => ({
             description: item.description,
             qty: Number(item.qty),
@@ -135,12 +147,20 @@ export default function InvoicePage() {
       return;
     }
 
+    // Resolve / auto-create customer record
+    let resolvedId = customerId;
+    if (!resolvedId && form.customerName.trim() && form.customerName.toLowerCase() !== "walk-in") {
+      const c = await findOrCreate({ name: form.customerName, email: customerEmail, phone: customerPhone }).catch(() => null);
+      if (c) resolvedId = c.id;
+    }
+
     const isEdit = !!editingDbId;
     const payload = {
       number: form.number,
       type: form.type as any,
       customer_name: form.customerName,
       customer_address: form.customerAddress || null,
+      customer_id: resolvedId,
       date: new Date().toISOString().split("T")[0],
       notes: form.notes || null,
       service_charge_percent: form.serviceChargePercent || 0,
@@ -175,7 +195,7 @@ export default function InvoicePage() {
     });
     if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft" };
+    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone };
     setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
     toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
     setEditingDbId(null);
@@ -189,6 +209,7 @@ export default function InvoicePage() {
       items: [{ description: "", qty: 1, rate: 0 }],
       serviceChargePercent: 0, notes: "",
     });
+    setCustomerId(null); setCustomerEmail(""); setCustomerPhone("");
   };
 
   const convertQuoteToInvoice = async (inv: SavedInvoice) => {
@@ -207,6 +228,10 @@ export default function InvoicePage() {
       serviceChargePercent: inv.serviceChargePercent || 0,
       notes: inv.notes || "",
     });
+    const linked = inv.customerId ? getById(inv.customerId) : null;
+    setCustomerId(inv.customerId || null);
+    setCustomerEmail(linked?.email || inv.customerEmail || "");
+    setCustomerPhone(linked?.phone || inv.customerPhone || "");
     setEditingDbId(inv.dbId);
     setShowSaved(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -236,6 +261,9 @@ export default function InvoicePage() {
       store: "Invoice",
       createdBy: user?.name || "System",
       createdByRole: user?.role || "",
+      customerId: inv.customerId || null,
+      customerEmail: inv.customerEmail || null,
+      customerPhone: inv.customerPhone || null,
     });
 
     // Deduct stock in BASE units
@@ -354,10 +382,21 @@ export default function InvoicePage() {
 
             <div className="glass-card rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-semibold text-foreground">Customer</h3>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
-                <Input value={form.customerName} onChange={(e) => setForm(prev => ({ ...prev, customerName: e.target.value }))} placeholder="Walk In Customer" className="mt-1" />
-              </div>
+              <CustomerPicker
+                value={{ id: customerId, name: form.customerName, email: customerEmail, phone: customerPhone }}
+                onChange={(v) => {
+                  setCustomerId(v.id);
+                  setCustomerEmail(v.email);
+                  setCustomerPhone(v.phone);
+                  setForm((prev) => ({
+                    ...prev,
+                    customerName: v.name,
+                    // Auto-fill address from selected customer when empty
+                    customerAddress: prev.customerAddress || (v.id ? (getById(v.id)?.address || "") : ""),
+                  }));
+                }}
+                placeholder="Walk In Customer"
+              />
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Address (optional)</label>
                 <Input value={form.customerAddress} onChange={(e) => setForm(prev => ({ ...prev, customerAddress: e.target.value }))} className="mt-1" />
