@@ -14,7 +14,7 @@ import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
-  Trash2, Receipt, User, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
+  Trash2, Receipt, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
 } from "lucide-react";
 
 interface CartItem {
