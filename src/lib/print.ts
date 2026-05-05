@@ -101,7 +101,32 @@ function nodeToHtml(node: HTMLElement, title: string): string {
     .text-sm { font-size: 14px !important; line-height: 1.4 !important; }
     
     @media print { .no-print { display: none !important; } }
-    @page { margin: 8mm; }
+
+    /* ============================================================
+     * Shared print document chrome — used by PrintTheme (PO + Invoice)
+     * Single source of truth for page margins and outer spacing so
+     * both templates render with identical geometry on every printer.
+     * ============================================================ */
+    @page { size: A4; margin: 12mm; }
+    .print-doc {
+      box-sizing: border-box;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      padding: 0 !important;        /* page margin handled by @page */
+      background: #fff !important;
+      color: #000 !important;
+    }
+    .print-doc header,
+    .print-doc main,
+    .print-doc footer { width: 100%; }
+    .print-doc table { width: 100%; border-collapse: collapse; }
+    .print-doc th, .print-doc td { padding: 4px 6px; vertical-align: top; }
+    @media print {
+      html, body { padding: 0 !important; }
+      .print-doc { page-break-inside: auto; }
+      .print-doc tr, .print-doc td { page-break-inside: avoid; }
+    }
   </style>
 </head>
 <body>${node.outerHTML}</body>
