@@ -382,10 +382,21 @@ export default function InvoicePage() {
 
             <div className="glass-card rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-semibold text-foreground">Customer</h3>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">Customer Name</label>
-                <Input value={form.customerName} onChange={(e) => setForm(prev => ({ ...prev, customerName: e.target.value }))} placeholder="Walk In Customer" className="mt-1" />
-              </div>
+              <CustomerPicker
+                value={{ id: customerId, name: form.customerName, email: customerEmail, phone: customerPhone }}
+                onChange={(v) => {
+                  setCustomerId(v.id);
+                  setCustomerEmail(v.email);
+                  setCustomerPhone(v.phone);
+                  setForm((prev) => ({
+                    ...prev,
+                    customerName: v.name,
+                    // Auto-fill address from selected customer when empty
+                    customerAddress: prev.customerAddress || (v.id ? (getById(v.id)?.address || "") : ""),
+                  }));
+                }}
+                placeholder="Walk In Customer"
+              />
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Address (optional)</label>
                 <Input value={form.customerAddress} onChange={(e) => setForm(prev => ({ ...prev, customerAddress: e.target.value }))} className="mt-1" />
