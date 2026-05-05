@@ -37,8 +37,6 @@ const PrintTheme = forwardRef<HTMLDivElement, PrintThemeProps>(function PrintThe
       ref={ref}
       className="bg-card text-foreground mx-auto print-doc"
       style={{
-        maxWidth: "800px",
-        padding: "16px 20px",
         fontFamily:
           'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         fontSize: "12px",
