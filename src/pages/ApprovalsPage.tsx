@@ -6,8 +6,9 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   ClipboardCheck, Clock, CheckCircle2, XCircle, AlertTriangle, Search,
   ChevronRight, User, DollarSign, ArrowRightLeft, FileText, ShoppingCart,
-  MessageSquare, TrendingUp, TrendingDown, Package, GitBranch, Lock,
+  MessageSquare, TrendingUp, TrendingDown, Package, GitBranch, Lock, Inbox,
 } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
 
 type Tab = "pending" | "history";
 
@@ -236,10 +237,12 @@ export default function ApprovalsPage() {
         {tab === "pending" && (
           <div className="space-y-3 animate-fade-in">
             {pending.length === 0 ? (
-              <div className="text-center py-12 text-sm text-muted-foreground">
-                <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>All caught up! No pending approvals.</p>
-              </div>
+              <EmptyState
+                icon={CheckCircle2}
+                title="All caught up"
+                description="There are no pending approvals waiting on your action right now."
+                hint="New requests appear here automatically — workflows route by role."
+              />
             ) : pending.map(renderCard)}
           </div>
         )}
@@ -252,7 +255,11 @@ export default function ApprovalsPage() {
             </div>
             <div className="space-y-3">
               {filteredHistory.length === 0 ? (
-                <div className="text-center py-10 text-sm text-muted-foreground">No matching records.</div>
+                <EmptyState
+                  icon={Inbox}
+                  title={search ? "No matches" : "No history yet"}
+                  description={search ? "No approval records match your search." : "Approved and rejected requests will appear here."}
+                />
               ) : filteredHistory.map(renderCard)}
             </div>
           </div>
