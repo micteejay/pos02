@@ -11,6 +11,9 @@ import { toast } from "sonner";
 import { printNode } from "@/lib/print";
 import { useCustomers } from "@/hooks/use-customers";
 import CustomerPicker from "@/components/CustomerPicker";
+import { DocumentPreviewSkeleton, PreviewErrorState } from "@/components/PreviewSkeleton";
+import EmptyState from "@/components/EmptyState";
+import { FileText } from "lucide-react";
 
 interface SavedInvoice extends InvoiceData {
   id: string;
@@ -323,7 +326,11 @@ export default function InvoicePage() {
                 ))}
               </div>
             ) : savedInvoices.length === 0 ? (
-              <p className="text-xs text-muted-foreground text-center py-4">No saved documents yet — Save & Record one to see it here.</p>
+              <EmptyState
+                icon={FileText}
+                title="No saved documents"
+                description="Save & Record a quote or invoice to see it appear here."
+              />
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {savedInvoices.map((inv, idx) => (
@@ -500,7 +507,19 @@ export default function InvoicePage() {
             <div className="sticky top-4">
               <h3 className="text-sm font-semibold text-foreground mb-3">Live Preview</h3>
               <div className="transform scale-[0.85] origin-top">
-                <InvoiceTemplate ref={printRef} data={form} />
+                {!form.customerName && form.items.every(i => !i.description) ? (
+                  <div className="glass-card rounded-xl">
+                    <PreviewErrorState
+                      title="Preview will appear here"
+                      description="Add a customer name and at least one line item to see the live document."
+                    />
+                    <div className="hidden">
+                      <InvoiceTemplate ref={printRef} data={form} />
+                    </div>
+                  </div>
+                ) : (
+                  <InvoiceTemplate ref={printRef} data={form} />
+                )}
               </div>
             </div>
           </div>

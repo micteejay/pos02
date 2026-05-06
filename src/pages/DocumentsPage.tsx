@@ -8,6 +8,9 @@ import {
   FileText, Upload, Search, Eye, Download, Folder, File, Image, FileSpreadsheet,
   Plus, FolderPlus, ChevronRight, MoreVertical, Trash2, X, Grid, List, ArrowUp, ArrowDown, Loader2, ExternalLink,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PreviewErrorState } from "@/components/PreviewSkeleton";
+import EmptyState from "@/components/EmptyState";
 
 interface DocRecord {
   id: string; name: string; type: string; size: string; modified: string;
@@ -48,15 +51,28 @@ function DocumentPreviewModal({ doc, onClose, onDownload, onDelete }: {
 }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
 
-  useEffect(() => {
+  const loadPreview = useCallback(() => {
     if (!doc.storagePath || !doc.storageBucket) return;
-    if (isImageType(doc.type) || isPdfType(doc.type)) {
-      setLoadingPreview(true);
-      supabase.storage.from(doc.storageBucket).createSignedUrl(doc.storagePath, 3600)
-        .then(({ data }) => { setPreviewUrl(data?.signedUrl || null); setLoadingPreview(false); });
-    }
+    if (!isImageType(doc.type) && !isPdfType(doc.type)) return;
+    setLoadingPreview(true);
+    setPreviewError(null);
+    setImgFailed(false);
+    supabase.storage.from(doc.storageBucket).createSignedUrl(doc.storagePath, 3600)
+      .then(({ data, error }) => {
+        if (error || !data?.signedUrl) setPreviewError(error?.message || "Could not generate preview link.");
+        else setPreviewUrl(data.signedUrl);
+        setLoadingPreview(false);
+      })
+      .catch((e) => {
+        setPreviewError(e?.message || "Preview failed");
+        setLoadingPreview(false);
+      });
   }, [doc.storagePath, doc.storageBucket, doc.type]);
+
+  useEffect(() => { loadPreview(); }, [loadPreview]);
 
   const Icon = iconMap[doc.type] || File;
 
@@ -71,14 +87,31 @@ function DocumentPreviewModal({ doc, onClose, onDownload, onDelete }: {
         {/* Preview Area */}
         <div className="w-full rounded-xl bg-muted/50 flex items-center justify-center mb-4 overflow-hidden">
           {loadingPreview ? (
-            <div className="h-64 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>
-          ) : isImageType(doc.type) && previewUrl ? (
-            <img src={previewUrl} alt={doc.name} className="max-w-full max-h-[50vh] object-contain" loading="lazy" />
+            <div className="w-full p-4 space-y-3">
+              <Skeleton className="h-48 w-full rounded-lg" />
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          ) : previewError ? (
+            <PreviewErrorState variant="error" description={previewError} onRetry={loadPreview} />
+          ) : isImageType(doc.type) && previewUrl && !imgFailed ? (
+            <img
+              src={previewUrl}
+              alt={doc.name}
+              className="max-w-full max-h-[50vh] object-contain"
+              loading="lazy"
+              onError={() => setImgFailed(true)}
+            />
+          ) : isImageType(doc.type) && imgFailed ? (
+            <PreviewErrorState variant="image" />
           ) : isPdfType(doc.type) && previewUrl ? (
             <iframe src={`${previewUrl}#toolbar=0`} className="w-full h-[50vh]" title={doc.name} />
           ) : (
-            <div className="h-48 flex items-center justify-center">
+            <div className="h-48 flex flex-col items-center justify-center gap-2">
               <Icon className={`w-16 h-16 ${colorMap[doc.type]}`} />
+              <p className="text-xs text-muted-foreground">Inline preview not supported — download to view.</p>
             </div>
           )}
         </div>
@@ -319,7 +352,19 @@ export default function DocumentsPage() {
   ];
 
   if (loading) {
-    return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
+    return (
+      <AppLayout>
+        <div className="space-y-4 animate-fade-in">
+          <Skeleton className="h-8 w-48" />
+          <div className="grid grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          </div>
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
