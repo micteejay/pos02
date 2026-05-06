@@ -352,7 +352,19 @@ export default function DocumentsPage() {
   ];
 
   if (loading) {
-    return <AppLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div></AppLayout>;
+    return (
+      <AppLayout>
+        <div className="space-y-4 animate-fade-in">
+          <Skeleton className="h-8 w-48" />
+          <div className="grid grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          </div>
+          <div className="space-y-2">
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-lg" />)}
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
