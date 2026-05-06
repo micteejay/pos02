@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import { printNode, printText } from "@/lib/print";
 import { generateReceiptText } from "@/lib/receipt-text";
 import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
+import EmptyState from "@/components/EmptyState";
+import TableSkeleton, { CardGridSkeleton } from "@/components/TableSkeleton";
 import {
   DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
   Banknote, Search, Eye, ArrowUpRight, Clock, Star, Target, Plus, X, Check,
@@ -219,9 +221,7 @@ export default function SalesPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 text-primary animate-spin" />
-          </div>
+          <TableSkeleton rows={6} cols={5} />
         ) : (
           <>
             {tab === "transactions" && (
@@ -416,7 +416,12 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-muted-foreground">No transactions found.</td></tr>
+                <tr><td colSpan={6} className="px-4 py-12">
+                  <div className="flex flex-col items-center text-center gap-2">
+                    <Search className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-sm text-muted-foreground">No transactions match your filters.</p>
+                  </div>
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -455,10 +460,12 @@ function AnalyticsTab({ paymentBreakdown, transactions, formatCurrency }: { paym
   return (
     <div className="space-y-4 animate-fade-in">
       {transactions.length === 0 ? (
-        <div className="glass-card rounded-xl p-10 text-center">
-          <TrendingUp className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">No transaction data for analytics yet.</p>
-        </div>
+        <EmptyState
+          icon={TrendingUp}
+          title="No analytics yet"
+          description="Once you record sales, charts and breakdowns will appear here automatically."
+          hint="Complete a sale at POS to see revenue, payment, and hourly trends."
+        />
       ) : (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -530,10 +537,11 @@ function RepsTab({ users, storeNames }: { users: { id: string; name: string; rol
 
   if (activeReps.length === 0) {
     return (
-      <div className="glass-card rounded-xl p-10 text-center animate-fade-in">
-        <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground">No active users. Add users in the Users & Roles page.</p>
-      </div>
+      <EmptyState
+        icon={Users}
+        title="No active reps"
+        description="Add users in the Users & Roles page to see sales rep performance here."
+      />
     );
   }
 
