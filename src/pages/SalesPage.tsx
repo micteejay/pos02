@@ -11,6 +11,8 @@ import { generateReceiptText } from "@/lib/receipt-text";
 import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
 import EmptyState from "@/components/EmptyState";
 import TableSkeleton, { CardGridSkeleton } from "@/components/TableSkeleton";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { PreviewErrorState } from "@/components/PreviewSkeleton";
 import {
   DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
   Banknote, Search, Eye, ArrowUpRight, Clock, Star, Target, Plus, X, Check,
@@ -240,13 +242,31 @@ export default function SalesPage() {
               <h3 className="text-lg font-semibold text-foreground">Reprint Receipt</h3>
               <button onClick={() => setReprintSale(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
-            <ReceiptTemplate
-              ref={reprintRef}
-              sale={reprintSale}
-              company={companyProfile}
-              formatCurrency={formatCurrency}
-              footer="Reprinted copy"
-            />
+            {!reprintSale.items || reprintSale.items.length === 0 ? (
+              <PreviewErrorState
+                variant="empty"
+                title="Receipt has no items"
+                description="This sale has no recorded line items, so a receipt cannot be rendered."
+              />
+            ) : (
+              <ErrorBoundary
+                fallback={
+                  <PreviewErrorState
+                    variant="error"
+                    title="Couldn't render receipt"
+                    description="Receipt template failed to load. You can still print a plain-text version."
+                  />
+                }
+              >
+                <ReceiptTemplate
+                  ref={reprintRef}
+                  sale={reprintSale}
+                  company={companyProfile}
+                  formatCurrency={formatCurrency}
+                  footer="Reprinted copy"
+                />
+              </ErrorBoundary>
+            )}
             <div className="flex gap-2 mt-4">
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
               <button onClick={() => {
