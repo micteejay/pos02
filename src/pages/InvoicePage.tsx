@@ -507,7 +507,19 @@ export default function InvoicePage() {
             <div className="sticky top-4">
               <h3 className="text-sm font-semibold text-foreground mb-3">Live Preview</h3>
               <div className="transform scale-[0.85] origin-top">
-                <InvoiceTemplate ref={printRef} data={form} />
+                {!form.customerName && form.items.every(i => !i.description) ? (
+                  <div className="glass-card rounded-xl">
+                    <PreviewErrorState
+                      title="Preview will appear here"
+                      description="Add a customer name and at least one line item to see the live document."
+                    />
+                    <div className="hidden">
+                      <InvoiceTemplate ref={printRef} data={form} />
+                    </div>
+                  </div>
+                ) : (
+                  <InvoiceTemplate ref={printRef} data={form} />
+                )}
               </div>
             </div>
           </div>
