@@ -3,7 +3,9 @@ import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useCustomers, type Customer } from "@/hooks/use-customers";
 import { useAppSettings } from "@/hooks/use-app-settings";
-import { Search, Plus, X, Edit2, Trash2, Mail, Phone, MapPin, User, Loader2, Users, RefreshCw } from "lucide-react";
+import { Search, Plus, X, Edit2, Trash2, Mail, Phone, MapPin, User, Users, RefreshCw } from "lucide-react";
+import EmptyState from "@/components/EmptyState";
+import TableSkeleton from "@/components/TableSkeleton";
 import { toast } from "sonner";
 
 export default function CustomersPage() {
@@ -86,16 +88,15 @@ export default function CustomersPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
+          <TableSkeleton rows={6} cols={4} />
         ) : filtered.length === 0 ? (
-          <div className="glass-card rounded-xl p-12 text-center">
-            <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">
-              {search ? "No customers match your search." : "No customers yet — add your first one."}
-            </p>
-          </div>
+          <EmptyState
+            icon={Users}
+            title={search ? "No matches" : "No customers yet"}
+            description={search ? "Try a different name, email, or phone number." : "Add your first customer to start tracking lifetime value and order history."}
+            hint={search ? undefined : "Customers added here are auto-suggested at POS and Invoices."}
+            action={search ? undefined : { label: "New Customer", onClick: () => { setEditing(null); setShowForm(true); } }}
+          />
         ) : (
           <div className="glass-card rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
