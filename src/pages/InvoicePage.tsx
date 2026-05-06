@@ -317,7 +317,13 @@ export default function InvoicePage() {
           <div className="glass-card rounded-xl p-5 space-y-3">
             <h3 className="text-sm font-semibold text-foreground">Saved Documents ({savedInvoices.length})</h3>
             {loading ? (
-              <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-12 rounded-lg bg-muted/40 animate-pulse" />
+                ))}
+              </div>
+            ) : savedInvoices.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">No saved documents yet — Save & Record one to see it here.</p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {savedInvoices.map((inv, idx) => (
