@@ -174,6 +174,7 @@ export default function InvoicePage() {
       service_charge_percent: form.serviceChargePercent || 0,
       created_by: user?.id || null,
       company_id: user?.companyId || null,
+      attachments: formAttachments as any,
     };
 
     let dbId = editingDbId;
@@ -203,7 +204,7 @@ export default function InvoicePage() {
     });
     if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone };
+    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone, attachments: formAttachments };
     setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
     toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
     setEditingDbId(null);
@@ -218,6 +219,7 @@ export default function InvoicePage() {
       serviceChargePercent: 0, notes: "",
     });
     setCustomerId(null); setCustomerEmail(""); setCustomerPhone("");
+    setFormAttachments([]);
   };
 
   const convertQuoteToInvoice = async (inv: SavedInvoice) => {
@@ -241,6 +243,7 @@ export default function InvoicePage() {
     setCustomerEmail(linked?.email || inv.customerEmail || "");
     setCustomerPhone(linked?.phone || inv.customerPhone || "");
     setEditingDbId(inv.dbId);
+    setFormAttachments(inv.attachments || []);
     setShowSaved(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
     toast.info(`Editing ${inv.number}`);
