@@ -561,6 +561,23 @@ export default function InvoicePage() {
               <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-lg bg-card border border-border hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <InvoiceTemplate ref={previewRef} data={previewInvoice} />
+            <div className="mt-4">
+              <AttachmentsManager
+                attachments={previewInvoice.attachments || []}
+                scope="invoice"
+                parentId={previewInvoice.dbId}
+                onChange={async (next) => {
+                  setPreviewInvoice({ ...previewInvoice, attachments: next });
+                  setSavedInvoices((prev) =>
+                    prev.map((s) => (s.dbId === previewInvoice.dbId ? { ...s, attachments: next } : s))
+                  );
+                  await supabase
+                    .from("invoices")
+                    .update({ attachments: next as any })
+                    .eq("id", previewInvoice.dbId);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
