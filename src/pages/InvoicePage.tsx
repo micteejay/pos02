@@ -14,6 +14,7 @@ import CustomerPicker from "@/components/CustomerPicker";
 import { DocumentPreviewSkeleton, PreviewErrorState } from "@/components/PreviewSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { FileText } from "lucide-react";
+import AttachmentsManager, { Attachment } from "@/components/AttachmentsManager";
 
 interface SavedInvoice extends InvoiceData {
   id: string;
@@ -23,6 +24,7 @@ interface SavedInvoice extends InvoiceData {
   customerId?: string | null;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  attachments?: Attachment[];
 }
 
 export default function InvoicePage() {
@@ -59,6 +61,8 @@ export default function InvoicePage() {
   const [payingInvoice, setPayingInvoice] = useState<SavedInvoice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mobile" | "transfer">("cash");
   const previewRef = useRef<HTMLDivElement>(null);
+  // Attachments on the in-progress (draft) form, keyed by editing id or "new"
+  const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
 
   // Fetch invoices from DB
   useEffect(() => {
@@ -90,6 +94,7 @@ export default function InvoicePage() {
           serviceChargePercent: Number(inv.service_charge_percent) || 0,
           notes: inv.notes || "",
           status: inv.status as SavedInvoice["status"],
+          attachments: Array.isArray(inv.attachments) ? (inv.attachments as Attachment[]) : [],
         })));
       }
       setLoading(false);
