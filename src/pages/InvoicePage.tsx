@@ -14,6 +14,7 @@ import CustomerPicker from "@/components/CustomerPicker";
 import { DocumentPreviewSkeleton, PreviewErrorState } from "@/components/PreviewSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { FileText } from "lucide-react";
+import AttachmentsManager, { Attachment } from "@/components/AttachmentsManager";
 
 interface SavedInvoice extends InvoiceData {
   id: string;
@@ -23,6 +24,7 @@ interface SavedInvoice extends InvoiceData {
   customerId?: string | null;
   customerEmail?: string | null;
   customerPhone?: string | null;
+  attachments?: Attachment[];
 }
 
 export default function InvoicePage() {
@@ -59,6 +61,8 @@ export default function InvoicePage() {
   const [payingInvoice, setPayingInvoice] = useState<SavedInvoice | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "mobile" | "transfer">("cash");
   const previewRef = useRef<HTMLDivElement>(null);
+  // Attachments on the in-progress (draft) form, keyed by editing id or "new"
+  const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
 
   // Fetch invoices from DB
   useEffect(() => {
@@ -90,6 +94,7 @@ export default function InvoicePage() {
           serviceChargePercent: Number(inv.service_charge_percent) || 0,
           notes: inv.notes || "",
           status: inv.status as SavedInvoice["status"],
+          attachments: Array.isArray(inv.attachments) ? (inv.attachments as Attachment[]) : [],
         })));
       }
       setLoading(false);
@@ -169,6 +174,7 @@ export default function InvoicePage() {
       service_charge_percent: form.serviceChargePercent || 0,
       created_by: user?.id || null,
       company_id: user?.companyId || null,
+      attachments: formAttachments as any,
     };
 
     let dbId = editingDbId;
@@ -198,7 +204,7 @@ export default function InvoicePage() {
     });
     if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone };
+    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone, attachments: formAttachments };
     setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
     toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
     setEditingDbId(null);
@@ -213,6 +219,7 @@ export default function InvoicePage() {
       serviceChargePercent: 0, notes: "",
     });
     setCustomerId(null); setCustomerEmail(""); setCustomerPhone("");
+    setFormAttachments([]);
   };
 
   const convertQuoteToInvoice = async (inv: SavedInvoice) => {
@@ -236,6 +243,7 @@ export default function InvoicePage() {
     setCustomerEmail(linked?.email || inv.customerEmail || "");
     setCustomerPhone(linked?.phone || inv.customerPhone || "");
     setEditingDbId(inv.dbId);
+    setFormAttachments(inv.attachments || []);
     setShowSaved(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
     toast.info(`Editing ${inv.number}`);
@@ -500,6 +508,13 @@ export default function InvoicePage() {
                 className="mt-1 w-full h-20 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-none"
               />
             </div>
+
+            <AttachmentsManager
+              attachments={formAttachments}
+              onChange={setFormAttachments}
+              scope="invoice"
+              parentId={editingDbId || "draft"}
+            />
           </div>
 
           {/* Live Preview */}
@@ -546,6 +561,23 @@ export default function InvoicePage() {
               <button onClick={() => setPreviewInvoice(null)} className="p-2 rounded-lg bg-card border border-border hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <InvoiceTemplate ref={previewRef} data={previewInvoice} />
+            <div className="mt-4">
+              <AttachmentsManager
+                attachments={previewInvoice.attachments || []}
+                scope="invoice"
+                parentId={previewInvoice.dbId}
+                onChange={async (next) => {
+                  setPreviewInvoice({ ...previewInvoice, attachments: next });
+                  setSavedInvoices((prev) =>
+                    prev.map((s) => (s.dbId === previewInvoice.dbId ? { ...s, attachments: next } : s))
+                  );
+                  await supabase
+                    .from("invoices")
+                    .update({ attachments: next as any })
+                    .eq("id", previewInvoice.dbId);
+                }}
+              />
+            </div>
           </div>
         </div>
       )}

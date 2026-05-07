@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import TableSkeleton, { CardGridSkeleton } from "@/components/TableSkeleton";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PreviewErrorState } from "@/components/PreviewSkeleton";
+import AttachmentsManager, { Attachment } from "@/components/AttachmentsManager";
 import {
   DollarSign, ShoppingCart, TrendingUp, TrendingDown, Users, Receipt, CreditCard,
   Banknote, Search, Eye, ArrowUpRight, Clock, Star, Target, Plus, X, Check,
@@ -63,6 +64,8 @@ export default function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [showNewSale, setShowNewSale] = useState(false);
   const [reprintSale, setReprintSale] = useState<ReceiptData | null>(null);
+  const [reprintSaleId, setReprintSaleId] = useState<string | null>(null);
+  const [reprintAttachments, setReprintAttachments] = useState<Attachment[]>([]);
   const reprintRef = useRef<HTMLDivElement>(null);
 
   // Fetch from DB
@@ -149,6 +152,8 @@ export default function SalesPage() {
       .eq("id", txn.dbId)
       .single();
     if (error || !data) { toast.error("Could not load receipt"); return; }
+    setReprintSaleId(data.id);
+    setReprintAttachments(Array.isArray((data as any).attachments) ? ((data as any).attachments as Attachment[]) : []);
     setReprintSale({
       id: data.transaction_number,
       total: Number(data.total),
@@ -266,6 +271,22 @@ export default function SalesPage() {
                   footer="Reprinted copy"
                 />
               </ErrorBoundary>
+            )}
+            {reprintSaleId && (
+              <div className="mt-4">
+                <AttachmentsManager
+                  attachments={reprintAttachments}
+                  scope="sale"
+                  parentId={reprintSaleId}
+                  onChange={async (next) => {
+                    setReprintAttachments(next);
+                    await supabase
+                      .from("sales_transactions")
+                      .update({ attachments: next as any })
+                      .eq("id", reprintSaleId);
+                  }}
+                />
+              </div>
             )}
             <div className="flex gap-2 mt-4">
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>

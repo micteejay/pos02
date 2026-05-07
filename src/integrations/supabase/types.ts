@@ -1099,6 +1099,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          attachments: Json
           company_id: string | null
           created_at: string
           created_by: string | null
@@ -1116,6 +1117,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          attachments?: Json
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1133,6 +1135,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          attachments?: Json
           company_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -1657,6 +1660,7 @@ export type Database = {
       sales_transactions: {
         Row: {
           amount_tendered: number | null
+          attachments: Json
           cashier_id: string | null
           change_given: number | null
           company_id: string | null
@@ -1680,6 +1684,7 @@ export type Database = {
         }
         Insert: {
           amount_tendered?: number | null
+          attachments?: Json
           cashier_id?: string | null
           change_given?: number | null
           company_id?: string | null
@@ -1703,6 +1708,7 @@ export type Database = {
         }
         Update: {
           amount_tendered?: number | null
+          attachments?: Json
           cashier_id?: string | null
           change_given?: number | null
           company_id?: string | null
