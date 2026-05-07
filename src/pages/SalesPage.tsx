@@ -272,6 +272,22 @@ export default function SalesPage() {
                 />
               </ErrorBoundary>
             )}
+            {reprintSaleId && (
+              <div className="mt-4">
+                <AttachmentsManager
+                  attachments={reprintAttachments}
+                  scope="sale"
+                  parentId={reprintSaleId}
+                  onChange={async (next) => {
+                    setReprintAttachments(next);
+                    await supabase
+                      .from("sales_transactions")
+                      .update({ attachments: next as any })
+                      .eq("id", reprintSaleId);
+                  }}
+                />
+              </div>
+            )}
             <div className="flex gap-2 mt-4">
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
               <button onClick={() => {
