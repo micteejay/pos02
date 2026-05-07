@@ -508,6 +508,13 @@ export default function InvoicePage() {
                 className="mt-1 w-full h-20 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground resize-none"
               />
             </div>
+
+            <AttachmentsManager
+              attachments={formAttachments}
+              onChange={setFormAttachments}
+              scope="invoice"
+              parentId={editingDbId || "draft"}
+            />
           </div>
 
           {/* Live Preview */}
