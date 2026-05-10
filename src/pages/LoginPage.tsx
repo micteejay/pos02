@@ -169,7 +169,7 @@ export default function LoginPage() {
           </p>
          <div className="mt-8 p-3 rounded-lg bg-muted/50 border border-border">
            <p className="text-[10px] text-muted-foreground text-center">
-             Demo:  <code className="text-primary font-mono"></code>  <code className="text-primary font-mono"></code>
+            MICTEEJAY GLOBALTECH:  <code className="text-primary font-mono"></code>  <code className="text-primary font-mono"></code>
            </p>
           </div>
         </div>
