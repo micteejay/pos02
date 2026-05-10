@@ -168,13 +168,6 @@ export default function LoginPage() {
             </Link>
           </p>
 
-       /*  <div className="mt-8 p-3 rounded-lg bg-muted/50 border border-border">
-           <p className="text-[10px] text-muted-foreground text-center">
-             Demo: username <code className="text-primary font-mono">admin</code> / password <code className="text-primary font-mono">admin12345</code>
-           </p>
-          </div>
-        </div>
-      </div>*/
 
       {/* Forgot password modal */}
       {showForgot && (
