@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   ArrowUpRight, Clock, AlertTriangle, CheckCircle2, MessageSquare, FileText,
@@ -14,9 +16,14 @@ import { useAppEvents } from "@/hooks/use-app-events";
 import AISalesInsights from "@/components/AISalesInsights";
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { formatCurrency, settings, users } = useAppSettings();
   const { inventory, sales, stores, warehouses } = useSharedData();
   const { approvalItems, notifications } = useAppEvents();
+
+  if (user?.role === "Sales Rep") {
+    return <Navigate to="/pos" replace />;
+  }
 
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.total, 0), [sales]);
   const lowStockAlerts = useMemo(() => inventory.filter(i => i.status === "critical" || i.status === "low"), [inventory]);

@@ -72,7 +72,10 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
   const visibleSections = navSections
     .map(section => ({
       ...section,
-      items: section.items.filter(item => hasPermission(item.permission as any))
+      items: section.items.filter(item => {
+        if (item.path === "/" && user?.role === "Sales Rep") return false;
+        return hasPermission(item.permission as any);
+      })
     }))
     .filter(section => section.items.length > 0);
 

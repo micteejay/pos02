@@ -169,25 +169,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!identifier.includes("@")) {
       // Try synthetic email pattern first (used by create-user edge function)
       const syntheticEmail = `${identifier.toLowerCase().replace(/\s+/g, ".")}@staff.internal`;
-      const { error: syntheticError } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password });
-      if (!syntheticError) return { ok: true };
+      const { data, error: syntheticError } = await supabase.auth.signInWithPassword({ email: syntheticEmail, password });
+      if (!syntheticError) {
+        if (data.session) await fetchUserProfile(data.session.user);
+        return { ok: true };
+      }
 
       // Fallback: look up by display name in profiles
-      const { data } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
         .select("email")
         .ilike("name", identifier)
         .limit(1)
         .single();
-      if (data?.email) {
-        const { error } = await supabase.auth.signInWithPassword({ email: data.email, password });
+      if (profileData?.email) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: profileData.email, password });
+        if (!error && data.session) await fetchUserProfile(data.session.user);
         return error ? { ok: false, message: error.message } : { ok: true };
       }
       return { ok: false, message: syntheticError?.message || "Invalid login credentials" };
     }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data.session) await fetchUserProfile(data.session.user);
     return error ? { ok: false, message: error.message } : { ok: true };
-  }, []);
+  }, [fetchUserProfile]);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<{ ok: boolean; message?: string; needsEmailConfirmation?: boolean }> => {
     const { data, error } = await supabase.auth.signUp({

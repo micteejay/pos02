@@ -32,7 +32,6 @@ export default function LoginPage() {
       // The actual company name is loaded by the auth provider; show a
       // generic toast here and the AppLayout chip will reflect the company.
       toast.success("Signed in. Loading your organization…");
-      navigate("/");
       return;
     }
     const msg = result.message || "";
