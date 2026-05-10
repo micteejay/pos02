@@ -167,7 +167,7 @@ export default function LoginPage() {
               Create account
             </Link>
           </p>
-
+};
           
 
       {/* Forgot password modal */}
