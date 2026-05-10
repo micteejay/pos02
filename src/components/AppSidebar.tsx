@@ -14,36 +14,37 @@ interface NavItem {
   icon: React.ElementType;
   path: string;
   badgeKey?: string;
+  permission: string;
 }
 
 const navSections: { title: string; items: NavItem[] }[] = [
   { title: "Overview", items: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { label: "Notifications", icon: Bell, path: "/notifications", badgeKey: "notifications" },
+    { label: "Dashboard", icon: LayoutDashboard, path: "/", permission: "pages.dashboard" },
+    { label: "Notifications", icon: Bell, path: "/notifications", badgeKey: "notifications", permission: "pages.notifications" },
   ]},
   { title: "Operations", items: [
-    { label: "POS", icon: ShoppingCart, path: "/pos" },
-    { label: "Inventory", icon: Package, path: "/inventory" },
-    { label: "Sales", icon: BarChart3, path: "/sales" },
-    { label: "Customers", icon: Contact, path: "/customers" },
-    { label: "Supply Chain", icon: Truck, path: "/supply" },
-    { label: "Workflows", icon: GitBranch, path: "/workflows" },
-    { label: "Approvals", icon: ClipboardCheck, path: "/approvals", badgeKey: "approvals" },
+    { label: "POS", icon: ShoppingCart, path: "/pos", permission: "pages.pos" },
+    { label: "Inventory", icon: Package, path: "/inventory", permission: "pages.inventory" },
+    { label: "Sales", icon: BarChart3, path: "/sales", permission: "pages.sales" },
+    { label: "Customers", icon: Contact, path: "/customers", permission: "pages.sales" },
+    { label: "Supply Chain", icon: Truck, path: "/supply", permission: "pages.supply" },
+    { label: "Workflows", icon: GitBranch, path: "/workflows", permission: "pages.workflows" },
+    { label: "Approvals", icon: ClipboardCheck, path: "/approvals", badgeKey: "approvals", permission: "pages.approvals" },
   ]},
   { title: "Communication", items: [
-    { label: "Chat", icon: MessageSquare, path: "/chat", badgeKey: "chat" },
-    { label: "Documents", icon: FileText, path: "/documents" },
-    { label: "Invoices", icon: Receipt, path: "/invoices" },
+    { label: "Chat", icon: MessageSquare, path: "/chat", badgeKey: "chat", permission: "pages.chat" },
+    { label: "Documents", icon: FileText, path: "/documents", permission: "pages.documents" },
+    { label: "Invoices", icon: Receipt, path: "/invoices", permission: "pages.documents" },
   ]},
   { title: "Analytics", items: [
-    { label: "Reports", icon: PieChart, path: "/reports" },
+    { label: "Reports", icon: PieChart, path: "/reports", permission: "pages.reports" },
   ]},
   { title: "Management", items: [
-    { label: "Users & Roles", icon: Users, path: "/users" },
-    { label: "Organization", icon: Building2, path: "/organization" },
-    { label: "Audit Log", icon: Shield, path: "/audit" },
-    { label: "Settings", icon: Settings, path: "/settings" },
-    { label: "My Profile", icon: UserCircle, path: "/profile" },
+    { label: "Users & Roles", icon: Users, path: "/users", permission: "pages.users" },
+    { label: "Organization", icon: Building2, path: "/organization", permission: "pages.organization" },
+    { label: "Audit Log", icon: Shield, path: "/audit", permission: "pages.audit" },
+    { label: "Settings", icon: Settings, path: "/settings", permission: "pages.settings" },
+    { label: "My Profile", icon: UserCircle, path: "/profile", permission: "dashboard.view" },
   ]},
 ];
 
@@ -54,7 +55,7 @@ interface AppSidebarProps {
 export default function AppSidebar({ onNavigate }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  const { settings } = useAppSettings();
+  const { settings, hasPermission } = useAppSettings();
   const { unreadCount, approvalItems } = useAppEvents();
   const { logout, user } = useAuth();
 
@@ -66,6 +67,14 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
     if (key === "approvals" && pendingApprovals > 0) return pendingApprovals;
     return undefined;
   };
+
+  // Filter sections and items based on permissions
+  const visibleSections = navSections
+    .map(section => ({
+      ...section,
+      items: section.items.filter(item => hasPermission(item.permission as any))
+    }))
+    .filter(section => section.items.length > 0);
 
   return (
     <aside className={`fixed top-0 left-0 h-screen bg-sidebar sidebar-glow z-40 flex flex-col transition-all duration-300 ${collapsed ? "w-[68px]" : "w-[260px]"}`}>
@@ -95,7 +104,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
       )}
 
       <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-5">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.title}>
             {!collapsed && <p className="text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/50 px-3 mb-1.5">{section.title}</p>}
             <div className="space-y-0.5">
@@ -137,12 +146,12 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
           </div>
         )}
         {collapsed && (
-          <button onClick={logout} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors mb-2" title="Logout">
+          <button onClick={logout} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors mb-1" title="Logout">
             <LogOut className="w-4 h-4" />
           </button>
         )}
         <div className="hidden lg:block">
-          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors">
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors" title={collapsed ? "Expand" : "Collapse"}>
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
