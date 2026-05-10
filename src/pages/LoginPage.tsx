@@ -167,7 +167,13 @@ export default function LoginPage() {
               Create account
             </Link>
           </p>
-};
+         <div className="mt-8 p-3 rounded-lg bg-muted/50 border border-border">
+           <p className="text-[10px] text-muted-foreground text-center">
+             Demo:  <code className="text-primary font-mono"></code>  <code className="text-primary font-mono"></code>
+           </p>
+          </div>
+        </div>
+      </div>
           
 
       {/* Forgot password modal */}
