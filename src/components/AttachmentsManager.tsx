@@ -144,7 +144,9 @@ function AttachmentPreviewModal({ att, onClose }: { att: Attachment; onClose: ()
     const a = document.createElement("a");
     a.href = blobUrl;
     a.download = att.name;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(blobUrl);
   };
 

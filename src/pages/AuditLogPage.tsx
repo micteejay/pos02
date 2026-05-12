@@ -135,7 +135,9 @@ export default function AuditLogPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 

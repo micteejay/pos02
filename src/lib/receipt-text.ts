@@ -14,11 +14,16 @@ export function generateReceiptText(
   sale: ReceiptData,
   company: CompanyInfo | null | undefined,
   formatCurrency: (n: number) => string,
-  footer?: string,
-  header?: string,
-  width: number = 32
+  settings?: any,
+  overrideFooter?: string
 ): string {
   let text = "";
+
+  const paperWidthStr = settings?.paperWidth || "58mm";
+  const width = paperWidthStr.includes("80mm") ? 48 : paperWidthStr.includes("A4") ? 80 : 32;
+  const isMinimal = settings?.receiptStyle === "minimal";
+  const isCompact = settings?.receiptStyle === "compact";
+  const isInvoice = settings?.receiptStyle === "invoice";
 
   const center = (str: string) => {
     if (str.length >= width) return str.substring(0, width);
@@ -35,19 +40,33 @@ export function generateReceiptText(
   };
 
   const divider = "-".repeat(width);
+  const thickDivider = "=".repeat(width);
 
-  // Header
-  text += center(company?.name || header || "Receipt") + "\n";
-  if (company?.address) {
-    const addressLine = [company.address, company.city].filter(Boolean).join(", ");
-    text += center(addressLine) + "\n";
+  const headerText = settings?.receiptHeader || company?.name || "Receipt";
+  const footerText = overrideFooter || settings?.receiptFooter;
+
+  if (isInvoice) {
+    text += center("INVOICE") + "\n";
+    text += center(headerText) + "\n";
+  } else {
+    text += center(headerText) + "\n";
   }
-  if (company?.phone) text += center(company.phone) + "\n";
+
+  if (!isMinimal) {
+    if (company?.address) {
+      const addressLine = [company.address, company.city].filter(Boolean).join(", ");
+      text += center(addressLine) + "\n";
+    }
+    if (company?.phone) text += center(company.phone) + "\n";
+  }
+
+  if (!isCompact) text += "\n";
+  text += isInvoice ? thickDivider + "\n" : divider + "\n";
   
-  text += divider + "\n";
-  text += line(`Receipt: ${sale.id}`, sale.date || "") + "\n";
+  text += line(isInvoice ? `Invoice: ${sale.id}` : `Receipt: ${sale.id}`, sale.date || "") + "\n";
   text += line("Customer:", sale.customer) + "\n";
-  text += divider + "\n";
+  
+  text += isInvoice ? thickDivider + "\n" : divider + "\n";
 
   // Items
   for (const item of sale.items) {
@@ -57,7 +76,7 @@ export function generateReceiptText(
     text += line(left, right) + "\n";
   }
 
-  text += divider + "\n";
+  text += isInvoice ? thickDivider + "\n" : divider + "\n";
   if (sale.subtotal !== undefined) {
     text += line("Subtotal", formatCurrency(sale.subtotal)) + "\n";
   }
@@ -67,13 +86,19 @@ export function generateReceiptText(
   if (sale.tax) {
     text += line("Tax", formatCurrency(sale.tax)) + "\n";
   }
-  text += line("TOTAL", formatCurrency(sale.total)) + "\n";
   
-  const methodLabel = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : "Mobile Pay";
+  text += line(isInvoice ? "TOTAL DUE" : "TOTAL", formatCurrency(sale.total)) + "\n";
+  
+  const methodLabel = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
   text += line("Payment", methodLabel) + "\n";
   
-  if (footer) {
-    text += "\n" + center(footer) + "\n";
+  if (footerText) {
+    if (!isCompact) text += "\n";
+    text += center(footerText) + "\n";
+  }
+  
+  if (settings?.receiptReturnPolicy && !isCompact) {
+    text += center(settings.receiptReturnPolicy) + "\n";
   }
 
   return text;

@@ -78,11 +78,12 @@ function DocumentPreviewModal({ doc, onClose, onDownload, onDelete }: {
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="glass-card rounded-2xl p-6 max-w-2xl w-full animate-fade-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-foreground">File Preview</h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-        </div>
+      <div className="glass-card rounded-2xl max-w-2xl w-full animate-fade-in max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-foreground">File Preview</h3>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors"><X className="w-5 h-5" /></button>
+          </div>
 
         {/* Preview Area */}
         <div className="w-full rounded-xl bg-muted/50 flex items-center justify-center mb-4 overflow-hidden">
@@ -124,14 +125,17 @@ function DocumentPreviewModal({ doc, onClose, onDownload, onDelete }: {
           <div className="flex justify-between text-sm"><span className="text-muted-foreground">Type</span><span className="text-foreground uppercase">{doc.type}</span></div>
           {doc.source && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Source</span><span className="text-info">{doc.source}</span></div>}
         </div>
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => onDownload(doc)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium"><Download className="w-4 h-4" /> Download</button>
+        </div>
+        <div className="flex gap-2 p-4 border-t border-border bg-card/80 backdrop-blur-md shrink-0">
+          <button onClick={() => onDownload(doc)} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+            <Download className="w-4 h-4" /> Download
+          </button>
           {isPdfType(doc.type) && previewUrl && (
-            <button onClick={() => window.open(previewUrl, "_blank")} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground text-sm font-medium hover:bg-muted">
+            <button onClick={() => window.open(previewUrl, "_blank")} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-foreground text-sm font-medium hover:bg-muted transition-colors">
               <Eye className="w-4 h-4" /> Open Full
             </button>
           )}
-          <button onClick={() => { onDelete(doc); onClose(); }} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10">
+          <button onClick={() => { onDelete(doc); onClose(); }} className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive/30 text-destructive text-sm font-medium hover:bg-destructive/10 transition-colors">
             <Trash2 className="w-4 h-4" /> Delete
           </button>
         </div>
@@ -332,7 +336,10 @@ export default function DocumentsPage() {
     if (data && !error) {
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
-      a.href = url; a.download = doc.name; a.click();
+      a.href = url; a.download = doc.name; 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } else {
       toast.error("Download failed");
@@ -372,7 +379,7 @@ export default function DocumentsPage() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Documents</h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Documents</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage and share organizational files</p>
           </div>
           <div className="flex items-center gap-2">
@@ -390,9 +397,9 @@ export default function DocumentsPage() {
 
         <div className="grid grid-cols-3 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="glass-card rounded-xl p-4 text-center">
-              <p className="text-xl font-bold text-foreground">{s.value}</p>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
+            <div key={s.label} className="glass-card rounded-xl p-4 text-center hover:stat-glow transition-all duration-300">
+              <p className="text-2xl font-bold text-foreground">{s.value}</p>
+              <p className="text-xs text-muted-foreground mt-1 uppercase tracking-wider">{s.label}</p>
             </div>
           ))}
         </div>
@@ -421,13 +428,15 @@ export default function DocumentsPage() {
 
         {dragOver && (
           <div
-            className="glass-card rounded-xl border-2 border-dashed border-primary/40 p-12 text-center cursor-pointer hover:border-primary transition-colors"
+            className={`glass-card rounded-xl border-2 border-dashed ${dragOver ? "border-primary bg-primary/5 shadow-[0_0_30px_rgba(var(--primary-rgb),0.15)]" : "border-primary/40 hover:border-primary hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]"} p-12 text-center cursor-pointer transition-all duration-300 group`}
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
             onClick={() => fileInputRef.current?.click()}
           >
-            <Upload className="w-10 h-10 text-primary mx-auto mb-3" />
+            <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center transition-all duration-500 ${dragOver ? "bg-primary text-primary-foreground scale-110" : "bg-primary/10 text-primary group-hover:scale-110 group-hover:bg-primary/20"}`}>
+              <Upload className="w-8 h-8" />
+            </div>
             <p className="text-sm font-medium text-foreground">Drop files here or click to upload</p>
             <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, XLSX, PNG, JPG up to 50MB</p>
           </div>

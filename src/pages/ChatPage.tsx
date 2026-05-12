@@ -333,7 +333,10 @@ export default function ChatPage() {
     if (data && !error) {
       const url = URL.createObjectURL(data);
       const a = document.createElement("a");
-      a.href = url; a.download = attachment.name; a.click();
+      a.href = url; a.download = attachment.name; 
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast.success(`Downloaded ${attachment.name}`);
     } else {

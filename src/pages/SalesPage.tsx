@@ -56,7 +56,7 @@ const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay
 
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
-  const { users, hasPermission, formatCurrency } = useAppSettings();
+  const { users, hasPermission, formatCurrency, settings } = useAppSettings();
   const { user, companyProfile } = useAuth();
   const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
@@ -106,13 +106,17 @@ export default function SalesPage() {
     const completed = transactions.filter((t) => t.status === "completed");
     const totalRevenue = completed.reduce((s, t) => s + t.total, 0);
     const avgTicket = completed.length > 0 ? totalRevenue / completed.length : 0;
-    return [
+    const allStats = [
       { label: "Total Revenue", value: formatCurrency(totalRevenue), change: `${completed.length} sales`, trend: "up" as const, icon: DollarSign },
       { label: "Transactions", value: transactions.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart },
       { label: "Avg. Ticket", value: formatCurrency(avgTicket), change: "", trend: "up" as const, icon: Receipt },
       { label: "Active Reps", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
     ];
-  }, [transactions, formatCurrency, users]);
+    if (user?.role === "Sales Rep") {
+      return allStats.filter(s => s.label === "Transactions" || s.label === "Active Reps");
+    }
+    return allStats;
+  }, [transactions, formatCurrency, users, user?.role]);
 
   const paymentBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -232,7 +236,7 @@ export default function SalesPage() {
         ) : (
           <>
             {tab === "transactions" && (
-              <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} onReprint={reprintTransaction} storeFilters={dynamicStoreFilters} formatCurrency={formatCurrency} />
+              <TransactionsTab transactions={transactions} onUpdateStatus={updateStatus} onDelete={deleteTransaction} onReprint={reprintTransaction} storeFilters={dynamicStoreFilters} formatCurrency={formatCurrency} isSalesRep={user?.role === "Sales Rep"} />
             )}
             {tab === "analytics" && <AnalyticsTab paymentBreakdown={paymentBreakdown} transactions={transactions} formatCurrency={formatCurrency} />}
             {tab === "reps" && <RepsTab users={users} storeNames={storeNames} />}
@@ -242,53 +246,56 @@ export default function SalesPage() {
 
       {reprintSale && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setReprintSale(null)}>
-          <div className="glass-card rounded-2xl p-6 max-w-sm w-full max-h-[90vh] overflow-y-auto animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-foreground">Reprint Receipt</h3>
-              <button onClick={() => setReprintSale(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
-            </div>
-            {!reprintSale.items || reprintSale.items.length === 0 ? (
-              <PreviewErrorState
-                variant="empty"
-                title="Receipt has no items"
-                description="This sale has no recorded line items, so a receipt cannot be rendered."
-              />
-            ) : (
-              <ErrorBoundary
-                fallback={
-                  <PreviewErrorState
-                    variant="error"
-                    title="Couldn't render receipt"
-                    description="Receipt template failed to load. You can still print a plain-text version."
-                  />
-                }
-              >
-                <ReceiptTemplate
-                  ref={reprintRef}
-                  sale={reprintSale}
-                  company={companyProfile}
-                  formatCurrency={formatCurrency}
-                  footer="Reprinted copy"
-                />
-              </ErrorBoundary>
-            )}
-            {reprintSaleId && (
-              <div className="mt-4">
-                <AttachmentsManager
-                  attachments={reprintAttachments}
-                  scope="sale"
-                  parentId={reprintSaleId}
-                  onChange={async (next) => {
-                    setReprintAttachments(next);
-                    await supabase
-                      .from("sales_transactions")
-                      .update({ attachments: next as any })
-                      .eq("id", reprintSaleId);
-                  }}
-                />
+          <div className="glass-card rounded-2xl max-w-sm w-full max-h-[90vh] flex flex-col overflow-hidden animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-foreground">Reprint Receipt</h3>
+                <button onClick={() => setReprintSale(null)} className="p-1.5 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
               </div>
-            )}
-            <div className="flex gap-2 mt-4">
+              {!reprintSale.items || reprintSale.items.length === 0 ? (
+                <PreviewErrorState
+                  variant="empty"
+                  title="Receipt has no items"
+                  description="This sale has no recorded line items, so a receipt cannot be rendered."
+                />
+              ) : (
+                <ErrorBoundary
+                  fallback={
+                    <PreviewErrorState
+                      variant="error"
+                      title="Couldn't render receipt"
+                      description="Receipt template failed to load. You can still print a plain-text version."
+                    />
+                  }
+                >
+                  <ReceiptTemplate
+                    ref={reprintRef}
+                    sale={reprintSale}
+                    company={companyProfile}
+                    formatCurrency={formatCurrency}
+                    settings={settings}
+                    overrideFooter="Reprinted copy"
+                  />
+                </ErrorBoundary>
+              )}
+              {reprintSaleId && (
+                <div className="mt-4">
+                  <AttachmentsManager
+                    attachments={reprintAttachments}
+                    scope="sale"
+                    parentId={reprintSaleId}
+                    onChange={async (next) => {
+                      setReprintAttachments(next);
+                      await supabase
+                        .from("sales_transactions")
+                        .update({ attachments: next as any })
+                        .eq("id", reprintSaleId);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 p-4 border-t border-border bg-card/80 backdrop-blur-md shrink-0">
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
               <button onClick={() => {
                 if (reprintSale) {
@@ -296,6 +303,7 @@ export default function SalesPage() {
                     reprintSale,
                     companyProfile,
                     formatCurrency,
+                    settings,
                     "Reprinted copy"
                   );
                   printText(text, `Receipt ${reprintSale.id}`);
@@ -312,13 +320,14 @@ export default function SalesPage() {
 }
 
 // --- Transactions Tab ---
-function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, storeFilters, formatCurrency }: {
+function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, storeFilters, formatCurrency, isSalesRep }: {
   transactions: Transaction[];
   onUpdateStatus: (id: string, status: Transaction["status"]) => void;
   onDelete: (id: string) => void;
   onReprint: (id: string) => void;
   storeFilters: string[];
   formatCurrency: (n: number) => string;
+  isSalesRep?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("All Stores");
@@ -397,9 +406,11 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                 </th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden md:table-cell">Payment</th>
                 <th className="text-left text-xs font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">Store</th>
-                <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 cursor-pointer hover:text-foreground" onClick={() => toggleSort("total")}>
-                  <span className="flex items-center justify-end gap-1">Total {sortKey === "total" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}</span>
-                </th>
+                {!isSalesRep && (
+                  <th className="text-right text-xs font-medium text-muted-foreground px-4 py-3 cursor-pointer hover:text-foreground" onClick={() => toggleSort("total")}>
+                    <span className="flex items-center justify-end gap-1">Total {sortKey === "total" && (sortDir === "asc" ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />)}</span>
+                  </th>
+                )}
                 <th className="text-center text-xs font-medium text-muted-foreground px-4 py-3">Status</th>
               </tr>
             </thead>
@@ -423,7 +434,9 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground"><MethodIcon className="w-3.5 h-3.5" />{txn.method}</div>
                       </td>
                       <td className="px-4 py-3 text-sm text-muted-foreground hidden lg:table-cell">{txn.storeName}</td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(txn.total)}</td>
+                      {!isSalesRep && (
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(txn.total)}</td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full ${sc.className}`}>{sc.label}</span>
                       </td>
@@ -436,18 +449,22 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                             <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
                             <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
                             <div className="ml-auto flex gap-2">
-                              <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 flex items-center gap-1">
-                                <Receipt className="w-3 h-3" /> Reprint
-                              </button>
+                              {!isSalesRep && (
+                                <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 flex items-center gap-1">
+                                  <Receipt className="w-3 h-3" /> Reprint
+                                </button>
+                              )}
                               {txn.status === "pending" && (
                                 <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Complete</button>
                               )}
-                              {txn.status === "completed" && (
+                              {txn.status === "completed" && !isSalesRep && (
                                 <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">Refund</button>
                               )}
-                              <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20">
-                                <Trash2 className="w-3 h-3 inline mr-1" /> Delete
-                              </button>
+                              {!isSalesRep && (
+                                <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20">
+                                  <Trash2 className="w-3 h-3 inline mr-1" /> Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         </td>

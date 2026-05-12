@@ -9,6 +9,7 @@ import { useCustomers } from "@/hooks/use-customers";
 import CustomerPicker from "@/components/CustomerPicker";
 import { printNode, printText } from "@/lib/print";
 import { generateReceiptText } from "@/lib/receipt-text";
+import ReceiptTemplate from "@/components/ReceiptTemplate";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
@@ -189,7 +190,7 @@ export default function POSPage() {
         <div className="flex-1 flex flex-col min-w-0 border-r border-border">
           <div className="p-4 border-b border-border space-y-3">
             <div className="flex items-center justify-between">
-              <h1 className="text-xl font-bold text-foreground">Point of Sale</h1>
+              <h1 className="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Point of Sale</h1>
               <div className="flex items-center gap-3">
                 {heldOrders.length > 0 && (
                   <button onClick={() => setShowHeld(!showHeld)} className="text-xs text-warning font-medium px-2 py-1 rounded-lg bg-warning/10 hover:bg-warning/20">{heldOrders.length} held</button>
@@ -208,15 +209,17 @@ export default function POSPage() {
               </div>
             )}
             <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products or scan barcode..." className="pl-9" />
+              <div className="relative flex-1 group">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search products or scan barcode..." className="pl-11 h-12 text-base rounded-xl border-border/80 bg-background/50 backdrop-blur-sm shadow-sm hover:border-primary/40 focus-visible:ring-primary/20 transition-all" />
               </div>
-              <button onClick={() => setShowScanner(true)} className="p-2.5 rounded-lg border border-border hover:bg-muted transition-colors"><Barcode className="w-4 h-4 text-muted-foreground" /></button>
+              <button onClick={() => setShowScanner(true)} className="p-3 rounded-xl border border-border/80 bg-background/50 shadow-sm hover:bg-muted hover:border-primary/40 transition-all group">
+                <Barcode className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </button>
             </div>
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide pt-1">
               {categories.map((c) => (
-                <button key={c} onClick={() => setCategory(c)} className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${category === c ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{c}</button>
+                <button key={c} onClick={() => setCategory(c)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300 ${category === c ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-105" : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-105"}`}>{c}</button>
               ))}
             </div>
           </div>
@@ -230,9 +233,12 @@ export default function POSPage() {
                   ...((p.units || []).filter(u => (u.sellable ?? true) && u.name.trim())),
                 ];
                 return (
-                  <div key={p.sku} className={`glass-card rounded-xl p-4 text-left transition-all hover:border-primary/30 hover:shadow-md relative ${totalInCartBase > 0 ? "border-primary/40 bg-primary/5" : ""} ${p.qty === 0 ? "opacity-40" : ""}`}>
-                    <button onClick={() => addToCart(p)} disabled={p.qty === 0} className="w-full text-left">
-                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mb-3"><Package className="w-5 h-5 text-muted-foreground" /></div>
+                  <div key={p.sku} className={`glass-card rounded-2xl p-4 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1 relative group overflow-hidden ${totalInCartBase > 0 ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20" : ""} ${p.qty === 0 ? "opacity-40 grayscale" : ""}`}>
+                    {totalInCartBase > 0 && <div className="absolute inset-0 bg-primary/5 pointer-events-none animate-pulse-slow" />}
+                    <button onClick={() => addToCart(p)} disabled={p.qty === 0} className="w-full text-left relative z-10 outline-none">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-3 transition-colors ${totalInCartBase > 0 ? "bg-primary/20" : "bg-muted group-hover:bg-primary/10"}`}>
+                        <Package className={`w-6 h-6 transition-colors ${totalInCartBase > 0 ? "text-primary" : "text-muted-foreground group-hover:text-primary"}`} />
+                      </div>
                       <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
                       <p className="text-[10px] text-muted-foreground font-mono">{p.sku}</p>
                       <div className="flex items-center justify-between mt-3">
@@ -255,7 +261,7 @@ export default function POSPage() {
                         ))}
                       </div>
                     )}
-                    {totalInCartBase > 0 && <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">{totalInCartBase}</div>}
+                    {totalInCartBase > 0 && <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shadow-lg shadow-primary/40 animate-in zoom-in">{totalInCartBase}</div>}
                   </div>
                 );
               })}
@@ -263,7 +269,7 @@ export default function POSPage() {
           </div>
         </div>
 
-        <div className="w-full lg:w-[380px] flex flex-col shrink-0 bg-card/50">
+        <div className="w-full lg:w-[400px] flex flex-col shrink-0 bg-background/80 backdrop-blur-md border-l border-border/50 shadow-2xl z-10">
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -290,7 +296,7 @@ export default function POSPage() {
                 <ShoppingCart className="w-12 h-12 mb-3 opacity-20" /><p className="text-sm">Cart is empty</p><p className="text-xs mt-1">Click products to add them</p>
               </div>
             ) : cart.map((item) => (
-              <div key={item.lineKey} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group">
+              <div key={item.lineKey} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40 shadow-sm group hover:border-primary/30 transition-all animate-in slide-in-from-right-2 fade-in">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
                   <p className="text-xs text-muted-foreground">
@@ -299,9 +305,9 @@ export default function POSPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => updateQty(item.lineKey, -1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Minus className="w-3 h-3" /></button>
-                  <span className="w-8 text-center text-sm font-semibold text-foreground">{item.qty}</span>
-                  <button onClick={() => updateQty(item.lineKey, 1)} className="w-6 h-6 rounded bg-background border border-border flex items-center justify-center hover:bg-muted"><Plus className="w-3 h-3" /></button>
+                  <button onClick={() => updateQty(item.lineKey, -1)} className="w-7 h-7 rounded-md bg-muted/50 hover:bg-muted border border-transparent hover:border-border flex items-center justify-center transition-colors active:scale-95"><Minus className="w-3.5 h-3.5" /></button>
+                  <span className="w-7 text-center text-sm font-bold text-foreground">{item.qty}</span>
+                  <button onClick={() => updateQty(item.lineKey, 1)} className="w-7 h-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 border border-transparent hover:border-primary/30 flex items-center justify-center transition-colors active:scale-95"><Plus className="w-3.5 h-3.5" /></button>
                 </div>
                 <p className="text-sm font-semibold text-foreground w-16 text-right">{formatCurrency(item.price * item.qty)}</p>
                 <button onClick={() => removeFromCart(item.lineKey)} className="p-1 rounded hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5 text-destructive" /></button>
@@ -314,21 +320,25 @@ export default function POSPage() {
                 <Percent className="w-4 h-4 text-muted-foreground" />
                 <input type="number" min={0} max={100} value={discountPercent || ""} onChange={(e) => setDiscountPercent(Number(e.target.value))} placeholder="Discount %" className="flex-1 h-8 rounded-md border border-input bg-background px-3 text-xs text-foreground outline-none" />
               </div>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-                {discountPercent > 0 && <div className="flex justify-between text-success"><span>Discount ({discountPercent}%)</span><span>-{formatCurrency(discountAmount)}</span></div>}
-                <div className="flex justify-between text-muted-foreground"><span>Tax ({settings.taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
-                <div className="flex justify-between text-lg font-bold text-foreground pt-2 border-t border-border"><span>Total</span><span>{formatCurrency(total)}</span></div>
+              <div className="space-y-2 text-sm p-3 rounded-xl bg-muted/30">
+                <div className="flex justify-between text-muted-foreground font-medium"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
+                {discountPercent > 0 && <div className="flex justify-between text-success font-medium"><span>Discount ({discountPercent}%)</span><span>-{formatCurrency(discountAmount)}</span></div>}
+                <div className="flex justify-between text-muted-foreground font-medium"><span>Tax ({settings.taxRate}%)</span><span>{formatCurrency(tax)}</span></div>
+                <div className="flex justify-between items-end pt-3 mt-1 border-t border-border/60">
+                  <span className="text-sm font-semibold text-muted-foreground mb-1">Total</span>
+                  <span className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80 tracking-tight">{formatCurrency(total)}</span>
+                </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2.5">
                 {paymentMethods.map((pm) => (
-                  <button key={pm.id} onClick={() => setPaymentMethod(pm.id)} className={`flex-1 flex flex-col items-center gap-1.5 p-2.5 rounded-lg border text-xs font-medium transition-colors ${paymentMethod === pm.id ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:bg-muted"}`}>
-                    <pm.icon className="w-4 h-4" />{pm.label}
+                  <button key={pm.id} onClick={() => setPaymentMethod(pm.id)} className={`flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-300 active:scale-95 ${paymentMethod === pm.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-transparent bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground hover:border-border/50"}`}>
+                    <pm.icon className={`w-5 h-5 ${paymentMethod === pm.id ? "animate-bounce" : ""}`} />
+                    <span className="text-[11px] font-bold uppercase tracking-wider">{pm.label}</span>
                   </button>
                 ))}
               </div>
-              <button onClick={completeSale} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
-                <DollarSign className="w-4 h-4" />Charge {formatCurrency(total)}
+              <button onClick={completeSale} className="w-full py-4 mt-2 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary text-primary-foreground font-bold text-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-primary/30 hover:shadow-xl hover:shadow-primary/40 active:scale-[0.98]">
+                <DollarSign className="w-5 h-5" />Charge {formatCurrency(total)}
               </button>
             </div>
           )}
@@ -337,46 +347,22 @@ export default function POSPage() {
 
       {completedSale && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setCompletedSale(null)}>
-          <div className="glass-card rounded-2xl p-6 max-w-sm w-full animate-fade-in max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4"><Check className="w-8 h-8 text-success" /></div>
-            <h3 className="text-xl font-bold text-foreground text-center">Sale Complete!</h3>
-            <p className="text-sm text-muted-foreground text-center mt-1">{completedSale.id}</p>
-            <div ref={receiptRef} className="mt-4 border border-border rounded-lg p-4 font-mono text-[10px] bg-card">
-              {settings.receiptStyle === "modern" || settings.receiptStyle === "branded" ? <div className="h-1 rounded-full bg-primary mb-2" /> : null}
-              <div className="text-center mb-2">
-                <p className="font-bold text-xs text-foreground">{companyProfile?.name || settings.receiptHeader || settings.appName}</p>
-                {companyProfile && (
-                  <p className="text-muted-foreground">
-                    {[companyProfile.address, companyProfile.city].filter(Boolean).join(", ")}
-                    {companyProfile.phone ? ` · ${companyProfile.phone}` : ""}
-                  </p>
-                )}
+          <div className="glass-card rounded-2xl max-w-sm w-full animate-fade-in max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4"><Check className="w-8 h-8 text-success" /></div>
+              <h3 className="text-xl font-bold text-foreground text-center">Sale Complete!</h3>
+              <p className="text-sm text-muted-foreground text-center mt-1">{completedSale.id}</p>
+              <div className="mt-4">
+                <ReceiptTemplate
+                  ref={receiptRef}
+                  sale={completedSale as any}
+                  company={companyProfile}
+                  formatCurrency={formatCurrency}
+                  settings={settings}
+                />
               </div>
-              <div className="border-t border-dashed border-border my-2" />
-              <div className="flex justify-between text-muted-foreground"><span>Customer: {completedSale.customer}</span></div>
-              <div className="border-t border-dashed border-border my-2" />
-              {completedSale.items.map((item) => (
-                <div key={item.lineKey} className="flex justify-between text-foreground">
-                  <div className="flex-1 pr-2">
-                    <div>{item.name} ×{item.qty} {item.unitName}</div>
-                    {item.unitFactor > 1 && (
-                      <div className="text-[9px] text-muted-foreground">
-                        1 {item.unitName} = {item.unitFactor} base · total {item.qty * item.unitFactor} base units · {formatCurrency(item.price)} / {item.unitName}
-                      </div>
-                    )}
-                  </div>
-                  <span>{formatCurrency(item.price * item.qty)}</span>
-                </div>
-              ))}
-              <div className="border-t border-dashed border-border my-2" />
-              <div className="flex justify-between font-bold text-foreground text-xs"><span>TOTAL</span><span>{formatCurrency(completedSale.total)}</span></div>
-              <div className="flex justify-between text-muted-foreground mt-1">
-                <span>Payment</span><span>{completedSale.method === "card" ? "Credit Card" : completedSale.method === "cash" ? "Cash" : "Mobile Pay"}</span>
-              </div>
-              <div className="text-center mt-2 text-muted-foreground">{settings.receiptFooter}</div>
-              {settings.receiptStyle === "branded" && <div className="h-1 rounded-full bg-primary mt-2" />}
             </div>
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 p-4 border-t border-border bg-card/80 backdrop-blur-md shrink-0">
               <button onClick={() => setCompletedSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">New Sale</button>
               <button
                 onClick={() => {
@@ -384,8 +370,7 @@ export default function POSPage() {
                     completedSale as any,
                     companyProfile,
                     formatCurrency,
-                    settings.receiptFooter,
-                    settings.receiptHeader || settings.appName
+                    settings
                   );
                   printText(text, `Receipt ${completedSale.id}`);
                 }}
