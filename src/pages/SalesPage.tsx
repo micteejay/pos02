@@ -2,9 +2,10 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useSharedData } from "@/hooks/use-shared-data";
-import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAppSettings, type Permission } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { printNode, printText } from "@/lib/print";
 import { generateReceiptText } from "@/lib/receipt-text";
@@ -36,6 +37,30 @@ interface Transaction {
   time: string;
   status: "completed" | "refunded" | "pending";
   date: string;
+  lineItems?: { name: string; qty: number; price: number }[];
+}
+
+interface SalesTransactionQueryRow {
+  transaction_number: string;
+  id: string;
+  customer_name: string | null;
+  sales_transaction_items: {
+    name: string;
+    qty: number;
+    price: string | number;
+    unit_name?: string | null;
+    unit_factor?: number | string | null;
+  }[];
+  total: string | number;
+  payment_method: string;
+  store_id: string | null;
+  stores: {
+    name: string;
+  } | null;
+  cashier_id: string | null;
+  created_at: string;
+  status: string;
+  attachments?: Json;
 }
 
 type Tab = "transactions" | "analytics" | "reps";
@@ -53,6 +78,18 @@ const methodIcons: Record<string, React.ElementType> = {
 
 const statuses = ["All Status", "completed", "refunded", "pending"];
 const methods = ["All Methods", "Credit Card", "Cash", "Debit Card", "Mobile Pay"];
+
+const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  { key: "transactions", label: "Transactions", icon: Receipt },
+  { key: "analytics", label: "Analytics", icon: TrendingUp },
+  { key: "reps", label: "Sales Reps", icon: Users },
+];
+
+const tabPermMap: Record<Tab, Permission> = {
+  transactions: "pages.sales.transactions",
+  analytics: "pages.sales.analytics",
+  reps: "pages.sales.reps",
+};
 
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
@@ -81,12 +118,13 @@ export default function SalesPage() {
       if (data && !error) {
         const profilesRes = await supabase.from("profiles").select("id, name");
         const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+        const rawData = data as unknown as SalesTransactionQueryRow[];
 
-        setTransactions(data.map((s: any) => ({
+        setTransactions(rawData.map((s) => ({
           id: s.transaction_number,
           dbId: s.id,
           customer: s.customer_name || "Walk-in",
-          items: (s.sales_transaction_items || []).reduce((sum: number, i: any) => sum + i.qty, 0),
+          items: (s.sales_transaction_items || []).reduce((sum: number, i) => sum + i.qty, 0),
           total: Number(s.total),
           method: s.payment_method,
           store: s.store_id || "",
@@ -95,6 +133,11 @@ export default function SalesPage() {
           time: new Date(s.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
           status: s.status as Transaction["status"],
           date: s.created_at,
+          lineItems: (s.sales_transaction_items || []).map((i) => ({
+            name: i.name,
+            qty: i.qty,
+            price: Number(i.price)
+          })),
         })));
       }
       setLoading(false);
@@ -132,7 +175,7 @@ export default function SalesPage() {
   const updateStatus = useCallback(async (id: string, status: Transaction["status"]) => {
     const txn = transactions.find(t => t.id === id);
     if (!txn) return;
-    await supabase.from("sales_transactions").update({ status: status as any }).eq("id", txn.dbId);
+    await supabase.from("sales_transactions").update({ status: status as Database["public"]["Enums"]["transaction_status"] }).eq("id", txn.dbId);
     setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
     toast.success(`Transaction ${id} marked as ${status}`);
   }, [transactions]);
@@ -157,7 +200,7 @@ export default function SalesPage() {
       .single();
     if (error || !data) { toast.error("Could not load receipt"); return; }
     setReprintSaleId(data.id);
-    setReprintAttachments(Array.isArray((data as any).attachments) ? ((data as any).attachments as Attachment[]) : []);
+    setReprintAttachments(Array.isArray(data.attachments) ? (data.attachments as unknown as Attachment[]) : []);
     setReprintSale({
       id: data.transaction_number,
       total: Number(data.total),
@@ -167,7 +210,7 @@ export default function SalesPage() {
       customer: data.customer_name || "Walk-in",
       method: data.payment_method,
       date: new Date(data.created_at).toLocaleString(),
-      items: (data.sales_transaction_items || []).map((i: any) => ({
+      items: (data.sales_transaction_items || []).map((i) => ({
         name: i.name,
         qty: i.qty,
         price: Number(i.price),
@@ -177,14 +220,7 @@ export default function SalesPage() {
     });
   }, [transactions]);
 
-  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: "transactions", label: "Transactions", icon: Receipt },
-    { key: "analytics", label: "Analytics", icon: TrendingUp },
-    { key: "reps", label: "Sales Reps", icon: Users },
-  ];
-
-  const tabPermMap: Record<Tab, string> = { transactions: "pages.sales.transactions", analytics: "pages.sales.analytics", reps: "pages.sales.reps" };
-  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key])), [hasPermission]);
 
   return (
     <AppLayout>
@@ -288,7 +324,7 @@ export default function SalesPage() {
                       setReprintAttachments(next);
                       await supabase
                         .from("sales_transactions")
-                        .update({ attachments: next as any })
+                        .update({ attachments: next as unknown as Json })
                         .eq("id", reprintSaleId);
                     }}
                   />
@@ -339,7 +375,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
   const [expandedTxn, setExpandedTxn] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    let result = transactions.filter((t) => {
+    const result = transactions.filter((t) => {
       const matchSearch = !search || t.id.toLowerCase().includes(search.toLowerCase()) || t.customer.toLowerCase().includes(search.toLowerCase()) || t.rep.toLowerCase().includes(search.toLowerCase());
       const matchStore = storeFilter === "All Stores" || t.storeName === storeFilter;
       const matchStatus = statusFilter === "All Status" || t.status === statusFilter;
@@ -443,28 +479,51 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                     </tr>
                     {isExpanded && (
                       <tr key={`${txn.id}-detail`} className="bg-muted/20">
-                        <td colSpan={6} className="px-4 py-3">
-                          <div className="flex flex-wrap items-center gap-3 animate-fade-in">
-                            <span className="text-xs text-muted-foreground">Rep: <span className="text-foreground font-medium">{txn.rep}</span></span>
-                            <span className="text-xs text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
-                            <span className="text-xs text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
-                            <div className="ml-auto flex gap-2">
-                              {!isSalesRep && (
-                                <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2 py-1 rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 flex items-center gap-1">
-                                  <Receipt className="w-3 h-3" /> Reprint
-                                </button>
-                              )}
-                              {txn.status === "pending" && (
-                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2 py-1 rounded bg-success/10 text-success font-medium hover:bg-success/20">Complete</button>
-                              )}
-                              {txn.status === "completed" && !isSalesRep && (
-                                <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2 py-1 rounded bg-warning/10 text-warning font-medium hover:bg-warning/20">Refund</button>
-                              )}
-                              {!isSalesRep && (
-                                <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive font-medium hover:bg-destructive/20">
-                                  <Trash2 className="w-3 h-3 inline mr-1" /> Delete
-                                </button>
-                              )}
+                        <td colSpan={6} className="px-6 py-4">
+                          <div className="space-y-4 animate-fade-in">
+                            <div className="flex flex-wrap items-center gap-4 text-xs">
+                              <span className="text-muted-foreground">Rep: <span className="text-foreground font-medium">{txn.rep}</span></span>
+                              <span className="text-muted-foreground">Store: <span className="text-foreground font-medium">{txn.storeName}</span></span>
+                              <span className="text-muted-foreground">Method: <span className="text-foreground font-medium">{txn.method}</span></span>
+                              <div className="ml-auto flex gap-2">
+                                {!isSalesRep && (
+                                  <button onClick={(e) => { e.stopPropagation(); onReprint(txn.id); }} className="text-xs px-2.5 py-1 rounded-md bg-primary/10 text-primary font-semibold hover:bg-primary/20 flex items-center gap-1 transition-colors">
+                                    <Receipt className="w-3.5 h-3.5" /> Reprint
+                                  </button>
+                                )}
+                                {txn.status === "pending" && (
+                                  <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "completed"); }} className="text-xs px-2.5 py-1 rounded-md bg-success/10 text-success font-semibold hover:bg-success/20 transition-colors">Complete</button>
+                                )}
+                                {txn.status === "completed" && !isSalesRep && (
+                                  <button onClick={(e) => { e.stopPropagation(); onUpdateStatus(txn.id, "refunded"); }} className="text-xs px-2.5 py-1 rounded-md bg-warning/10 text-warning font-semibold hover:bg-warning/20 transition-colors">Refund</button>
+                                )}
+                                {!isSalesRep && (
+                                  <button onClick={(e) => { e.stopPropagation(); onDelete(txn.id); }} className="text-xs px-2.5 py-1 rounded-md bg-destructive/10 text-destructive font-semibold hover:bg-destructive/20 flex items-center gap-1 transition-colors">
+                                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* List of Goods nested display */}
+                            <div className="border border-border/40 rounded-xl overflow-hidden bg-card/65 shadow-inner">
+                              <div className="px-4 py-2 bg-muted/40 border-b border-border/40 text-xs font-bold text-muted-foreground uppercase tracking-wider">Goods Sold</div>
+                              <div className="divide-y divide-border/30">
+                                {txn.lineItems && txn.lineItems.length > 0 ? (
+                                  txn.lineItems.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center px-4 py-2.5 text-xs hover:bg-muted/10 transition-colors">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+                                        <span className="font-semibold text-foreground">{item.name}</span>
+                                        <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full font-medium">Qty: {item.qty}</span>
+                                      </div>
+                                      <span className="font-bold text-foreground">{formatCurrency(item.price * item.qty)} <span className="text-[10px] text-muted-foreground font-normal">({formatCurrency(item.price)} each)</span></span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-xs text-muted-foreground text-center">No item details available.</div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

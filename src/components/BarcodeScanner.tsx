@@ -18,6 +18,7 @@ export default function BarcodeScanner({ open, onClose, onScan }: BarcodeScanner
     if (!open) return;
 
     let mounted = true;
+    let isStarting = true;
     const scanner = new Html5Qrcode(containerId);
     scannerRef.current = scanner;
 
@@ -28,19 +29,38 @@ export default function BarcodeScanner({ open, onClose, onScan }: BarcodeScanner
         (decodedText) => {
           if (mounted) {
             onScan(decodedText);
-            scanner.stop().catch(() => {});
+            try {
+              if (scanner.isScanning) {
+                scanner.stop().catch(() => {});
+              }
+            } catch {}
             onClose();
           }
         },
         () => {}
       )
+      .then(() => {
+        isStarting = false;
+        if (!mounted) {
+          try {
+            if (scanner.isScanning) {
+              scanner.stop().catch(() => {});
+            }
+          } catch {}
+        }
+      })
       .catch((err) => {
+        isStarting = false;
         if (mounted) setError("Camera access denied or unavailable. Use manual entry below.");
       });
 
     return () => {
       mounted = false;
-      scanner.stop().catch(() => {});
+      try {
+        if (scanner.isScanning) {
+          scanner.stop().catch(() => {});
+        }
+      } catch {}
       scannerRef.current = null;
     };
   }, [open]);

@@ -28,7 +28,7 @@ export interface InventoryItem {
 }
 
 export interface SaleRecord {
-  id: string; items: { name: string; sku: string; qty: number; price: number }[]; total: number; customer: string; method: string; date: string; store: string; createdBy: string; createdByRole: string;
+  id: string; items: { name: string; sku: string; qty: number; price: number; unitFactor?: number; unitName?: string; baseQty?: number }[]; total: number; customer: string; method: string; date: string; store: string; createdBy: string; createdByRole: string;
   customerId?: string | null; customerEmail?: string | null; customerPhone?: string | null;
 }
 
@@ -164,7 +164,13 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         setSales(salesRes.data.map(s => ({
           id: s.transaction_number,
           items: ((s as any).sales_transaction_items || []).map((si: any) => ({
-            name: si.name, sku: si.sku || "", qty: si.qty, price: Number(si.price),
+            name: si.name,
+            sku: si.sku || "",
+            qty: si.qty,
+            price: Number(si.price),
+            unitFactor: Number(si.unit_factor) || 1,
+            unitName: si.unit_name || "",
+            baseQty: Number(si.base_qty) || si.qty,
           })),
           total: Number(s.total), customer: s.customer_name || "Walk-in",
           method: s.payment_method, date: s.created_at,
@@ -356,9 +362,15 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       // Insert line items
       const lineItems = sale.items.map(item => ({
         transaction_id: data.id,
-        name: item.name, sku: item.sku, qty: item.qty,
-        price: item.price, total: item.price * item.qty,
+        name: item.name,
+        sku: item.sku,
+        qty: item.qty,
+        price: item.price,
+        total: item.price * item.qty,
         inventory_item_id: inventory.find(i => i.sku === item.sku)?.id || null,
+        unit_factor: item.unitFactor || 1,
+        unit_name: item.unitName || null,
+        base_qty: item.baseQty || item.qty * (item.unitFactor || 1),
       }));
       await supabase.from("sales_transaction_items").insert(lineItems);
 

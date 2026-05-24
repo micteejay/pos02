@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, Fragment } from "react";
 import AppLayout from "@/components/AppLayout";
 import {
   Package, Warehouse, ArrowRightLeft, Search, Filter, Plus, AlertTriangle,
@@ -13,7 +13,7 @@ import { useSharedData, InventoryItem, CategoryType, ItemUnit } from "@/hooks/us
 import { UnitsEditor } from "@/components/UnitsEditor";
 import { InventoryCsvImport } from "@/components/InventoryCsvImport";
 import { useAppEvents } from "@/hooks/use-app-events";
-import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAppSettings, type Permission } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,34 @@ import type { OrgWarehouse } from "@/hooks/use-shared-data";
 type Tab = "stock" | "warehouses" | "transfers" | "categories";
 
 const BASE_UNIT_OPTIONS = ["pcs", "kg", "g", "ltr", "ml", "m", "cm", "box", "pack", "bottle", "can", "bag", "pair", "set"];
+
+interface StockTransferQueryRow {
+  transfer_number: string;
+  id: string;
+  stock_transfer_items: { name: string; qty: number }[];
+  from_wh: { name: string } | null;
+  to_wh: { name: string } | null;
+  from_warehouse_id: string | null;
+  to_warehouse_id: string | null;
+  created_at: string;
+  eta: string | null;
+  status: string;
+  requester: string | null;
+}
+
+const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
+  { key: "stock", label: "Stock Levels", icon: Package },
+  { key: "warehouses", label: "Warehouses", icon: Warehouse },
+  { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
+  { key: "categories", label: "Categories", icon: Tag },
+];
+
+const tabPermMap: Record<Tab, Permission> = {
+  stock: "pages.inventory.stock",
+  warehouses: "pages.inventory.warehouses",
+  transfers: "pages.inventory.transfers",
+  categories: "pages.inventory.categories",
+};
 
 /**
  * Validate units + pack size. Returns an error message or null if valid.
@@ -93,15 +121,16 @@ export default function InventoryPage() {
       if (data) {
         const profilesRes = await supabase.from("profiles").select("id, name");
         const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
+        const rawTransfers = data as unknown as StockTransferQueryRow[];
 
-        setTransfers(data.map((t: any) => {
-          const items = (t.stock_transfer_items || []).map((i: any) => `${i.name} ×${i.qty}`).join(", ");
+        setTransfers(rawTransfers.map((t) => {
+          const items = (t.stock_transfer_items || []).map((i) => `${i.name} ×${i.qty}`).join(", ");
           return {
             id: t.transfer_number,
             dbId: t.id,
             items: items || "Items",
-            from: (t.from_wh as any)?.name || "Unknown",
-            to: (t.to_wh as any)?.name || "Unknown",
+            from: t.from_wh?.name || "Unknown",
+            to: t.to_wh?.name || "Unknown",
             fromId: t.from_warehouse_id,
             toId: t.to_warehouse_id,
             initiated: new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
@@ -129,15 +158,7 @@ export default function InventoryPage() {
     ];
   }, [inventory, transfers, formatCurrency]);
 
-  const allTabs: { key: Tab; label: string; icon: React.ElementType }[] = [
-    { key: "stock", label: "Stock Levels", icon: Package },
-    { key: "warehouses", label: "Warehouses", icon: Warehouse },
-    { key: "transfers", label: "Transfers", icon: ArrowRightLeft },
-    { key: "categories", label: "Categories", icon: Tag },
-  ];
-
-  const tabPermMap: Record<Tab, string> = { stock: "pages.inventory.stock", warehouses: "pages.inventory.warehouses", transfers: "pages.inventory.transfers", categories: "pages.inventory.categories" };
-  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key] as any)), [hasPermission]);
+  const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key])), [hasPermission]);
 
   const addTransfer = async (tr: Transfer) => {
     // Save to DB
@@ -150,7 +171,7 @@ export default function InventoryPage() {
       transfer_number: transferNumber,
       from_warehouse_id: fromWh?.id || null,
       to_warehouse_id: toWh?.id || null,
-      status: "pending" as any,
+      status: "pending" as Database["public"]["Enums"]["transfer_status"],
       requester: user?.id || null,
       notes: tr.items,
     }).select().single();
@@ -175,7 +196,7 @@ export default function InventoryPage() {
   const updateTransferStatus = async (id: string, status: Transfer["status"]) => {
     const tr = transfers.find(t => t.id === id);
     if (!tr) return;
-    await supabase.from("stock_transfers").update({ status: status as any }).eq("id", tr.dbId);
+    await supabase.from("stock_transfers").update({ status: status as Database["public"]["Enums"]["transfer_status"] }).eq("id", tr.dbId);
     setTransfers(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     if (status === "delivered") {
       addNotification({ type: "inventory", title: `Transfer ${id} delivered`, message: "Stock has been received at destination", link: "/inventory" });
@@ -533,7 +554,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
     });
     if (sortKey) {
       result = [...result].sort((a, b) => {
-        let cmp = sortKey === "name" ? a.name.localeCompare(b.name) : sortKey === "qty" ? a.qty - b.qty : a.price - b.price;
+        const cmp = sortKey === "name" ? a.name.localeCompare(b.name) : sortKey === "qty" ? a.qty - b.qty : a.price - b.price;
         return sortDir === "desc" ? -cmp : cmp;
       });
     }
@@ -607,8 +628,8 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                   const sc = statusConfig[item.status];
                   const isExpanded = expandedSku === item.sku;
                   return (
-                    <>
-                      <tr key={item.sku} className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => setExpandedSku(isExpanded ? null : item.sku)}>
+                    <Fragment key={item.sku}>
+                      <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => setExpandedSku(isExpanded ? null : item.sku)}>
                         <td className="px-5 py-3"><p className="text-sm font-medium text-foreground">{item.name}</p><p className="text-xs text-muted-foreground">{item.category}{item.barcode ? ` · ${item.barcode}` : ""}</p></td>
                         <td className="px-5 py-3 text-xs font-mono text-primary">{item.sku}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground hidden md:table-cell">{item.warehouse}</td>
@@ -619,7 +640,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                         <td className="px-3 py-3 text-right"><MoreHorizontal className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100" /></td>
                       </tr>
                       {isExpanded && (
-                        <tr key={`${item.sku}-actions`} className="bg-muted/20">
+                        <tr className="bg-muted/20">
                           <td colSpan={8} className="px-5 py-3">
                             <div className="space-y-3 animate-fade-in">
                               <div className="flex flex-wrap items-center gap-2">
@@ -644,7 +665,7 @@ function StockTab({ items, onDelete, onAdjustQty, onEdit, formatCurrency }: {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -793,7 +814,7 @@ function CategoriesTab({ categories, onAdd, onApprove, onReject, onDelete, userR
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <select value={filterType} onChange={e => setFilterType(e.target.value as any)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+          <select value={filterType} onChange={e => setFilterType(e.target.value as CategoryType | "all")} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
             <option value="all">All Types</option>
             <option value="inventory">Inventory</option>
             <option value="expense">Expense</option>

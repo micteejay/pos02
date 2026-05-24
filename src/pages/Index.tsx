@@ -15,6 +15,13 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import AISalesInsights from "@/components/AISalesInsights";
 
+const colorMap = {
+  primary: { bg: "bg-primary/10", text: "text-primary" },
+  info: { bg: "bg-info/10", text: "text-info" },
+  warning: { bg: "bg-warning/10", text: "text-warning" },
+  success: { bg: "bg-success/10", text: "text-success" },
+};
+
 export default function Dashboard() {
   const { user } = useAuth();
   const { formatCurrency, settings, users } = useAppSettings();
@@ -30,10 +37,10 @@ export default function Dashboard() {
   const pendingApprovals = useMemo(() => approvalItems.filter(a => a.status === "pending"), [approvalItems]);
 
   const statCards = useMemo(() => [
-    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: sales.length > 0 ? `${sales.length} sales` : "No sales yet", trend: "up" as const, icon: DollarSign, color: "primary" },
-    { label: "Active Orders", value: sales.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart, color: "info" },
-    { label: "Inventory Items", value: inventory.length.toLocaleString(), change: `${lowStockAlerts.length} alerts`, trend: lowStockAlerts.length > 0 ? "down" as const : "up" as const, icon: Package, color: "warning" },
-    { label: "Active Users", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users, color: "success" },
+    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: sales.length > 0 ? `${sales.length} sales` : "No sales yet", trend: "up" as const, icon: DollarSign, colorClass: colorMap.primary },
+    { label: "Active Orders", value: sales.length.toString(), change: "", trend: "up" as const, icon: ShoppingCart, colorClass: colorMap.info },
+    { label: "Inventory Items", value: inventory.length.toLocaleString(), change: `${lowStockAlerts.length} alerts`, trend: lowStockAlerts.length > 0 ? "down" as const : "up" as const, icon: Package, colorClass: colorMap.warning },
+    { label: "Active Users", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users, colorClass: colorMap.success },
   ], [formatCurrency, users, totalRevenue, sales, inventory, lowStockAlerts]);
 
   // Build revenue data from sales
@@ -85,8 +92,8 @@ export default function Dashboard() {
           {statCards.map((stat) => (
             <div key={stat.label} className="glass-card rounded-xl p-5 hover:stat-glow transition-all duration-300 group">
               <div className="flex items-start justify-between mb-3">
-                <div className={`w-10 h-10 rounded-lg bg-${stat.color}/10 flex items-center justify-center`}>
-                  <stat.icon className={`w-5 h-5 text-${stat.color}`} />
+                <div className={`w-10 h-10 rounded-lg ${stat.colorClass.bg} flex items-center justify-center`}>
+                  <stat.icon className={`w-5 h-5 ${stat.colorClass.text}`} />
                 </div>
                 {stat.change && (
                   <div className={`flex items-center gap-1 text-xs font-medium ${stat.trend === "up" ? "text-success" : "text-destructive"}`}>
@@ -102,15 +109,14 @@ export default function Dashboard() {
         </div>
 
         {/* Charts Row */}
-        {revenueData.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 glass-card rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-foreground">Revenue Overview</h3>
-                  <p className="text-xs text-muted-foreground">From recorded sales</p>
-                </div>
-              </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Revenue Overview */}
+          <div className="lg:col-span-2 glass-card rounded-xl p-5 flex flex-col justify-between">
+            <div className="mb-4">
+              <h3 className="font-semibold text-foreground">Revenue Overview</h3>
+              <p className="text-xs text-muted-foreground">From recorded sales</p>
+            </div>
+            {revenueData.length > 0 ? (
               <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={revenueData}>
                   <defs>
@@ -126,40 +132,45 @@ export default function Dashboard() {
                   <Area type="monotone" dataKey="revenue" stroke="hsl(172, 66%, 40%)" strokeWidth={2} fill="url(#revenueGradient)" />
                 </AreaChart>
               </ResponsiveContainer>
-            </div>
-            <div className="glass-card rounded-xl p-5">
-              <div className="mb-4">
-                <h3 className="font-semibold text-foreground">Inventory by Warehouse</h3>
-                <p className="text-xs text-muted-foreground">Stock distribution</p>
+            ) : (
+              <div className="h-[260px] flex flex-col items-center justify-center text-center">
+                <ShoppingCart className="w-12 h-12 text-muted-foreground/20 mb-3" />
+                <h4 className="font-semibold text-sm text-foreground">No sales data yet</h4>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm">Complete sales in POS to see revenue charts here.</p>
               </div>
-              {(() => {
-                const warehouseStock = warehouses.map(w => ({
-                  name: w.name.length > 12 ? w.name.substring(0, 12) + "…" : w.name,
-                  value: inventory.filter(i => i.warehouse === w.name).reduce((s, i) => s + i.qty, 0),
-                }));
-                return warehouseStock.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={warehouseStock} layout="vertical" barSize={14}>
-                      <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" />
-                      <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" width={80} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="hsl(172, 66%, 40%)" radius={[0, 6, 6, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : <p className="text-sm text-muted-foreground text-center py-10">No warehouses set up yet.</p>;
-              })()}
-            </div>
+            )}
           </div>
-        )}
 
-        {/* No data state */}
-        {revenueData.length === 0 && (
-          <div className="glass-card rounded-xl p-10 text-center">
-            <ShoppingCart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <h3 className="font-semibold text-foreground">No sales data yet</h3>
-            <p className="text-sm text-muted-foreground mt-1">Complete sales in POS to see revenue charts here.</p>
+          {/* Inventory by Warehouse */}
+          <div className="glass-card rounded-xl p-5 flex flex-col justify-between">
+            <div className="mb-4">
+              <h3 className="font-semibold text-foreground">Inventory by Warehouse</h3>
+              <p className="text-xs text-muted-foreground">Stock distribution</p>
+            </div>
+            {(() => {
+              const warehouseStock = warehouses.map(w => ({
+                name: w.name.length > 12 ? w.name.substring(0, 12) + "…" : w.name,
+                value: inventory.filter(i => i.warehouse === w.name).reduce((s, i) => s + i.qty, 0),
+              }));
+              return warehouseStock.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={warehouseStock} layout="vertical" barSize={14}>
+                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" />
+                    <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} stroke="hsl(220, 10%, 46%)" width={80} />
+                    <Tooltip />
+                    <Bar dataKey="value" fill="hsl(172, 66%, 40%)" radius={[0, 6, 6, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[260px] flex flex-col items-center justify-center text-center">
+                  <Package className="w-12 h-12 text-muted-foreground/20 mb-3" />
+                  <h4 className="font-semibold text-sm text-foreground">No warehouse stock</h4>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">Add stock and warehouses to see the distribution chart.</p>
+                </div>
+              );
+            })()}
           </div>
-        )}
+        </div>
 
         {/* Supply Chain + Inventory Alerts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

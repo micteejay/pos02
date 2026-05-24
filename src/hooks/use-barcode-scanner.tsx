@@ -19,9 +19,11 @@ export function useBarcodeScanner(onScan: (barcode: string) => void, enabled = t
     const MIN_BARCODE_LENGTH = 4; // minimum chars to consider a barcode
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input/textarea (unless it's very fast input)
       const target = e.target as HTMLElement;
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+
+      // Let input fields handle their keydowns natively
+      if (isInput) return;
 
       const now = Date.now();
       const timeSinceLastKey = now - lastKeyTimeRef.current;
@@ -48,12 +50,6 @@ export function useBarcodeScanner(onScan: (barcode: string) => void, enabled = t
 
       // Only accept printable single characters
       if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // If this is rapid input (scanner-like) and we're in an input field,
-        // prevent the character from being typed
-        if (isInput && bufferRef.current.length >= 2 && timeSinceLastKey <= MAX_KEY_INTERVAL) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
         bufferRef.current += e.key;
 
         // Auto-clear buffer after a pause (in case Enter never comes)

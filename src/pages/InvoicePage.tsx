@@ -264,7 +264,15 @@ export default function InvoicePage() {
     addSale({
       items: inv.items.filter(i => i.description).map(i => {
         const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
-        return { name: i.unitName ? `${i.description} (${i.unitName})` : i.description, sku: invItem?.sku || "CUSTOM", qty: i.qty, price: i.rate };
+        return {
+          name: i.unitName ? `${i.description} (${i.unitName})` : i.description,
+          sku: invItem?.sku || "CUSTOM",
+          qty: i.qty,
+          price: i.rate,
+          unitFactor: i.unitFactor || 1,
+          unitName: i.unitName || "",
+          baseQty: i.qty * (i.unitFactor || 1),
+        };
       }),
       total,
       customer: inv.customerName,

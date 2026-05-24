@@ -61,7 +61,10 @@ export default function ReportsPage() {
       grouped[key].revenue += sale.total;
       const costTotal = sale.items.reduce((s, item) => {
         const invItem = inventory.find(i => i.sku === item.sku);
-        return s + (invItem?.costPrice || item.price * 0.6) * item.qty;
+        const factor = item.unitFactor || 1;
+        const totalBaseQty = item.baseQty || (item.qty * factor);
+        const costPrice = invItem && invItem.costPrice > 0 ? invItem.costPrice : (item.price / factor) * 0.6;
+        return s + costPrice * totalBaseQty;
       }, 0);
       grouped[key].costOfGoods += costTotal;
     });
@@ -133,7 +136,10 @@ export default function ReportsPage() {
     const map: Record<string, { name: string; revenue: number; cost: number; units: number }> = {};
     sales.forEach(s => s.items.forEach(item => {
       const invItem = inventory.find(i => i.sku === item.sku);
-      const cost = (invItem?.costPrice || item.price * 0.6) * item.qty;
+      const factor = item.unitFactor || 1;
+      const totalBaseQty = item.baseQty || (item.qty * factor);
+      const costPrice = invItem && invItem.costPrice > 0 ? invItem.costPrice : (item.price / factor) * 0.6;
+      const cost = costPrice * totalBaseQty;
       if (!map[item.name]) map[item.name] = { name: item.name, revenue: 0, cost: 0, units: 0 };
       map[item.name].revenue += item.qty * item.price;
       map[item.name].cost += cost;
@@ -157,7 +163,10 @@ export default function ReportsPage() {
     const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((a, i) => a + i.qty, 0), 0);
     const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((a, item) => {
       const invItem = inventory.find(i => i.sku === item.sku);
-      return a + (invItem?.costPrice || item.price * 0.6) * item.qty;
+      const factor = item.unitFactor || 1;
+      const totalBaseQty = item.baseQty || (item.qty * factor);
+      const costPrice = invItem && invItem.costPrice > 0 ? invItem.costPrice : (item.price / factor) * 0.6;
+      return a + costPrice * totalBaseQty;
     }, 0), 0);
     const todayOpExpenses = todayExpenses.reduce((s, e) => s + e.amount, 0);
     const byMethod: Record<string, number> = {};
