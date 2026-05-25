@@ -124,9 +124,9 @@ export default function POSPage() {
         return prev;
       }
       if (existing) {
-        return prev.map((i) => i.lineKey === lineKey ? { ...i, qty: i.qty + 1 } : i);
+        return [{ ...existing, qty: existing.qty + 1 }, ...prev.filter((i) => i.lineKey !== lineKey)];
       }
-      return [...prev, { lineKey, sku: item.sku, name: item.name, price, qty: 1, discount: 0, stock: item.qty, unitName, unitFactor }];
+      return [{ lineKey, sku: item.sku, name: item.name, price, qty: 1, discount: 0, stock: item.qty, unitName, unitFactor }, ...prev];
     });
     // Ensure search input is focused after adding an item so successive scans work
     setTimeout(() => searchInputRef.current?.focus(), 50);
