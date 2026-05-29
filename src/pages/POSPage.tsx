@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
   Trash2, Receipt, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
+  Pencil,
 } from "lucide-react";
 
 interface CartItem {
@@ -80,6 +81,17 @@ export default function POSPage() {
   const [heldOrders, setHeldOrders] = useState<{ id: string; cart: CartItem[]; customer: string }[]>([]);
   const [showHeld, setShowHeld] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null);
+  const [tempPrice, setTempPrice] = useState<string>("");
+
+  const handlePriceSave = useCallback((lineKey: string) => {
+    const parsedPrice = parseFloat(tempPrice);
+    if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+      setCart((prev) => prev.map(i => i.lineKey === lineKey ? { ...i, price: parsedPrice } : i));
+      toast.success("Price updated in cart");
+    }
+    setEditingPriceKey(null);
+  }, [tempPrice]);
 
   // Auto-focus search input on mount and keep it focused
   useEffect(() => {
@@ -382,10 +394,40 @@ export default function POSPage() {
               <div key={item.lineKey} className="flex items-center gap-3.5 p-3 rounded-xl bg-card/60 border border-border/30 shadow-sm group hover:border-primary/25 hover:bg-card transition-all duration-300 animate-in slide-in-from-right-2 fade-in">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground/80 mt-0.5 font-medium">
-                    {formatCurrency(item.price)} / {item.unitName}
-                    {item.unitFactor > 1 && <span className="ml-1 opacity-70">({item.unitFactor} base)</span>}
-                  </p>
+                  {editingPriceKey === item.lineKey ? (
+                    <div className="flex items-center gap-1 mt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-xs text-muted-foreground">{settings.currencySymbol}</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={tempPrice}
+                        onChange={(e) => setTempPrice(e.target.value)}
+                        onBlur={() => handlePriceSave(item.lineKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handlePriceSave(item.lineKey);
+                          if (e.key === "Escape") setEditingPriceKey(null);
+                        }}
+                        className="w-20 h-6 px-1.5 py-0.5 text-xs font-semibold rounded border border-primary bg-background focus:outline-none focus:ring-1 focus:ring-primary/30"
+                        autoFocus
+                      />
+                      <span className="text-xs text-muted-foreground">/ {item.unitName}</span>
+                    </div>
+                  ) : (
+                    <p
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPriceKey(item.lineKey);
+                        setTempPrice(item.price.toString());
+                      }}
+                      className="text-xs text-muted-foreground/80 mt-0.5 font-medium hover:text-primary hover:underline cursor-pointer flex items-center gap-1 group/price"
+                      title="Click to edit unit price"
+                    >
+                      {formatCurrency(item.price)} / {item.unitName}
+                      <Pencil className="w-3 h-3 text-primary opacity-0 group-hover/price:opacity-100 transition-opacity" />
+                      {item.unitFactor > 1 && <span className="ml-1 opacity-70">({item.unitFactor} base)</span>}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 bg-muted/40 p-0.5 rounded-lg border border-border/20">
                   <button onClick={() => updateQty(item.lineKey, -1)} className="w-6.5 h-6.5 rounded-md bg-muted/50 hover:bg-muted border border-transparent hover:border-border flex items-center justify-center transition-colors active:scale-95"><Minus className="w-3 h-3" /></button>

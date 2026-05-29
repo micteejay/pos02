@@ -113,25 +113,25 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <span>Customer: {sale.customer}</span>
       </div>
       
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
+      <div className="flex justify-between text-[8px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+        <span>goods  quntity rate</span>
+        <span>amonut</span>
+      </div>
+      
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-1`} />
       
       {sale.items.map((item, i) => {
         const factor = item.unitFactor || 1;
         return (
-          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between text-foreground">
-            <div className="flex-1 pr-2">
-              <div>
-                {item.name} ×{item.qty}
-                {item.unitName ? ` ${item.unitName}` : ""}
-              </div>
-              {factor > 1 && (
-                <div className="text-[9px] text-muted-foreground">
-                  1 {item.unitName} = {factor} base · total {item.qty * factor} base ·{" "}
-                  {formatCurrency(item.price)} / {item.unitName}
-                </div>
-              )}
+          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-foreground py-0.5">
+            <div className="flex-1 pr-2 flex items-baseline gap-2 truncate">
+              <span className="font-bold text-[10px]">{item.name}</span>
+              <span className="text-[8.5px] text-muted-foreground whitespace-nowrap">
+                {item.qty} x {formatCurrency(item.price)}
+                {item.unitName ? ` / ${item.unitName}` : ""}
+              </span>
             </div>
-            <span>{formatCurrency(item.price * item.qty)}</span>
+            <span className="text-right font-bold text-[10px] whitespace-nowrap">{formatCurrency(item.price * item.qty)}</span>
           </div>
         );
       })}

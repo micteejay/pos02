@@ -65,13 +65,14 @@ export function generateReceiptText(
   
   text += line(isInvoice ? `Invoice: ${sale.id}` : `Receipt: ${sale.id}`, sale.date || "") + "\n";
   text += line("Customer:", sale.customer) + "\n";
-  
   text += isInvoice ? thickDivider + "\n" : divider + "\n";
+  text += line("goods  quntity rate", "amonut") + "\n";
+  text += divider + "\n";
 
   // Items
   for (const item of sale.items) {
-    const qtyStr = `x${item.qty}`;
-    const left = `${item.name} ${qtyStr}`;
+    const qtyStr = `${item.qty} x ${formatCurrency(item.price)}${item.unitName ? ` / ${item.unitName}` : ""}`;
+    const left = `${item.name}  ${qtyStr}`;
     const right = formatCurrency(item.price * item.qty);
     text += line(left, right) + "\n";
   }
