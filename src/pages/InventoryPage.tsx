@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import type { Database } from "@/integrations/supabase/types";
 import type { OrgWarehouse } from "@/hooks/use-shared-data";
 
 type Tab = "stock" | "warehouses" | "transfers" | "categories";

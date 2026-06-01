@@ -3,11 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Paperclip, Upload, X, Download, FileText, Image as ImageIcon,
-  Loader2, Eye, Link as LinkIcon, File as FileIcon,
+  Loader2, Eye, Link as LinkIcon, File as FileIcon, Trash2,
 } from "lucide-react";
 import { PreviewErrorState } from "@/components/PreviewSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /**
  * A single attachment record stored on a parent row (invoice / sale).
@@ -312,6 +316,8 @@ export default function AttachmentsManager({
   const [uploading, setUploading] = useState(false);
   const [previewing, setPreviewing] = useState<Attachment | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [confirmRemoveIndex, setConfirmRemoveIndex] = useState<number | null>(null);
+  const [removing, setRemoving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
@@ -344,10 +350,23 @@ export default function AttachmentsManager({
     toast.success("Attachment added");
   };
 
-  const handleRemove = (idx: number) => {
+  const handleRemove = async (idx: number) => {
     if (!onChange) return;
+    const att = attachments[idx];
+    if (!att) return;
+    setRemoving(true);
+    // Clean up storage for direct uploads (not linked documents)
+    if (!att.documentId && att.storagePath) {
+      const { error } = await supabase.storage.from(att.storageBucket).remove([att.storagePath]);
+      if (error) {
+        toast.error("Failed to remove file from storage: " + error.message);
+      }
+    }
     const next = attachments.filter((_, i) => i !== idx);
     onChange(next);
+    setRemoving(false);
+    setConfirmRemoveIndex(null);
+    toast.success("Attachment removed");
   };
 
   return (
@@ -404,7 +423,7 @@ export default function AttachmentsManager({
               key={`${att.storagePath}-${i}`}
               att={att}
               onPreview={setPreviewing}
-              onRemove={!readOnly ? () => handleRemove(i) : undefined}
+              onRemove={!readOnly ? () => setConfirmRemoveIndex(i) : undefined}
               readOnly={readOnly}
             />
           ))}
@@ -423,6 +442,35 @@ export default function AttachmentsManager({
           }}
         />
       )}
+      <AlertDialog open={confirmRemoveIndex !== null} onOpenChange={(open) => { if (!open) setConfirmRemoveIndex(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              Remove attachment?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRemoveIndex !== null && attachments[confirmRemoveIndex]
+                ? `This will permanently delete "${attachments[confirmRemoveIndex].name}" from this record.`
+                : "This will permanently delete the attachment from this record."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmRemoveIndex(null)} disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRemoveIndex !== null && handleRemove(confirmRemoveIndex)}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
