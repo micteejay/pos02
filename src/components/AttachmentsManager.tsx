@@ -3,11 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   Paperclip, Upload, X, Download, FileText, Image as ImageIcon,
-  Loader2, Eye, Link as LinkIcon, File as FileIcon,
+  Loader2, Eye, Link as LinkIcon, File as FileIcon, Trash2,
 } from "lucide-react";
 import { PreviewErrorState } from "@/components/PreviewSkeleton";
 import EmptyState from "@/components/EmptyState";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 /**
  * A single attachment record stored on a parent row (invoice / sale).
