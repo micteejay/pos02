@@ -316,6 +316,8 @@ export default function AttachmentsManager({
   const [uploading, setUploading] = useState(false);
   const [previewing, setPreviewing] = useState<Attachment | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [confirmRemoveIndex, setConfirmRemoveIndex] = useState<number | null>(null);
+  const [removing, setRemoving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
@@ -348,10 +350,23 @@ export default function AttachmentsManager({
     toast.success("Attachment added");
   };
 
-  const handleRemove = (idx: number) => {
+  const handleRemove = async (idx: number) => {
     if (!onChange) return;
+    const att = attachments[idx];
+    if (!att) return;
+    setRemoving(true);
+    // Clean up storage for direct uploads (not linked documents)
+    if (!att.documentId && att.storagePath) {
+      const { error } = await supabase.storage.from(att.storageBucket).remove([att.storagePath]);
+      if (error) {
+        toast.error("Failed to remove file from storage: " + error.message);
+      }
+    }
     const next = attachments.filter((_, i) => i !== idx);
     onChange(next);
+    setRemoving(false);
+    setConfirmRemoveIndex(null);
+    toast.success("Attachment removed");
   };
 
   return (
