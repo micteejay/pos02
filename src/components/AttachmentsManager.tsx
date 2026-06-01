@@ -423,7 +423,7 @@ export default function AttachmentsManager({
               key={`${att.storagePath}-${i}`}
               att={att}
               onPreview={setPreviewing}
-              onRemove={!readOnly ? () => handleRemove(i) : undefined}
+              onRemove={!readOnly ? () => setConfirmRemoveIndex(i) : undefined}
               readOnly={readOnly}
             />
           ))}
@@ -442,6 +442,35 @@ export default function AttachmentsManager({
           }}
         />
       )}
+      <AlertDialog open={confirmRemoveIndex !== null} onOpenChange={(open) => { if (!open) setConfirmRemoveIndex(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-destructive" />
+              Remove attachment?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmRemoveIndex !== null && attachments[confirmRemoveIndex]
+                ? `This will permanently delete "${attachments[confirmRemoveIndex].name}" from this record.`
+                : "This will permanently delete the attachment from this record."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmRemoveIndex(null)} disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => confirmRemoveIndex !== null && handleRemove(confirmRemoveIndex)}
+              disabled={removing}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {removing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
