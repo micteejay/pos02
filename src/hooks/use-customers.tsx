@@ -14,6 +14,8 @@ export interface Customer {
   totalOrders: number;
   lastPurchaseAt: string | null;
   createdAt: string;
+  outstanding_balance?: number;
+  loyalty_points?: number;
 }
 
 function mapRow(r: any): Customer {
@@ -29,6 +31,8 @@ function mapRow(r: any): Customer {
     totalOrders: r.total_orders || 0,
     lastPurchaseAt: r.last_purchase_at,
     createdAt: r.created_at,
+    outstanding_balance: Number(r.outstanding_balance) || 0,
+    loyalty_points: Number(r.loyalty_points) || 0,
   };
 }
 
