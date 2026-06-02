@@ -30,6 +30,15 @@ export interface InventoryItem {
 export interface SaleRecord {
   id: string; items: { name: string; sku: string; qty: number; price: number; unitFactor?: number; unitName?: string; baseQty?: number }[]; total: number; customer: string; method: string; date: string; store: string; createdBy: string; createdByRole: string;
   customerId?: string | null; customerEmail?: string | null; customerPhone?: string | null;
+  /** Optional financial breakdown (preferred over the single `total`). */
+  subtotal?: number;
+  tax?: number;
+  discount?: number;
+  /** Optional split-payment breakdown. */
+  payments?: Array<{ method: string; amount: number; reference?: string }>;
+  amountTendered?: number;
+  change?: number;
+  balanceDue?: number;
 }
 
 export interface SharedDocument {
@@ -345,14 +354,32 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     const { data: txnNum } = await supabase.rpc("generate_txn_number");
     const txnNumber = txnNum || `TXN-${Date.now()}`;
 
+    const subtotal = typeof sale.subtotal === "number" ? sale.subtotal : sale.total;
+    const tax = typeof sale.tax === "number" ? sale.tax : 0;
+    const discount = typeof sale.discount === "number" ? sale.discount : 0;
+    // Primary method label: first payment line if available, else sale.method
+    const primaryMethod = sale.payments && sale.payments.length > 0 ? sale.payments[0].method : sale.method;
+    const methodLabel = primaryMethod === "card" ? "Credit Card"
+      : primaryMethod === "cash" ? "Cash"
+      : primaryMethod === "mobile" ? "Mobile Pay"
+      : primaryMethod === "transfer" ? "Bank Transfer"
+      : primaryMethod;
+
     const { data, error } = await supabase.from("sales_transactions").insert({
       transaction_number: txnNumber,
       customer_name: sale.customer || "Walk-in",
       customer_id: sale.customerId || null,
       customer_email: sale.customerEmail || null,
       customer_phone: sale.customerPhone || null,
-      payment_method: sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method,
-      subtotal: sale.total, tax: 0, total: sale.total,
+      payment_method: methodLabel,
+      subtotal,
+      tax,
+      discount,
+      total: sale.total,
+      amount_tendered: sale.amountTendered ?? 0,
+      change_given: sale.change ?? 0,
+      balance_due: sale.balanceDue ?? 0,
+      payments: (sale.payments ?? []) as any,
       store_id: storeId, cashier_id: user?.id || null,
       status: "completed",
       company_id: user?.companyId || null,
@@ -382,6 +409,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         customerId: sale.customerId || null,
         customerEmail: sale.customerEmail || null,
         customerPhone: sale.customerPhone || null,
+        subtotal, tax, discount,
+        payments: sale.payments || [],
+        amountTendered: sale.amountTendered ?? 0,
+        change: sale.change ?? 0,
+        balanceDue: sale.balanceDue ?? 0,
       }, ...prev]);
 
       // Bump customer aggregates if linked

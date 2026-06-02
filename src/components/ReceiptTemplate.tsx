@@ -19,6 +19,10 @@ export interface ReceiptData {
   method: string;
   items: ReceiptItem[];
   date?: string;
+  payments?: Array<{ method: string; amount: number; reference?: string }>;
+  amountTendered?: number;
+  change?: number;
+  balanceDue?: number;
 }
 
 export interface CompanyInfo {
@@ -113,28 +117,24 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <span>Customer: {sale.customer}</span>
       </div>
       
-      <div className="flex justify-between text-[8px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
-        <span>goods  quntity rate</span>
-        <span>amonut</span>
+      <div className="text-[8.5px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+        Items
       </div>
       
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-1`} />
       
-      {sale.items.map((item, i) => {
-        const factor = item.unitFactor || 1;
-        return (
-          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-foreground py-0.5">
-            <div className="flex-1 pr-2 flex items-baseline gap-2 truncate">
-              <span className="font-bold text-[10px]">{item.name}</span>
-              <span className="text-[8.5px] text-muted-foreground whitespace-nowrap">
-                {item.qty} x {formatCurrency(item.price)}
-                {item.unitName ? ` / ${item.unitName}` : ""}
-              </span>
-            </div>
-            <span className="text-right font-bold text-[10px] whitespace-nowrap">{formatCurrency(item.price * item.qty)}</span>
+      {sale.items.map((item, i) => (
+        <div key={item.lineKey || `${item.name}-${i}`} className="text-foreground py-1">
+          <p className="font-bold text-[10px] leading-tight break-words">{item.name}</p>
+          <div className="flex justify-between items-baseline mt-0.5">
+            <span className="text-[8.5px] text-muted-foreground">
+              {item.qty} × {formatCurrency(item.price)}
+              {item.unitName ? ` / ${item.unitName}` : ""}
+            </span>
+            <span className="font-bold text-[10px]">{formatCurrency(item.price * item.qty)}</span>
           </div>
-        );
-      })}
+        </div>
+      ))}
       
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
       
@@ -163,10 +163,42 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <span>TOTAL</span>
         <span>{formatCurrency(sale.total)}</span>
       </div>
-      <div className="flex justify-between text-muted-foreground mt-1">
-        <span>Payment</span>
-        <span>{methodLabel(sale.method)}</span>
-      </div>
+      {sale.payments && sale.payments.length > 0 ? (
+        <div className="mt-1 space-y-0.5">
+          {sale.payments.map((p, i) => (
+            <div key={i}>
+              <div className="flex justify-between text-muted-foreground">
+                <span>{methodLabel(p.method)}</span>
+                <span>{formatCurrency(p.amount)}</span>
+              </div>
+              {p.reference && <p className="text-[8px] text-muted-foreground/80 pl-1">ref: {p.reference}</p>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex justify-between text-muted-foreground mt-1">
+          <span>Payment</span>
+          <span>{methodLabel(sale.method)}</span>
+        </div>
+      )}
+      {typeof sale.amountTendered === "number" && sale.amountTendered > 0 && (
+        <div className="flex justify-between text-muted-foreground">
+          <span>Tendered</span>
+          <span>{formatCurrency(sale.amountTendered)}</span>
+        </div>
+      )}
+      {typeof sale.change === "number" && sale.change > 0 && (
+        <div className="flex justify-between text-success">
+          <span>Change</span>
+          <span>{formatCurrency(sale.change)}</span>
+        </div>
+      )}
+      {typeof sale.balanceDue === "number" && sale.balanceDue > 0 && (
+        <div className="flex justify-between font-bold text-warning">
+          <span>Balance Due</span>
+          <span>{formatCurrency(sale.balanceDue)}</span>
+        </div>
+      )}
       
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mt-3 pt-2 text-center`}>
         {settings?.showQRCode && !isCompact && (<div className="w-12 h-12 mx-auto mb-2 border border-border rounded flex items-center justify-center text-[8px] text-muted-foreground">QR</div>)}
