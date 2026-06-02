@@ -6,20 +6,23 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Search, Plus, X, Edit2, Trash2, Mail, Phone, MapPin, User, Users, RefreshCw,
-  Clock, CreditCard, Banknote, DollarSign, Loader2, Store, ShoppingBag, ChevronDown, ChevronUp
+  Clock, CreditCard, Banknote, DollarSign, Loader2, Store, ShoppingBag, ChevronDown, ChevronUp,
+  Award, Wallet
 } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
 import TableSkeleton from "@/components/TableSkeleton";
 import { toast } from "sonner";
+import CustomerPaymentDialog from "@/components/CustomerPaymentDialog";
 
 export default function CustomersPage() {
   const { customers, loading, addCustomer, updateCustomer, deleteCustomer, recomputeStats } = useCustomers();
   const [recomputing, setRecomputing] = useState(false);
-  const { formatCurrency } = useAppSettings();
+  const { formatCurrency, settings } = useAppSettings();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [expandedCustomerId, setExpandedCustomerId] = useState<string | null>(null);
+  const [payingCustomer, setPayingCustomer] = useState<{ id: string; name: string; outstanding: number } | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -118,6 +121,8 @@ export default function CustomersPage() {
                 <tbody>
                   {filtered.map((c) => {
                     const isExpanded = expandedCustomerId === c.id;
+                    const outstanding = Number((c as any).outstanding_balance || (c as any).outstandingBalance || 0);
+                    const loyaltyPoints = Number((c as any).loyalty_points || (c as any).loyaltyPoints || 0);
                     return (
                       <>
                         <tr
@@ -132,7 +137,19 @@ export default function CustomersPage() {
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-foreground">{c.name}</p>
-                                {c.address && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{c.address}</p>}
+                                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                                  {c.address && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{c.address}</p>}
+                                  {outstanding > 0 && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-warning/15 text-warning flex items-center gap-1">
+                                      <Wallet className="w-3 h-3" /> {formatCurrency(outstanding)} owed
+                                    </span>
+                                  )}
+                                  {loyaltyPoints > 0 && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary flex items-center gap-1">
+                                      <Award className="w-3 h-3" /> {loyaltyPoints} pts
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -144,6 +161,16 @@ export default function CustomersPage() {
                           <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">{formatCurrency(c.totalSpend)}</td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-1">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPayingCustomer({ id: c.id, name: c.name, outstanding });
+                                }}
+                                className="p-1.5 rounded hover:bg-primary/10 text-primary"
+                                title="Record payment"
+                              >
+                                <Wallet className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -204,6 +231,18 @@ export default function CustomersPage() {
               else toast.error(res.error || "Failed to add customer");
             }
           }}
+        />
+      )}
+
+      {payingCustomer && (
+        <CustomerPaymentDialog
+          customerId={payingCustomer.id}
+          customerName={payingCustomer.name}
+          outstanding={payingCustomer.outstanding}
+          currencySymbol={settings.currencySymbol}
+          formatCurrency={formatCurrency}
+          onClose={() => setPayingCustomer(null)}
+          onRecorded={() => {}}
         />
       )}
     </AppLayout>
