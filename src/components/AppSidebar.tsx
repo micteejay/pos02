@@ -116,7 +116,7 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
                 const badge = getBadge(item.badgeKey);
                 return (
                   <Link key={item.path} to={item.path} onClick={onNavigate}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative ${isActive ? "bg-sidebar-accent text-sidebar-primary font-medium" : "text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"}`}
+                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all group relative ${isActive ? "bg-sidebar-accent text-sidebar-primary font-medium" : "text-sidebar-foreground hover:bg-sidebar-muted/50"}`}
                     title={collapsed ? item.label : undefined}>
                     {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-sidebar-primary rounded-r" />}
                     <item.icon className="w-4 h-4 shrink-0" />
@@ -149,12 +149,12 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
           </div>
         )}
         {collapsed && (
-          <button onClick={logout} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors mb-1" title="Logout">
+          <button onClick={logout} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-destructive hover:bg-sidebar-accent/50 transition-colors mb-2" title="Logout">
             <LogOut className="w-4 h-4" />
           </button>
         )}
         <div className="hidden lg:block">
-          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 transition-colors" title={collapsed ? "Expand" : "Collapse"}>
+          <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center w-full py-2 rounded-lg text-sidebar-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-muted/50 transition-colors" title={collapsed ? "Expand" : "Collapse"}>
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
