@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAppEvents } from "@/hooks/use-app-events";
 import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-shared-data";
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomers } from "@/hooks/use-customers";
@@ -44,7 +45,8 @@ const paymentMethods = [
 ];
 
 export default function POSPage() {
-  const { formatCurrency, settings } = useAppSettings();
+  const { formatCurrency, formatDateTime, settings } = useAppSettings();
+  const { addApprovalItem, addNotification } = useAppEvents();
   const { inventory, adjustInventoryQty, addSale, storeNames } = useSharedData();
   const { customers, findOrCreate } = useCustomers();
   const { companyProfile } = useAuth();
@@ -75,7 +77,11 @@ export default function POSPage() {
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerEmail, setCustomerEmail] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState(settings.defaultPaymentMethod || "cash");
+
+  useEffect(() => {
+    setPaymentMethod(settings.defaultPaymentMethod || "cash");
+  }, [settings.defaultPaymentMethod]);
   const [completedSale, setCompletedSale] = useState<{ id: string; total: number; subtotal: number; tax: number; discount: number; items: CartItem[]; customer: string; method: string; date?: string } | null>(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [heldOrders, setHeldOrders] = useState<{ id: string; cart: CartItem[]; customer: string }[]>([]);
@@ -131,7 +137,7 @@ export default function POSPage() {
       const existing = prev.find((i) => i.lineKey === lineKey);
       // total base units already in cart for this sku across all unit lines
       const baseInCart = prev.filter(i => i.sku === item.sku).reduce((s, i) => s + i.qty * i.unitFactor, 0);
-      if (baseInCart + unitFactor > item.qty) {
+      if (!settings.allowNegativeStock && baseInCart + unitFactor > item.qty) {
         toast.error(`Not enough stock (${item.qty} ${item.baseUnit || "pcs"} available)`);
         return prev;
       }
@@ -142,7 +148,7 @@ export default function POSPage() {
     });
     // Ensure search input is focused after adding an item so successive scans work
     setTimeout(() => searchInputRef.current?.focus(), 50);
-  }, []);
+  }, [settings.allowNegativeStock]);
 
   const handleBarcodeScan = useCallback((barcode: string) => {
     const item = inventory.find(p => p.barcode === barcode || p.sku === barcode);
@@ -207,13 +213,13 @@ export default function POSPage() {
       if (newQty <= 0) return prev.filter(i => i.lineKey !== lineKey);
       const baseInCart = prev.filter(i => i.sku === line.sku && i.lineKey !== lineKey)
         .reduce((s, i) => s + i.qty * i.unitFactor, 0);
-      if (baseInCart + newQty * line.unitFactor > line.stock) {
+      if (!settings.allowNegativeStock && baseInCart + newQty * line.unitFactor > line.stock) {
         toast.error(`Not enough stock`);
         return prev;
       }
       return prev.map(i => i.lineKey === lineKey ? { ...i, qty: newQty } : i);
     });
-  }, []);
+  }, [settings.allowNegativeStock]);
 
   const removeFromCart = useCallback((lineKey: string) => {
     setCart((prev) => prev.filter((i) => i.lineKey !== lineKey));
@@ -270,7 +276,27 @@ export default function POSPage() {
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
-    const dateStr = new Date().toLocaleString();
+    const dateStr = formatDateTime(new Date());
+    if (total >= settings.requireApprovalAbove) {
+      addApprovalItem({
+        title: `High-value sale ${saleId}`,
+        type: "general",
+        sourceId: saleId,
+        requester: user?.name || "Cashier",
+        department: "Sales",
+        amount: total,
+        description: `${resolvedName} — ${cart.length} item(s), ${paymentMethod}`,
+        priority: "high",
+      });
+      addNotification({
+        type: "sales",
+        title: `Sale above ${formatCurrency(settings.requireApprovalAbove)}`,
+        message: `${saleId} for ${formatCurrency(total)} requires manager review`,
+        link: "/approvals",
+        targetRoles: ["Manager", "Admin", "Super Admin"],
+      });
+      toast.info("High-value sale flagged for manager approval");
+    }
     setCompletedSale({ id: saleId, total, subtotal, tax, discount: discountAmount, items: [...cart], customer: resolvedName, method: paymentMethod, date: dateStr });
     setCart([]); setCustomerName(""); setCustomerId(null); setCustomerEmail(""); setCustomerPhone(""); setDiscountPercent(0);
     // Queue focus re-activation

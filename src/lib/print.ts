@@ -28,15 +28,6 @@ function getSelectedPrinter(): string {
  * Captures computed CSS variables from :root so colors render correctly.
  */
 function nodeToHtml(node: HTMLElement, title: string): string {
-  const rootStyle = getComputedStyle(document.documentElement);
-  const cssVars: string[] = [];
-  for (let i = 0; i < rootStyle.length; i++) {
-    const name = rootStyle.item(i);
-    if (name.startsWith("--")) {
-      cssVars.push(`${name}:${rootStyle.getPropertyValue(name)};`);
-    }
-  }
-
   // Inline ALL stylesheets (resolved to absolute URLs) so Tailwind/utility
   // classes still apply inside the iframe/print window. Inline <style> blocks
   // are copied verbatim; <link rel="stylesheet"> is rewritten with an absolute
@@ -64,7 +55,17 @@ function nodeToHtml(node: HTMLElement, title: string): string {
   <base href="${base}" />
   ${styleLinks}
   <style>
-    :root { ${cssVars.join(" ")} }
+    /* Override all theme colors with black for printing */
+    :root { 
+      --background: 255 255 255;
+      --foreground: 0 0 0;
+      --card: 255 255 255;
+      --card-foreground: 0 0 0;
+      --primary: 0 0 0;
+      --primary-foreground: 255 255 255;
+      --border: 0 0 0;
+    }
+    
     html, body {
       margin: 0; padding: 4px;
       width: 100%; max-width: 100%;

@@ -58,22 +58,22 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
     >
       <div>
         {/* Bill To + Date */}
-        <div className="flex justify-between items-start mb-6 border-t border-border pt-4">
+        <div className="flex justify-between items-start mb-6 border-t border-black pt-4">
           <div>
-            <p className="text-xs text-muted-foreground">Bill To</p>
-            <p className="font-semibold text-foreground">{data.customerName}</p>
-            {data.customerAddress && <p className="text-xs text-muted-foreground">{data.customerAddress}</p>}
+            <p className="text-xs text-black">Bill To</p>
+            <p className="font-semibold text-black">{data.customerName}</p>
+            {data.customerAddress && <p className="text-xs text-black">{data.customerAddress}</p>}
           </div>
           <div className="text-right">
-            <p className="text-xs text-muted-foreground">{data.type === "quote" ? "Quote" : "Invoice"} Date :</p>
-            <p className="font-medium text-foreground">{data.date}</p>
+            <p className="text-xs text-black">{data.type === "quote" ? "Quote" : "Invoice"} Date :</p>
+            <p className="font-medium text-black">{data.date}</p>
           </div>
         </div>
 
         {/* Items Table */}
         <table className="w-full mb-4">
           <thead>
-            <tr className="bg-primary text-primary-foreground">
+            <tr className="bg-black text-white">
               <th className="text-left py-2.5 px-3 text-xs font-semibold rounded-tl-lg w-10">#</th>
               <th className="text-left py-2.5 px-3 text-xs font-semibold">Item & Description</th>
               <th className="text-center py-2.5 px-3 text-xs font-semibold w-20">Qty</th>
@@ -83,23 +83,23 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
           </thead>
           <tbody>
             {data.items.map((item, i) => (
-              <tr key={i} className="border-b border-border/50">
-                <td className="py-3 px-3 text-muted-foreground text-center">{i + 1}</td>
-                <td className="py-3 px-3 text-foreground">
+              <tr key={i} className="border-b border-black">
+                <td className="py-3 px-3 text-black text-center">{i + 1}</td>
+                <td className="py-3 px-3 text-black">
                   {item.description}
                   {item.unitName && (item.unitFactor || 1) > 1 && (
-                    <div className="text-[10px] text-muted-foreground">
+                    <div className="text-[10px] text-black">
                       Sold as {item.unitName} · 1 {item.unitName} = {item.unitFactor} base
                     </div>
                   )}
                 </td>
-                <td className="py-3 px-3 text-center text-muted-foreground">
+                <td className="py-3 px-3 text-center text-black">
                   {item.qty.toFixed(2)}{item.unitName ? ` ${item.unitName}` : ""}
                 </td>
-                <td className="py-3 px-3 text-right text-muted-foreground">
+                <td className="py-3 px-3 text-right text-black">
                   {formatCurrency(item.rate)}{item.unitName ? ` / ${item.unitName}` : ""}
                 </td>
-                <td className="py-3 px-3 text-right font-medium text-foreground">{formatCurrency(item.qty * item.rate)}</td>
+                <td className="py-3 px-3 text-right font-medium text-black">{formatCurrency(item.qty * item.rate)}</td>
               </tr>
             ))}
           </tbody>
@@ -108,17 +108,17 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
         {/* Totals */}
         <div className="flex justify-end mb-6">
           <div className="w-72 space-y-1.5">
-            <div className="flex justify-between text-sm text-muted-foreground px-3">
+            <div className="flex justify-between text-sm text-black px-3">
               <span>Sub Total</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
             {data.serviceChargePercent && data.serviceChargePercent > 0 && (
-              <div className="flex justify-between text-sm text-muted-foreground px-3">
+              <div className="flex justify-between text-sm text-black px-3">
                 <span>Service Charge ({data.serviceChargePercent}%)</span>
                 <span>{formatCurrency(serviceCharge)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm font-bold text-foreground bg-primary/10 rounded-lg px-3 py-2.5 mt-2">
+            <div className="flex justify-between text-sm font-bold text-black bg-gray-200 rounded-lg px-3 py-2.5 mt-2">
               <span>Total</span>
               <span>{settings.currency}{formatCurrency(total).replace(settings.currencySymbol, "")}</span>
             </div>
@@ -127,9 +127,9 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(({ data
 
         {/* Notes */}
         {data.notes && (
-          <div className="border-t border-border pt-4">
-            <p className="text-xs font-semibold text-primary mb-1">Notes</p>
-            <p className="text-xs text-muted-foreground whitespace-pre-line">{data.notes}</p>
+          <div className="border-t border-black pt-4">
+            <p className="text-xs font-semibold text-black mb-1">Notes</p>
+            <p className="text-xs text-black whitespace-pre-line">{data.notes}</p>
           </div>
         )}
       </div>

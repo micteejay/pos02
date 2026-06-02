@@ -19,6 +19,11 @@ export interface ReceiptData {
   method: string;
   items: ReceiptItem[];
   date?: string;
+  cashier?: string;
+  workstation?: string;
+  amountTendered?: number;
+  changeGiven?: number;
+  debitCardAmount?: number;
 }
 
 export interface CompanyInfo {
@@ -27,6 +32,7 @@ export interface CompanyInfo {
   city?: string | null;
   phone?: string | null;
   email?: string | null;
+  logoUrl?: string | null;
 }
 
 interface Props {
@@ -35,46 +41,137 @@ interface Props {
   formatCurrency: (n: number) => string;
   settings?: any;
   overrideFooter?: string;
+  showBarcode?: boolean;
+  barcodeNumber?: string;
+  receiptSize?: 'small' | 'medium' | 'large';
+  customColors?: {
+    primary?: string;
+    secondary?: string;
+    background?: string;
+  };
 }
 
 const methodLabel = (m: string) =>
   m === "card" ? "Credit Card" : m === "cash" ? "Cash" : m === "mobile" ? "Mobile Pay" : m;
 
 const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTemplate(
-  { sale, company, formatCurrency, settings, overrideFooter },
+  { sale, company, formatCurrency, settings, overrideFooter, showBarcode, barcodeNumber },
   ref,
 ) {
-  const style = settings?.receiptStyle || "modern";
+  const style = settings?.receiptStyle || "classic";
   const isModern = style === "modern";
+  const isClassic = style === "classic";
   const isMinimal = style === "minimal";
   const isBranded = style === "branded";
   const isCompact = style === "compact";
   const isThermal = style === "thermal";
   const isInvoice = style === "invoice";
+  
+  const receiptSize = settings?.receiptSize || 'medium';
+  const sizeClasses = {
+    small: 'max-w-[240px] p-3 text-[8px]',
+    medium: 'max-w-[280px] p-4 text-[10px]',
+    large: 'max-w-[320px] p-5 text-[12px]'
+  }[receiptSize];
+  
+  const customColors = settings?.customColors || {};
+  const primaryColor = customColors.primary || 'currentColor';
+  const backgroundColor = customColors.background || 'bg-white';
+
+  const fontSizeClass =
+    settings?.fontSize === "Small" ? "text-[8px]" :
+    settings?.fontSize === "Large" ? "text-[12px]" : "text-[10px]";
 
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
 
   if (isInvoice) {
     return (
-      <div ref={ref} className="bg-card border border-border rounded-lg p-5 text-[10px] leading-relaxed max-w-[320px] mx-auto font-sans w-full">
+      <div 
+        ref={ref} 
+        className={`bg-white border-2 border-black rounded-lg font-sans ${sizeClasses} leading-relaxed mx-auto w-full`}
+      >
+        {/* Invoice Header */}
         <div className="flex justify-between items-start mb-4">
-          <div><p className="font-bold text-foreground text-sm">{headerText}</p><p className="text-muted-foreground">{[company?.address, company?.city].filter(Boolean).join(", ")}</p></div>
-          <div className="text-right"><p className="text-lg font-bold text-primary">INVOICE</p><p className="text-muted-foreground">{sale.id}</p><p className="text-muted-foreground">{sale.date}</p></div>
+          <div className="flex-1">
+            {company?.logoUrl && (
+              <img 
+                src={company.logoUrl} 
+                alt="Company Logo" 
+                className="mb-2 h-12 w-auto object-contain"
+              />
+            )}
+            <p className="font-bold text-black text-base mb-1">{headerText}</p>
+            <p className="text-black text-[10px]">{[company?.address, company?.city].filter(Boolean).join(", ")}</p>
+            {company?.phone && <p className="text-black text-[10px]">Tel: {company.phone}</p>}
+            {company?.email && <p className="text-black text-[10px]">{company.email}</p>}
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-black mb-1">INVOICE</p>
+            <p className="text-black text-[10px]">#{sale.id}</p>
+            <p className="text-black text-[10px]">{sale.date}</p>
+          </div>
         </div>
-        <div className="border-t border-border pt-2 mb-3"><p className="font-semibold text-foreground mb-1">Bill To:</p><p className="text-muted-foreground">{sale.customer}</p></div>
-        <table className="w-full mb-3"><thead><tr className="border-b border-border"><th className="text-left py-1 text-muted-foreground font-medium">Item</th><th className="text-center py-1 text-muted-foreground font-medium">Qty</th><th className="text-right py-1 text-muted-foreground font-medium">Price</th><th className="text-right py-1 text-muted-foreground font-medium">Total</th></tr></thead>
-        <tbody>{sale.items.map((item, i) => (<tr key={i} className="border-b border-border/50"><td className="py-1 text-foreground">{item.name} {item.unitName ? `(${item.unitName})` : ''}</td><td className="py-1 text-center text-muted-foreground">{item.qty}</td><td className="py-1 text-right text-muted-foreground">{formatCurrency(item.price)}</td><td className="py-1 text-right text-foreground">{formatCurrency(item.qty * item.price)}</td></tr>))}</tbody></table>
-        <div className="border-t border-border pt-2 space-y-0.5">
-          {sale.subtotal !== undefined && <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(sale.subtotal)}</span></div>}
-          {sale.discount ? <div className="flex justify-between text-muted-foreground"><span>Discount</span><span>-{formatCurrency(sale.discount)}</span></div> : null}
-          {sale.tax ? <div className="flex justify-between text-muted-foreground"><span>Tax</span><span>{formatCurrency(sale.tax)}</span></div> : null}
-          <div className="flex justify-between font-bold text-foreground text-xs mt-1 pt-1 border-t border-border"><span>Total Due</span><span>{formatCurrency(sale.total)}</span></div>
+        
+        {/* Bill To Section */}
+        <div className="border-t-2 border-black pt-3 mb-4">
+          <p className="font-semibold text-black text-[10px] mb-1">Bill To:</p>
+          <p className="text-black text-[10px]">{sale.customer}</p>
         </div>
+        
+        {/* Items Table */}
+        <table className="w-full mb-4">
+          <thead>
+            <tr className="border-b-2 border-black">
+              <th className="text-left py-2 text-black text-[10px] font-semibold">Item</th>
+              <th className="text-center py-2 text-black text-[10px] font-semibold">Qty</th>
+              <th className="text-right py-2 text-black text-[10px] font-semibold">Price</th>
+              <th className="text-right py-2 text-black text-[10px] font-semibold">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sale.items.map((item, i) => (
+              <tr key={i} className="border-b border-black/30">
+                <td className="py-2 text-black text-[10px]">{item.name} {item.unitName ? `(${item.unitName})` : ''}</td>
+                <td className="py-2 text-center text-black text-[10px]">{item.qty}</td>
+                <td className="py-2 text-right text-black text-[10px]">{formatCurrency(item.price)}</td>
+                <td className="py-2 text-right text-black text-[10px] font-semibold">{formatCurrency(item.qty * item.price)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        
+        {/* Totals Section */}
+        <div className="border-t-2 border-black pt-3 space-y-1.5">
+          {sale.subtotal !== undefined && (
+            <div className="flex justify-between text-black">
+              <span className="text-[10px]">Subtotal</span>
+              <span className="text-[10px]">{formatCurrency(sale.subtotal)}</span>
+            </div>
+          )}
+          {sale.discount && (
+            <div className="flex justify-between text-black">
+              <span className="text-[10px]">Discount</span>
+              <span className="text-[10px]">-{formatCurrency(sale.discount)}</span>
+            </div>
+          )}
+          {sale.tax && (
+            <div className="flex justify-between text-black">
+              <span className="text-[10px]">Tax</span>
+              <span className="text-[10px]">{formatCurrency(sale.tax)}</span>
+            </div>
+          )}
+          <div className="flex justify-between font-bold text-black text-base mt-2 pt-2 border-t border-black">
+            <span>Total Due</span>
+            <span className="text-black">{formatCurrency(sale.total)}</span>
+          </div>
+        </div>
+        
+        {/* Footer */}
         {(footerText || settings?.receiptReturnPolicy) && (
-          <div className="mt-3 pt-2 border-t border-border text-center text-muted-foreground">
-            {footerText && <p>{footerText}</p>}
-            {settings?.receiptReturnPolicy && <p className="mt-1 text-[9px]">{settings.receiptReturnPolicy}</p>}
+          <div className="mt-4 pt-3 border-t border-black text-center">
+            {footerText && <p className="text-black text-[10px] mb-1 font-semibold">{footerText}</p>}
+            {settings?.receiptReturnPolicy && <p className="text-black text-[9px]">{settings.receiptReturnPolicy}</p>}
           </div>
         )}
       </div>
@@ -84,97 +181,157 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
   return (
     <div
       ref={ref}
-      className={`border border-border rounded-lg p-4 font-mono text-[10px] leading-relaxed max-w-[280px] mx-auto bg-card w-full ${isThermal ? "bg-amber-50 dark:bg-amber-950/20 border-dashed" : ""}`}
+      className={`border-2 border-black bg-white font-mono ${fontSizeClass} leading-snug ${sizeClasses} mx-auto w-full receipt-container`}
     >
-      {(isModern || isBranded) && <div className="h-1 rounded-full bg-primary mb-3" />}
-      
-      <div className={`${isMinimal ? "text-left" : "text-center"} mb-3`}>
-        {!isMinimal && !isCompact && (
-          <div className={`w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm ${isMinimal ? "" : "mx-auto"} mb-1`}>
-            {(settings?.appName || company?.name || "R").charAt(0)}
-          </div>
+      {/* Header Section */}
+      <div className="text-center mb-3">
+        {company?.logoUrl && (
+          <img 
+            src={company.logoUrl} 
+            alt="Company Logo" 
+            className="mx-auto mb-2 h-12 w-auto object-contain max-w-full"
+          />
         )}
-        <p className="font-bold text-foreground text-xs">{headerText}</p>
-        {!isCompact && company && (
-          <p className="text-muted-foreground">
-            {[company.address, company.city].filter(Boolean).join(", ")}
+        <p className="font-bold text-black text-lg mb-1 tracking-wide">{headerText}</p>
+        {company && (
+          <p className="text-black text-[9px] mb-0.5">
+            {company.address}{company.city ? `, ${company.city}` : ""}
           </p>
         )}
-        {!isCompact && company?.phone && <p className="text-muted-foreground">Tel: {company.phone}</p>}
+        {company?.phone && <p className="text-black text-[9px]">Tel: {company.phone}</p>}
       </div>
 
-      {!isMinimal && <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-2`} />}
-      
-      <div className="flex justify-between text-muted-foreground mb-1">
-        <span>Date: {sale.date?.split(',')[0] || sale.date}</span>
-        <span>{sale.id}</span>
+      {/* Receipt Info */}
+      <div className="border-t border-black mb-2" />
+      <div className="flex justify-between text-black mb-1">
+        <span className="text-[9px] font-semibold">Sales Receipt # {sale.id}</span>
+        {sale.workstation && <span className="text-[9px]">Workstation: {sale.workstation}</span>}
       </div>
-      <div className="flex justify-between text-muted-foreground mb-2">
-        <span>Customer: {sale.customer}</span>
+      <div className="text-black mb-2">
+        <span className="text-[9px]">{sale.date}</span>
       </div>
-      
-      <div className="flex justify-between text-[8px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
-        <span>goods  quntity rate</span>
-        <span>amonut</span>
+
+      {/* Customer & Cashier */}
+      <div className="border-t border-black mb-2" />
+      <div className="space-y-1 mb-2">
+        <div className="text-black">
+          <span className="text-[9px] font-semibold">Bill To: {sale.customer}</span>
+        </div>
+        {sale.cashier && (
+          <div className="text-black">
+            <span className="text-[9px]">Cashier: {sale.cashier}</span>
+          </div>
+        )}
       </div>
+
+      {/* Items Table Header */}
+      <div className="border-t border-black mb-1" />
+      <div className="flex justify-between text-[8px] text-black uppercase tracking-wider mb-1 font-bold">
+        <span className="flex-1">Item Name</span>
+        <span className="w-12 text-center">Qty</span>
+        <span className="w-16 text-right">Price</span>
+        <span className="w-16 text-right">Ext Price</span>
+      </div>
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mb-1`} />
       
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-1`} />
-      
+      {/* Items */}
       {sale.items.map((item, i) => {
         const factor = item.unitFactor || 1;
         return (
-          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-foreground py-0.5">
-            <div className="flex-1 pr-2 flex items-baseline gap-2 truncate">
-              <span className="font-bold text-[10px]">{item.name}</span>
-              <span className="text-[8.5px] text-muted-foreground whitespace-nowrap">
-                {item.qty} x {formatCurrency(item.price)}
-                {item.unitName ? ` / ${item.unitName}` : ""}
-              </span>
+          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-black py-0.5">
+            <div className="flex-1">
+              <div className="text-[9px]">{item.name}</div>
             </div>
-            <span className="text-right font-bold text-[10px] whitespace-nowrap">{formatCurrency(item.price * item.qty)}</span>
+            <div className="w-12 text-center text-[9px] text-black">
+              {item.qty}
+            </div>
+            <div className="w-16 text-right text-[9px] text-black">
+              {formatCurrency(item.price)}
+            </div>
+            <div className="w-16 text-right text-[9px] font-semibold">
+              {formatCurrency(item.price * item.qty)}
+            </div>
           </div>
         );
       })}
       
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
       
-      {sale.subtotal !== undefined && (
-        <div className="flex justify-between text-muted-foreground">
-          <span>Subtotal</span>
-          <span>{formatCurrency(sale.subtotal)}</span>
+      {/* Summary Section */}
+      <div className="space-y-1">
+        {sale.subtotal !== undefined && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Subtotal</span>
+            <span className="text-[9px]">{formatCurrency(sale.subtotal)}</span>
+          </div>
+        )}
+        <div className="flex justify-between text-black">
+          <span className="text-[9px]">Local Sales Tax</span>
+          <span className="text-[9px]">{sale.tax ? `${((sale.tax / sale.subtotal) * 100).toFixed(0)}% Tax ${formatCurrency(sale.tax)}` : "0% Tax N0.00"}</span>
         </div>
-      )}
-      {sale.discount ? (
-        <div className="flex justify-between text-muted-foreground text-success">
-          <span>Discount</span>
-          <span>-{formatCurrency(sale.discount)}</span>
-        </div>
-      ) : null}
-      {sale.tax ? (
-        <div className="flex justify-between text-muted-foreground">
-          <span>Tax</span>
-          <span>{formatCurrency(sale.tax)}</span>
-        </div>
-      ) : null}
+      </div>
       
-      {(isModern || isBranded) && <div className="h-px bg-primary/30 my-1" />}
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
       
-      <div className="flex justify-between font-bold text-foreground text-xs mt-1">
-        <span>TOTAL</span>
+      <div className="flex justify-between font-bold text-black text-sm pt-1">
+        <span>RECEIPT TOTAL</span>
         <span>{formatCurrency(sale.total)}</span>
       </div>
-      <div className="flex justify-between text-muted-foreground mt-1">
-        <span>Payment</span>
-        <span>{methodLabel(sale.method)}</span>
+
+      {/* Payment Section */}
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
+      <div className="space-y-1">
+        {sale.amountTendered !== undefined && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Amount Tendered</span>
+            <span className="text-[9px]">{formatCurrency(sale.amountTendered)}</span>
+          </div>
+        )}
+        {sale.changeGiven !== undefined && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Change Given</span>
+            <span className="text-[9px]">{formatCurrency(sale.changeGiven)}</span>
+          </div>
+        )}
+        {sale.debitCardAmount !== undefined && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Debit Card</span>
+            <span className="text-[9px]">{formatCurrency(sale.debitCardAmount)}</span>
+          </div>
+        )}
+        {sale.discount && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Total Sales Discounts</span>
+            <span className="text-[9px]">-{formatCurrency(sale.discount)}</span>
+          </div>
+        )}
       </div>
       
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mt-3 pt-2 text-center`}>
-        {settings?.showQRCode && !isCompact && (<div className="w-12 h-12 mx-auto mb-2 border border-border rounded flex items-center justify-center text-[8px] text-muted-foreground">QR</div>)}
-        {footerText && <p className="text-muted-foreground">{footerText}</p>}
-        {settings?.receiptReturnPolicy && !isCompact && <p className="text-muted-foreground mt-1 text-[9px]">{settings.receiptReturnPolicy}</p>}
+      {/* Footer */}
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mt-3 pt-2 text-center`}>
+        {footerText && <p className="text-black text-[9px] mb-2 font-semibold">{footerText}</p>}
+        {showBarcode && (
+          <div className="flex flex-col items-center mt-2 barcode-container">
+            <div className="w-48 h-12 bg-white border-2 border-black flex items-center justify-center mb-1 p-2">
+              <div className="flex gap-px">
+                {[2,1,3,1,2,1,1,3,2,1,1,2,3,1,2,1,3,1,1,2,1,3,2,1,1,3,1,2,1,2,3,1,2,1,1,3,2,1,2,1,1,3,1,2,1,2,3,1].map((width, i) => (
+                  <div
+                    key={i}
+                    className="bg-black"
+                    style={{
+                      width: `${width}px`,
+                      height: '100%',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            {barcodeNumber && <p className="text-black text-[9px] font-mono mt-1">{barcodeNumber}</p>}
+          </div>
+        )}
       </div>
       
-      {isBranded && <div className="h-1 rounded-full bg-primary mt-3" />}
+      {settings?.receiptReturnPolicy && <p className="text-black text-[8px] mt-2">{settings.receiptReturnPolicy}</p>}
     </div>
   );
 });

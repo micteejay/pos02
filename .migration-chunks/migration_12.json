@@ -1,0 +1,1 @@
+{"name":"bbb21d47_5ac3_4f42_8b58_ae3628b8672c","query":"ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb;\r\nALTER TABLE public.sales_transactions ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb;"}

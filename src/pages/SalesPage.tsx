@@ -93,7 +93,7 @@ const tabPermMap: Record<Tab, Permission> = {
 
 export default function SalesPage() {
   const { storeNames, stores } = useSharedData();
-  const { users, hasPermission, formatCurrency, settings } = useAppSettings();
+  const { users, hasPermission, formatCurrency, formatDateTime, settings } = useAppSettings();
   const { user, companyProfile } = useAuth();
   const dynamicStoreFilters = useMemo(() => ["All Stores", ...storeNames], [storeNames]);
   const [tab, setTab] = useState<Tab>("transactions");
@@ -209,7 +209,7 @@ export default function SalesPage() {
       discount: Number(data.discount || 0),
       customer: data.customer_name || "Walk-in",
       method: data.payment_method,
-      date: new Date(data.created_at).toLocaleString(),
+      date: formatDateTime(data.created_at),
       items: (data.sales_transaction_items || []).map((i) => ({
         name: i.name,
         qty: i.qty,

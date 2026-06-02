@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { formatAppDate } from "@/lib/format-date";
 
 export type NotificationType = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
 
@@ -122,6 +124,7 @@ const AppEventsContext = createContext<AppEventsContextType>(null!);
 
 export function AppEventsProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { settings, shouldSendNotification } = useAppSettings();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>([]);
   const [approvalHandlers, setApprovalHandlers] = useState<((id: string, type: string, sourceId: string, approved: boolean) => void)[]>([]);
@@ -150,7 +153,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       if (data) {
         setNotifications(data.map(n => ({
           id: n.id, type: n.type as NotificationType, title: n.title,
-          message: n.message || "", time: new Date(n.created_at).toLocaleString(),
+          message: n.message || "", time: formatAppDate(n.created_at, settings, true),
           read: n.read || false, link: n.link || undefined,
           targetRoles: n.target_roles || undefined,
           createdBy: n.created_by_name || undefined,
@@ -214,10 +217,11 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+  }, [user, settings.dateFormat, settings.timeFormat, settings.timezone]);
 
   const addNotification = useCallback(async (n: Omit<AppNotification, "id" | "time" | "read">) => {
     if (!user) return;
+    if (!shouldSendNotification(n.type)) return;
     // If targeted to roles, use the RPC
     if (n.targetRoles && n.targetRoles.length > 0) {
       await supabase.rpc("send_role_notification", {
@@ -238,7 +242,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       });
     }
     // Local state will be updated via realtime subscription
-  }, [user]);
+  }, [user, shouldSendNotification]);
 
   const markRead = useCallback(async (id: string) => {
     await supabase.from("notifications").update({ read: true }).eq("id", id);

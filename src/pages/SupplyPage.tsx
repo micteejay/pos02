@@ -40,7 +40,7 @@ const statusConfig: Record<POStatus, { label: string; className: string; icon: R
 export default function SupplyPage() {
   const { user } = useAuth();
   const { companyProfile } = useAuth();
-  const { formatCurrency, hasPermission } = useAppSettings();
+  const { formatCurrency, hasPermission, settings } = useAppSettings();
   const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
   const { inventory, addStockFromPO, warehouseNames } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
@@ -169,10 +169,12 @@ export default function SupplyPage() {
       if (o.id !== id) return o;
       const updated = { ...o, status: newStatus, approvedBy: newStatus === "approved" ? "You" : o.approvedBy };
       if (newStatus === "submitted") {
-        addApprovalItem({ title: `${o.po_number}: ${o.supplier_name}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")}`, priority: "medium" });
-        addNotification({ type: "supply", title: `PO ${o.po_number} submitted for approval`, message: `${o.supplier_name} order for ${formatCurrency(o.total)}`, link: "/approvals" });
-        // Also create a linked Workflow row so the PO appears under /workflows
-        (async () => {
+        const needsApproval = o.total >= settings.requireApprovalAbove;
+        if (needsApproval) {
+          addApprovalItem({ title: `${o.po_number}: ${o.supplier_name}`, type: "purchase_order", sourceId: o.id, requester: "You", department: "Operations", amount: o.total, description: `${o.items.map(i => `${i.name} ×${i.qty}`).join(", ")}`, priority: "medium" });
+          addNotification({ type: "supply", title: `PO ${o.po_number} submitted for approval`, message: `${o.supplier_name} order for ${formatCurrency(o.total)}`, link: "/approvals" });
+          // Also create a linked Workflow row so the PO appears under /workflows
+          (async () => {
           const stages = getStagesForType("purchase_order");
           const steps = (stages.length ? stages : [
             { name: "Manager Review", role: "manager" },
@@ -194,7 +196,12 @@ export default function SupplyPage() {
             created_by: user?.id || null,
             company_id: user?.companyId || null,
           });
-        })();
+          })();
+        } else {
+          toast.success(`PO auto-approved (below ${formatCurrency(settings.requireApprovalAbove)} threshold)`);
+          void supabase.from("purchase_orders").update({ status: "approved" }).eq("id", o.id);
+          return { ...updated, status: "approved" as POStatus, approvedBy: "Auto-approved" };
+        }
       }
       if (newStatus === "received") {
         addStockFromPO(o.items, o.warehouse);
@@ -203,7 +210,7 @@ export default function SupplyPage() {
       return updated;
     }));
     toast.success(`PO status updated to ${newStatus}`);
-  }, [formatCurrency, addApprovalItem, addNotification, addStockFromPO, getStagesForType, user]);
+  }, [formatCurrency, settings.requireApprovalAbove, addApprovalItem, addNotification, addStockFromPO, getStagesForType, user]);
 
   const deleteOrder = useCallback(async (id: string) => {
     const { error } = await supabase.from("purchase_order_items").delete().eq("purchase_order_id", id);

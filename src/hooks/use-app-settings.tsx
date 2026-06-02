@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, ReactNode, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { formatAppDate } from "@/lib/format-date";
+import { computeStockStatus, getStockThreshold } from "@/lib/stock-status";
+type NotifyCategory = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
 
 export interface AppSettings {
   appName: string;
@@ -200,6 +203,11 @@ interface AppSettingsContextType {
   hasPermission: (permission: Permission) => boolean;
   allPermissions: Permission[];
   formatCurrency: (amount: number) => string;
+  formatDate: (value: Date | string | number) => string;
+  formatDateTime: (value: Date | string | number) => string;
+  getItemStockThreshold: (itemReorder: number) => number;
+  getItemStockStatus: (qty: number, itemReorder: number) => "critical" | "low" | "ok";
+  shouldSendNotification: (type: NotifyCategory) => boolean;
   integrations: IntegrationConfig[];
   connectIntegration: (name: string, configValues: Record<string, string>) => Promise<void>;
   disconnectIntegration: (name: string) => Promise<void>;
@@ -565,6 +573,57 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     return `${settings.currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }, [settings.currencySymbol]);
 
+  const formatDate = useCallback(
+    (value: Date | string | number) => formatAppDate(value, settings, false),
+    [settings.dateFormat, settings.timeFormat, settings.timezone],
+  );
+
+  const formatDateTime = useCallback(
+    (value: Date | string | number) => formatAppDate(value, settings, true),
+    [settings.dateFormat, settings.timeFormat, settings.timezone],
+  );
+
+  const getItemStockThreshold = useCallback(
+    (itemReorder: number) => getStockThreshold(itemReorder, settings.lowStockThreshold),
+    [settings.lowStockThreshold],
+  );
+
+  const getItemStockStatus = useCallback(
+    (qty: number, itemReorder: number) =>
+      computeStockStatus(qty, getStockThreshold(itemReorder, settings.lowStockThreshold)),
+    [settings.lowStockThreshold],
+  );
+
+  const shouldSendNotification = useCallback(
+    (type: NotifyCategory) => {
+      switch (type) {
+        case "inventory":
+          return settings.notifyLowStock;
+        case "sales":
+        case "supply":
+          return settings.notifyNewOrder;
+        case "approval":
+        case "workflow":
+          return settings.notifyApproval;
+        case "security":
+          return settings.notifySms || settings.notifyEmail;
+        case "chat":
+        case "document":
+        case "system":
+        default:
+          return settings.notifyPush;
+      }
+    },
+    [
+      settings.notifyLowStock,
+      settings.notifyNewOrder,
+      settings.notifyApproval,
+      settings.notifyPush,
+      settings.notifySms,
+      settings.notifyEmail,
+    ],
+  );
+
   const connectIntegration = useCallback(async (name: string, configValues: Record<string, string>) => {
     await supabase.from("integration_configs").update({ connected: true, config_values: configValues }).eq("name", name);
     setIntegrations(prev => prev.map(i => i.name === name ? { ...i, connected: true, configValues } : i));
@@ -589,7 +648,8 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       roles, addRole, updateRole, deleteRole,
       users, addUser, updateUser, deleteUser,
       currentUser, hasPermission, allPermissions,
-      formatCurrency,
+      formatCurrency, formatDate, formatDateTime,
+      getItemStockThreshold, getItemStockStatus, shouldSendNotification,
       integrations, connectIntegration, disconnectIntegration, isIntegrationConnected, getIntegrationConfig,
     }}>
       {children}

@@ -1,0 +1,1 @@
+{"name":"5a6f0bc0_8ad2_4f39_9bbc_ce5f74bcd53d","query":"DROP INDEX IF EXISTS public.app_settings_key_company_unique;\r\nALTER TABLE public.app_settings\r\n  ADD CONSTRAINT app_settings_key_company_unique UNIQUE (key, company_id);\r\n"}

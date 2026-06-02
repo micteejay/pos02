@@ -19,7 +19,7 @@ export function generateReceiptText(
 ): string {
   let text = "";
 
-  const paperWidthStr = settings?.paperWidth || "58mm";
+  const paperWidthStr = settings?.paperWidth || "80mm";
   const width = paperWidthStr.includes("80mm") ? 48 : paperWidthStr.includes("A4") ? 80 : 32;
   const isMinimal = settings?.receiptStyle === "minimal";
   const isCompact = settings?.receiptStyle === "compact";
@@ -66,13 +66,14 @@ export function generateReceiptText(
   text += line(isInvoice ? `Invoice: ${sale.id}` : `Receipt: ${sale.id}`, sale.date || "") + "\n";
   text += line("Customer:", sale.customer) + "\n";
   text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  text += line("goods  quntity rate", "amonut") + "\n";
+  text += line("Item Name  Qty  Price", "Amount") + "\n";
   text += divider + "\n";
 
   // Items
   for (const item of sale.items) {
-    const qtyStr = `${item.qty} x ${formatCurrency(item.price)}${item.unitName ? ` / ${item.unitName}` : ""}`;
-    const left = `${item.name}  ${qtyStr}`;
+    const itemName = item.name.length > 20 ? item.name.substring(0, 20) + ".." : item.name;
+    const qtyStr = `${item.qty} x ${formatCurrency(item.price)}`;
+    const left = `${itemName}  ${qtyStr}`;
     const right = formatCurrency(item.price * item.qty);
     text += line(left, right) + "\n";
   }
@@ -81,17 +82,26 @@ export function generateReceiptText(
   if (sale.subtotal !== undefined) {
     text += line("Subtotal", formatCurrency(sale.subtotal)) + "\n";
   }
+  if (sale.tax) {
+    const taxRate = sale.subtotal ? ((sale.tax / sale.subtotal) * 100).toFixed(0) : "0";
+    text += line(`Tax (${taxRate}%)`, formatCurrency(sale.tax)) + "\n";
+  }
   if (sale.discount) {
     text += line("Discount", `-${formatCurrency(sale.discount)}`) + "\n";
   }
-  if (sale.tax) {
-    text += line("Tax", formatCurrency(sale.tax)) + "\n";
-  }
   
+  text += isInvoice ? thickDivider + "\n" : divider + "\n";
   text += line(isInvoice ? "TOTAL DUE" : "TOTAL", formatCurrency(sale.total)) + "\n";
   
   const methodLabel = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
-  text += line("Payment", methodLabel) + "\n";
+  text += line("Payment Method", methodLabel) + "\n";
+  
+  if (sale.amountTendered !== undefined) {
+    text += line("Amount Tendered", formatCurrency(sale.amountTendered)) + "\n";
+  }
+  if (sale.changeGiven !== undefined) {
+    text += line("Change Given", formatCurrency(sale.changeGiven)) + "\n";
+  }
   
   if (footerText) {
     if (!isCompact) text += "\n";

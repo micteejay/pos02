@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useAppSettings } from "@/hooks/use-app-settings";
+import { useAppEvents } from "@/hooks/use-app-events";
+import { computeStockStatus, getStockThreshold } from "@/lib/stock-status";
 
 export interface ItemUnit {
   /** Unit name e.g. "Box", "Carton", "Pack" */
@@ -122,6 +125,8 @@ const SharedDataContext = createContext<SharedDataContextType>(null!);
 
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { settings } = useAppSettings();
+  const { addNotification } = useAppEvents();
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -147,17 +152,23 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       ]);
 
       if (invRes.data) {
-        setInventory(invRes.data.map(i => ({
-          id: i.id, sku: i.sku, name: i.name, category: i.category || "Uncategorized",
-          warehouse: "",
-          qty: i.qty, reorder: i.reorder_point, costPrice: Number(i.cost_price) || 0,
-          price: Number(i.price), status: i.status as InventoryItem["status"],
-          warehouseId: i.warehouse_id || undefined, categoryId: i.category_id || undefined,
-          barcode: i.barcode || undefined,
-          baseUnit: (i as any).base_unit || i.unit || "pcs",
-          packSize: (i as any).pack_size || 1,
-          units: Array.isArray((i as any).units) ? (i as any).units as ItemUnit[] : [],
-        })));
+        const globalThreshold = settings.lowStockThreshold;
+        setInventory(invRes.data.map(i => {
+          const reorder = i.reorder_point ?? 0;
+          const threshold = getStockThreshold(reorder, globalThreshold);
+          const qty = i.qty;
+          return {
+            id: i.id, sku: i.sku, name: i.name, category: i.category || "Uncategorized",
+            warehouse: "",
+            qty, reorder, costPrice: Number(i.cost_price) || 0,
+            price: Number(i.price), status: computeStockStatus(qty, threshold),
+            warehouseId: i.warehouse_id || undefined, categoryId: i.category_id || undefined,
+            barcode: i.barcode || undefined,
+            baseUnit: (i as any).base_unit || i.unit || "pcs",
+            packSize: (i as any).pack_size || 1,
+            units: Array.isArray((i as any).units) ? (i as any).units as ItemUnit[] : [],
+          };
+        }));
       }
 
       if (salesRes.data) {
@@ -263,7 +274,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, settings.lowStockThreshold]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -307,12 +318,11 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     setInventory(prev => prev.map(i => {
       if (i.sku !== sku) return i;
       const updated = { ...i, ...updates };
-      if (updated.qty <= updated.reorder * 0.3) updated.status = "critical";
-      else if (updated.qty <= updated.reorder) updated.status = "low";
-      else updated.status = "ok";
+      const threshold = getStockThreshold(updated.reorder, settings.lowStockThreshold);
+      updated.status = computeStockStatus(updated.qty, threshold);
       return updated;
     }));
-  }, [inventory, warehouses]);
+  }, [inventory, warehouses, settings.lowStockThreshold]);
 
   const deleteInventoryItem = useCallback(async (sku: string) => {
     const existing = inventory.find(i => i.sku === sku);
@@ -325,14 +335,30 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const adjustInventoryQty = useCallback(async (sku: string, delta: number) => {
     const existing = inventory.find(i => i.sku === sku);
     if (!existing?.id) return;
-    const newQty = Math.max(0, existing.qty + delta);
+    const newQty = settings.allowNegativeStock
+      ? existing.qty + delta
+      : Math.max(0, existing.qty + delta);
+    const threshold = getStockThreshold(existing.reorder, settings.lowStockThreshold);
+    const status = computeStockStatus(newQty, threshold);
     await supabase.from("inventory_items").update({ qty: newQty }).eq("id", existing.id);
     setInventory(prev => prev.map(i => {
       if (i.sku !== sku) return i;
-      const status: InventoryItem["status"] = newQty <= i.reorder * 0.3 ? "critical" : newQty <= i.reorder ? "low" : "ok";
       return { ...i, qty: newQty, status };
     }));
-  }, [inventory]);
+    if (
+      (status === "low" || status === "critical") &&
+      existing.status === "ok" &&
+      delta < 0
+    ) {
+      addNotification({
+        type: "inventory",
+        title: `Low stock: ${existing.name}`,
+        message: `${newQty} ${existing.baseUnit || "units"} left (alert at ${threshold})`,
+        link: "/inventory",
+        targetRoles: ["Manager", "Admin", "Super Admin"],
+      });
+    }
+  }, [inventory, settings.lowStockThreshold, settings.allowNegativeStock, addNotification]);
 
   const addStockFromPO = useCallback(async (items: { name: string; qty: number; unitPrice: number }[], warehouse: string) => {
     // This is handled by the DB trigger on PO received now, but also update local state

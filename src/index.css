@@ -135,9 +135,11 @@
 }
 
 @media print {
+  /* Hide non-print elements */
   body.print-mode > *:not(#print-container) {
     display: none !important;
   }
+  
   #print-container {
     position: absolute;
     top: 0;
@@ -146,5 +148,95 @@
     margin: 0;
     padding: 0;
     background: white;
+  }
+  
+  /* Print-specific styles for receipts */
+  @page {
+    margin: 8mm;
+    size: auto;
+  }
+  
+  /* Ensure proper text rendering */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  
+  /* Improve thermal printer compatibility */
+  .thermal-print {
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+  
+  /* Prevent page breaks inside receipts */
+  .receipt-container,
+  .invoice-container {
+    page-break-inside: avoid;
+    page-break-after: always;
+  }
+  
+  /* Optimize for 80mm thermal printers */
+  @media print and (max-width: 80mm) {
+    body {
+      font-size: 10px !important;
+    }
+    
+    .receipt-container {
+      width: 80mm !important;
+      max-width: 80mm !important;
+      margin: 0 !important;
+      padding: 2mm !important;
+    }
+  }
+  
+  /* Optimize for standard A4 printing */
+  @media print and (min-width: 80mm) {
+    .invoice-container {
+      max-width: 210mm !important;
+      margin: 0 auto !important;
+    }
+  }
+  
+  /* Hide scrollbars and shadows in print */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Ensure images print properly */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+  }
+  
+  /* Improve barcode printing */
+  .barcode-container {
+    page-break-inside: avoid;
+  }
+  
+  /* Optimize table printing */
+  table {
+    page-break-inside: auto;
+  }
+  
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  /* Remove background colors for ink saving */
+  .no-print-bg {
+    background: white !important;
+  }
+  
+  /* Ensure borders print clearly */
+  .print-border {
+    border: 1px solid #000 !important;
   }
 }
