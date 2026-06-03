@@ -142,6 +142,9 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
 
+      {/* Initial column header (first chunk) */}
+      <ColumnHeader />
+
       {/* Items — paginated into sections that repeat the column header and
           break cleanly across printed pages for long receipts. */}
       {itemChunks.map((chunk, chunkIdx) => {
