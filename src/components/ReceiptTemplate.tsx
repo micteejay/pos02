@@ -91,14 +91,10 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
       className={`border border-border rounded-lg p-4 font-mono text-[10px] leading-relaxed max-w-[280px] mx-auto bg-card w-full ${isThermal ? "bg-amber-50 dark:bg-amber-950/20 border-dashed" : ""}`}
     >
       {(isModern || isBranded) && <div className="h-1 rounded-full bg-primary mb-3" />}
-      
-      <div className={`${isMinimal ? "text-left" : "text-center"} mb-3`}>
-        {!isMinimal && !isCompact && (
-          <div className={`w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm ${isMinimal ? "" : "mx-auto"} mb-1`}>
-            {(settings?.appName || company?.name || "R").charAt(0)}
-          </div>
-        )}
-        <p className="font-bold text-foreground text-xs">{headerText}</p>
+
+      <div className="text-center mb-2">
+        <p className="font-bold text-foreground text-sm tracking-[0.2em]">CASH RECEIPT</p>
+        <p className="font-bold text-foreground text-[11px] mt-0.5">{headerText}</p>
         {!isCompact && company && (
           <p className="text-muted-foreground">
             {[company.address, company.city].filter(Boolean).join(", ")}
@@ -108,34 +104,46 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
       </div>
 
       {!isMinimal && <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-2`} />}
-      
-      <div className="flex justify-between text-muted-foreground mb-1">
-        <span>Date: {sale.date?.split(',')[0] || sale.date}</span>
-        <span>{sale.id}</span>
+
+      <div className="flex justify-between text-muted-foreground mb-0.5">
+        <span>RECEIPT: {sale.id}</span>
+        <span>{sale.date?.split(',')[0] || sale.date}</span>
       </div>
+      {sale.date?.includes(',') && (
+        <div className="flex justify-end text-muted-foreground mb-0.5">
+          <span>TIME: {sale.date.split(',').slice(1).join(',').trim()}</span>
+        </div>
+      )}
       <div className="flex justify-between text-muted-foreground mb-2">
-        <span>Customer: {sale.customer}</span>
+        <span>CUSTOMER: {sale.customer}</span>
       </div>
-      
-      <div className="text-[8.5px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
-        Items
+
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
+
+      {/* Column header */}
+      <div className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+        <span className="text-right">QTY</span>
+        <span>DESCRIPTION</span>
+        <span className="text-right">PRICE</span>
+        <span className="text-right">TOTAL</span>
       </div>
-      
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-1`} />
-      
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
+
       {sale.items.map((item, i) => (
-        <div key={item.lineKey || `${item.name}-${i}`} className="text-foreground py-1">
-          <p className="font-bold text-[10px] leading-tight break-words">{item.name}</p>
-          <div className="flex justify-between items-baseline mt-0.5">
-            <span className="text-[8.5px] text-muted-foreground">
-              {item.qty} × {formatCurrency(item.price)}
-              {item.unitName ? ` / ${item.unitName}` : ""}
-            </span>
-            <span className="font-bold text-[10px]">{formatCurrency(item.price * item.qty)}</span>
-          </div>
+        <div
+          key={item.lineKey || `${item.name}-${i}`}
+          className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-foreground py-[1px] items-start"
+        >
+          <span className="text-right tabular-nums">{item.qty}</span>
+          <span className="break-words leading-tight">
+            {item.name}
+            {item.unitName ? ` (${item.unitName})` : ""}
+          </span>
+          <span className="text-right tabular-nums">{formatCurrency(item.price)}</span>
+          <span className="text-right tabular-nums">{formatCurrency(item.price * item.qty)}</span>
         </div>
       ))}
-      
+
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
       
       {sale.subtotal !== undefined && (
