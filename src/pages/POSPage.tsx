@@ -14,10 +14,11 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
 import PaymentDialog, { type PaymentLine } from "@/components/PaymentDialog";
+import CustomerDetailDialog from "@/components/CustomerDetailDialog";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
   Trash2, Receipt, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
-  Pencil,
+  Pencil, User,
 } from "lucide-react";
 
 interface CartItem {
@@ -91,6 +92,7 @@ export default function POSPage() {
   const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>("");
   const [showPayment, setShowPayment] = useState(false);
+  const [showCustomerDetail, setShowCustomerDetail] = useState(false);
 
   const handlePriceSave = useCallback((lineKey: string) => {
     const parsedPrice = parseFloat(tempPrice);
@@ -426,11 +428,24 @@ export default function POSPage() {
               </div>
             </div>
             <div className="mt-4">
-              <CustomerPicker
-                compact
-                value={{ id: customerId, name: customerName, email: customerEmail, phone: customerPhone }}
-                onChange={(v) => { setCustomerId(v.id); setCustomerName(v.name); setCustomerEmail(v.email); setCustomerPhone(v.phone); }}
-              />
+              <div className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <CustomerPicker
+                    compact
+                    value={{ id: customerId, name: customerName, email: customerEmail, phone: customerPhone }}
+                    onChange={(v) => { setCustomerId(v.id); setCustomerName(v.name); setCustomerEmail(v.email); setCustomerPhone(v.phone); }}
+                  />
+                </div>
+                {customerId && (
+                  <button
+                    onClick={() => setShowCustomerDetail(true)}
+                    className="p-2 rounded-lg border border-border/50 bg-background/50 hover:border-primary/50 hover:bg-primary/5 transition-colors shrink-0"
+                    title="View loyalty & payment history"
+                  >
+                    <User className="w-4 h-4 text-primary" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
@@ -570,6 +585,14 @@ export default function POSPage() {
         onCancel={() => setShowPayment(false)}
         onConfirm={(result) => completeSale(result)}
       />
+
+      {showCustomerDetail && customerId && (
+        <CustomerDetailDialog
+          customerId={customerId}
+          formatCurrency={formatCurrency}
+          onClose={() => setShowCustomerDetail(false)}
+        />
+      )}
     </AppLayout>
   );
 }
