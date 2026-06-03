@@ -42,8 +42,7 @@ export default function SupplyPage() {
   const { companyProfile } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
-  const { inventory, addStockFromPO, warehouseNames } = useSharedData();
-  const { refreshData: refreshShared } = useSharedData();
+  const { inventory, addStockFromPO, warehouseNames, refreshData: refreshShared } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
