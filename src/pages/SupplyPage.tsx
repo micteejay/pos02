@@ -42,7 +42,7 @@ export default function SupplyPage() {
   const { companyProfile } = useAuth();
   const { formatCurrency, hasPermission } = useAppSettings();
   const { addApprovalItem, addNotification, getStagesForType } = useAppEvents();
-  const { inventory, addStockFromPO, warehouseNames } = useSharedData();
+  const { inventory, addStockFromPO, warehouseNames, refreshData: refreshShared } = useSharedData();
   const [tab, setTab] = useState<Tab>("orders");
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -444,6 +444,41 @@ export default function SupplyPage() {
             </div>
             <NewPOForm suppliers={suppliers.filter(s => s.status === "active")} formatCurrency={formatCurrency} inventoryItems={inventory} warehouseNames={warehouseNames}
               onSubmit={async (data) => {
+                // Auto-create inventory items for any PO lines that don't have one.
+                // The line's purchase price becomes the item's cost_price (and seeds
+                // selling price so it can be sold immediately if needed).
+                const created: { name: string; sku: string }[] = [];
+                const resolvedItems = await Promise.all(
+                  data.items.map(async (i: any) => {
+                    if (i.inventory_item_id) return i;
+                    const unitName = i.unitName || "pcs";
+                    const factor = Number(i.unitFactor) || 1;
+                    const baseCost = (Number(i.unitPrice) || 0) / factor;
+                    const sku = `AUTO-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+                    const { data: newInv, error: newErr } = await supabase.from("inventory_items").insert({
+                      sku,
+                      name: i.name,
+                      category: "Uncategorized",
+                      qty: 0,
+                      reorder_point: 50,
+                      cost_price: baseCost,
+                      price: baseCost,
+                      unit: unitName,
+                      base_unit: unitName,
+                      pack_size: 1,
+                      units: [],
+                      company_id: user?.companyId || null,
+                    }).select().single();
+                    if (newErr || !newInv) {
+                      toast.error(`Failed to create inventory item "${i.name}"`);
+                      return i;
+                    }
+                    created.push({ name: i.name, sku });
+                    return { ...i, inventory_item_id: newInv.id };
+                  })
+                );
+                data.items = resolvedItems;
+
                 // Generate PO number
                 const { data: poNum } = await supabase.rpc("generate_po_number");
                 const { data: po, error } = await supabase.from("purchase_orders").insert({
@@ -484,6 +519,10 @@ export default function SupplyPage() {
                   expectedDelivery: "—", warehouse: data.warehouse_name || "", warehouse_id: data.warehouse_id,
                   notes: data.notes, approvedBy: null,
                 }, ...prev]);
+                if (created.length > 0) {
+                  refreshShared();
+                  toast.success(`Created ${created.length} new inventory item${created.length > 1 ? "s" : ""}`);
+                }
                 setShowNewPO(false);
                 toast.success("Purchase order created");
               }} onCancel={() => setShowNewPO(false)} />

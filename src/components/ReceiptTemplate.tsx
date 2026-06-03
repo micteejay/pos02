@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, Fragment } from "react";
 
 export interface ReceiptItem {
   name: string;
@@ -58,6 +58,28 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
+
+  // Page size — how many items per "section" before we repeat the column
+  // header and insert a print page-break. Keeps long receipts (20+ items)
+  // readable both on screen and when printed on Letter / A4.
+  const PAGE_SIZE = Number(settings?.receiptPageSize) || 25;
+  const itemChunks: typeof sale.items[] = [];
+  for (let i = 0; i < sale.items.length; i += PAGE_SIZE) {
+    itemChunks.push(sale.items.slice(i, i + PAGE_SIZE));
+  }
+  if (itemChunks.length === 0) itemChunks.push([]);
+
+  const ColumnHeader = () => (
+    <>
+      <div className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
+        <span className="text-right">QTY</span>
+        <span>DESCRIPTION</span>
+        <span className="text-right">PRICE</span>
+        <span className="text-right">TOTAL</span>
+      </div>
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
+    </>
+  );
 
   if (isInvoice) {
     return (
@@ -120,31 +142,49 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
 
-      {/* Column header */}
-      <div className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="text-right">QTY</span>
-        <span>DESCRIPTION</span>
-        <span className="text-right">PRICE</span>
-        <span className="text-right">TOTAL</span>
-      </div>
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
+      {/* Initial column header (first chunk) */}
+      <ColumnHeader />
 
-      {sale.items.map((item, i) => (
-        <div
-          key={item.lineKey || `${item.name}-${i}`}
-          className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-foreground py-[1px] items-start"
-        >
-          <span className="text-right tabular-nums">{item.qty}</span>
-          <span className="break-words leading-tight">
-            {item.name}
-            {item.unitName ? ` (${item.unitName})` : ""}
-          </span>
-          <span className="text-right tabular-nums">{formatCurrency(item.price)}</span>
-          <span className="text-right tabular-nums">{formatCurrency(item.price * item.qty)}</span>
-        </div>
-      ))}
+      {/* Items — paginated into sections that repeat the column header and
+          break cleanly across printed pages for long receipts. */}
+      {itemChunks.map((chunk, chunkIdx) => {
+        const startIdx = chunkIdx * PAGE_SIZE;
+        return (
+          <Fragment key={`chunk-${chunkIdx}`}>
+            {chunkIdx > 0 && (
+              <>
+                <div className="break-before-page" />
+                <p className="text-center text-[9px] text-muted-foreground/80 italic my-2">
+                  — continued (page {chunkIdx + 1} of {itemChunks.length}) —
+                </p>
+                <ColumnHeader />
+              </>
+            )}
+            {chunk.map((item, i) => (
+              <div
+                key={item.lineKey || `${item.name}-${startIdx + i}`}
+                className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-foreground py-[1px] items-start break-inside-avoid"
+              >
+                <span className="text-right tabular-nums">{item.qty}</span>
+                <span className="break-words leading-tight">
+                  {item.name}
+                  {item.unitName ? ` (${item.unitName})` : ""}
+                </span>
+                <span className="text-right tabular-nums">{formatCurrency(item.price)}</span>
+                <span className="text-right tabular-nums">{formatCurrency(item.price * item.qty)}</span>
+              </div>
+            ))}
+          </Fragment>
+        );
+      })}
 
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2`} />
+      {itemChunks.length > 1 && (
+        <p className="text-center text-[9px] text-muted-foreground/80 italic mt-1">
+          — end of items ({sale.items.length} total) —
+        </p>
+      )}
+
+      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border my-2 break-before-avoid`} />
       
       {sale.subtotal !== undefined && (
         <div className="flex justify-between text-muted-foreground">

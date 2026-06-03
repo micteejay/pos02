@@ -107,19 +107,39 @@ export function generateReceiptText(
   const row = (qty: string, desc: string, price: string, total: string) =>
     padLeft(qty, qtyW) + " " + padRight(desc, descW) + " " + padLeft(price, priceW) + padLeft(total, totalW);
 
-  // Header row
-  text += row("QTY", "DESCRIPTION", "PRICE", "TOTAL") + "\n";
-  text += divider + "\n";
+  // Items — paginated into sections of PAGE_SIZE so long receipts repeat
+  // the column header and stay readable when many items are printed.
+  const PAGE_SIZE = Number(settings?.receiptPageSize) || 25;
+  const chunks: typeof sale.items[] = [];
+  for (let i = 0; i < sale.items.length; i += PAGE_SIZE) {
+    chunks.push(sale.items.slice(i, i + PAGE_SIZE));
+  }
+  if (chunks.length === 0) chunks.push([]);
 
-  // Items — single-line per item with wrapping under DESCRIPTION column.
-  for (const item of sale.items) {
-    const priceStr = formatCurrency(item.price);
-    const totalStr = formatCurrency(item.price * item.qty);
-    const descLines = wrap(item.unitName ? `${item.name} (${item.unitName})` : item.name, descW);
-    text += row(String(item.qty), descLines[0] ?? "", priceStr, totalStr) + "\n";
-    for (let i = 1; i < descLines.length; i++) {
-      text += row("", descLines[i], "", "") + "\n";
+  const emitHeader = () => {
+    text += row("QTY", "DESCRIPTION", "PRICE", "TOTAL") + "\n";
+    text += divider + "\n";
+  };
+
+  chunks.forEach((chunk, ci) => {
+    if (ci > 0) {
+      text += "\n";
+      text += center(`-- continued (page ${ci + 1} of ${chunks.length}) --`) + "\n";
     }
+    emitHeader();
+    for (const item of chunk) {
+      const priceStr = formatCurrency(item.price);
+      const totalStr = formatCurrency(item.price * item.qty);
+      const descLines = wrap(item.unitName ? `${item.name} (${item.unitName})` : item.name, descW);
+      text += row(String(item.qty), descLines[0] ?? "", priceStr, totalStr) + "\n";
+      for (let i = 1; i < descLines.length; i++) {
+        text += row("", descLines[i], "", "") + "\n";
+      }
+    }
+  });
+
+  if (chunks.length > 1) {
+    text += center(`-- end of items (${sale.items.length} total) --`) + "\n";
   }
 
   text += isInvoice ? thickDivider + "\n" : divider + "\n";
