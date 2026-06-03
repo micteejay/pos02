@@ -49,10 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = useCallback(async (supaUser: User) => {
-    // Get profile (including company_id)
+    // Get profile (including company_id, store_id, and department_id)
     const { data: profile } = await supabase
       .from("profiles")
-      .select("name, email, avatar, company_id")
+      .select("name, email, avatar, company_id, store_id, department_id")
       .eq("id", supaUser.id)
       .single();
 
@@ -75,7 +75,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const roleName = (roleChecks.find((role) => role !== null) ?? "Viewer") as string;
 
-    const profileCompanyId = profile?.company_id || null;
+    let profileCompanyId = profile?.company_id || null;
+
+    // Self-healing: if company_id is null, infer it from store_id or department_id
+    if (!profileCompanyId) {
+      if (profile?.store_id) {
+        const { data: storeRow } = await supabase
+          .from("stores")
+          .select("company_id")
+          .eq("id", profile.store_id)
+          .single();
+        if (storeRow?.company_id) {
+          profileCompanyId = storeRow.company_id;
+          // Background update to self-heal profile row
+          supabase
+            .from("profiles")
+            .update({ company_id: profileCompanyId })
+            .eq("id", supaUser.id)
+            .then(({ error }) => {
+              if (error) console.error("Self-healing company_id update failed:", error);
+            });
+        }
+      }
+      if (!profileCompanyId && profile?.department_id) {
+        const { data: deptRow } = await supabase
+          .from("departments")
+          .select("company_id")
+          .eq("id", profile.department_id)
+          .single();
+        if (deptRow?.company_id) {
+          profileCompanyId = deptRow.company_id;
+          // Background update to self-heal profile row
+          supabase
+            .from("profiles")
+            .update({ company_id: profileCompanyId })
+            .eq("id", supaUser.id)
+            .then(({ error }) => {
+              if (error) console.error("Self-healing company_id update failed:", error);
+            });
+        }
+      }
+    }
 
     const authUser: AuthUser = {
       id: supaUser.id,

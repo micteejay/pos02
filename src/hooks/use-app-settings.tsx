@@ -387,11 +387,12 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const currentRole = roles.find(r => r.name === currentUser.role);
 
   const hasPermission = useCallback((permission: Permission) => {
+    if (currentUser.role === "Super Admin" || currentUser.role === "Admin") return true;
     // Check from DB permissions first, fall back to role permissions
     if (currentUserPermissions.length > 0) return currentUserPermissions.includes(permission);
     if (!currentRole) return false;
     return currentRole.permissions.includes(permission);
-  }, [currentRole, currentUserPermissions]);
+  }, [currentUser.role, currentRole, currentUserPermissions]);
 
   const updateSettings = useCallback(async (updates: Partial<AppSettings>) => {
     setSettings(prev => {
@@ -471,6 +472,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           role: user.role,
           department: user.department,
           store: user.store,
+          companyId: authUser?.companyId || null,
         },
       });
       if (res.error) {

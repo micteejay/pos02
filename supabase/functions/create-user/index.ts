@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const { username, password, name, role, department, store } = await req.json();
+    const { username, password, name, role, department, store, companyId: bodyCompanyId } = await req.json();
 
     if (!username || !password || !name) {
       return new Response(JSON.stringify({ error: "username, password, and name are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -66,8 +66,11 @@ Deno.serve(async (req) => {
     const userId = newUser.user.id;
 
     // Get caller's company_id to assign to the new user
-    const { data: callerProfile } = await adminClient.from("profiles").select("company_id").eq("id", callerId).single();
-    const companyId = callerProfile?.company_id || null;
+    let companyId = bodyCompanyId;
+    if (!companyId) {
+      const { data: callerProfile } = await adminClient.from("profiles").select("company_id").eq("id", callerId).single();
+      companyId = callerProfile?.company_id || null;
+    }
 
     // Update profile with name and company_id (trigger should have created it)
     await adminClient.from("profiles").update({ name, email, company_id: companyId }).eq("id", userId);
