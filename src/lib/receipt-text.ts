@@ -1,10 +1,11 @@
 import { ReceiptData, CompanyInfo } from "../components/ReceiptTemplate";
 
 /**
- * Generates a clean, left-aligned monospace text receipt.
+ * Generates a clean, columnar monospace text receipt in the classic
+ * "QTY  DESCRIPTION         PRICE      TOTAL" supermarket layout.
  *
- * Layout uses a two-line block per item so long product names never overflow
- * and amounts stay readable regardless of how many items are in the cart.
+ * Long descriptions wrap under the DESCRIPTION column so the PRICE / TOTAL
+ * columns stay perfectly aligned regardless of how many items are printed.
  */
 export function generateReceiptText(
   sale: ReceiptData,
@@ -70,38 +71,55 @@ export function generateReceiptText(
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
 
-  if (isInvoice) {
-    text += center("INVOICE") + "\n";
-    text += center(headerText) + "\n";
-  } else {
-    text += center(headerText) + "\n";
-  }
+  // Title banner (CASH RECEIPT / INVOICE) then store details.
+  text += center(isInvoice ? "INVOICE" : "CASH RECEIPT") + "\n";
+  text += center(headerText) + "\n";
 
   if (!isMinimal) {
     if (company?.address) {
       const addressLine = [company.address, company.city].filter(Boolean).join(", ");
       for (const w of wrap(addressLine, width)) text += center(w) + "\n";
     }
-    if (company?.phone) text += center(company.phone) + "\n";
+    if (company?.phone) text += center(`Tel: ${company.phone}`) + "\n";
   }
 
   if (!isCompact) text += "\n";
+
+  // Meta block: cashier / receipt id on the left, date/time on the right.
+  const dateStr = sale.date || "";
+  const [datePart, ...timeParts] = dateStr.split(",");
+  const timePart = timeParts.join(",").trim();
+  text += line(isInvoice ? `INVOICE: ${sale.id}` : `RECEIPT: ${sale.id}`, datePart || "") + "\n";
+  if (timePart) text += line("", `TIME: ${timePart}`) + "\n";
+  text += line(`CUSTOMER: ${sale.customer}`, "") + "\n";
+
   text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  
-  text += line(isInvoice ? `Invoice: ${sale.id}` : `Receipt: ${sale.id}`, sale.date || "") + "\n";
-  text += `Customer: ${sale.customer}` + "\n";
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  text += "ITEMS" + "\n";
+
+  // Column widths — match the supermarket receipt layout: QTY | DESC | PRICE | TOTAL
+  const qtyW = 3;
+  const priceW = Math.max(8, Math.floor(width * 0.22));
+  const totalW = Math.max(9, Math.floor(width * 0.24));
+  const descW = Math.max(8, width - qtyW - priceW - totalW - 2); // 2 single-space gaps
+
+  const padRight = (s: string, w: number) => (s.length >= w ? s.slice(0, w) : s + " ".repeat(w - s.length));
+  const padLeft = (s: string, w: number) => (s.length >= w ? s.slice(s.length - w) : " ".repeat(w - s.length) + s);
+
+  const row = (qty: string, desc: string, price: string, total: string) =>
+    padLeft(qty, qtyW) + " " + padRight(desc, descW) + " " + padLeft(price, priceW) + padLeft(total, totalW);
+
+  // Header row
+  text += row("QTY", "DESCRIPTION", "PRICE", "TOTAL") + "\n";
   text += divider + "\n";
 
-  // Items — clean left-aligned two-line block per item, with totals on the right.
+  // Items — single-line per item with wrapping under DESCRIPTION column.
   for (const item of sale.items) {
-    const lineTotal = formatCurrency(item.price * item.qty);
-    // Name line: wrap to full width.
-    for (const w of wrap(item.name, width)) text += w + "\n";
-    // Detail line: "  3 x 1,500.00 / Box" left, total right.
-    const detail = `  ${item.qty} x ${formatCurrency(item.price)}${item.unitName ? ` / ${item.unitName}` : ""}`;
-    text += line(detail, lineTotal) + "\n";
+    const priceStr = formatCurrency(item.price);
+    const totalStr = formatCurrency(item.price * item.qty);
+    const descLines = wrap(item.unitName ? `${item.name} (${item.unitName})` : item.name, descW);
+    text += row(String(item.qty), descLines[0] ?? "", priceStr, totalStr) + "\n";
+    for (let i = 1; i < descLines.length; i++) {
+      text += row("", descLines[i], "", "") + "\n";
+    }
   }
 
   text += isInvoice ? thickDivider + "\n" : divider + "\n";
