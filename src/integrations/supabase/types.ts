@@ -467,6 +467,45 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_payments: {
+        Row: {
+          amount: number
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          method: string
+          note: string | null
+          reference: string | null
+          sale_id: string | null
+        }
+        Insert: {
+          amount: number
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          method?: string
+          note?: string | null
+          reference?: string | null
+          sale_id?: string | null
+        }
+        Update: {
+          amount?: number
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          method?: string
+          note?: string | null
+          reference?: string | null
+          sale_id?: string | null
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -477,8 +516,10 @@ export type Database = {
           email: string | null
           id: string
           last_purchase_at: string | null
+          loyalty_points: number
           name: string
           notes: string | null
+          outstanding_balance: number
           phone: string | null
           total_orders: number
           total_spend: number
@@ -493,8 +534,10 @@ export type Database = {
           email?: string | null
           id?: string
           last_purchase_at?: string | null
+          loyalty_points?: number
           name: string
           notes?: string | null
+          outstanding_balance?: number
           phone?: string | null
           total_orders?: number
           total_spend?: number
@@ -509,8 +552,10 @@ export type Database = {
           email?: string | null
           id?: string
           last_purchase_at?: string | null
+          loyalty_points?: number
           name?: string
           notes?: string | null
+          outstanding_balance?: number
           phone?: string | null
           total_orders?: number
           total_spend?: number
@@ -1160,6 +1205,45 @@ export type Database = {
           },
         ]
       }
+      loyalty_transactions: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          id: string
+          note: string | null
+          points: number
+          reference_id: string | null
+          reference_type: string | null
+          type: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          id?: string
+          note?: string | null
+          points: number
+          reference_id?: string | null
+          reference_type?: string | null
+          type: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          id?: string
+          note?: string | null
+          points?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           company_id: string | null
@@ -1652,6 +1736,7 @@ export type Database = {
         Row: {
           amount_tendered: number | null
           attachments: Json
+          balance_due: number
           cashier_id: string | null
           change_given: number | null
           company_id: string | null
@@ -1665,6 +1750,7 @@ export type Database = {
           id: string
           notes: string | null
           payment_method: string
+          payments: Json
           receipt_number: string | null
           status: Database["public"]["Enums"]["transaction_status"]
           store_id: string | null
@@ -1676,6 +1762,7 @@ export type Database = {
         Insert: {
           amount_tendered?: number | null
           attachments?: Json
+          balance_due?: number
           cashier_id?: string | null
           change_given?: number | null
           company_id?: string | null
@@ -1689,6 +1776,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          payments?: Json
           receipt_number?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
           store_id?: string | null
@@ -1700,6 +1788,7 @@ export type Database = {
         Update: {
           amount_tendered?: number | null
           attachments?: Json
+          balance_due?: number
           cashier_id?: string | null
           change_given?: number | null
           company_id?: string | null
@@ -1713,6 +1802,7 @@ export type Database = {
           id?: string
           notes?: string | null
           payment_method?: string
+          payments?: Json
           receipt_number?: string | null
           status?: Database["public"]["Enums"]["transaction_status"]
           store_id?: string | null
@@ -2431,6 +2521,14 @@ export type Database = {
       generate_receipt_number: { Args: never; Returns: string }
       generate_transfer_number: { Args: never; Returns: string }
       generate_txn_number: { Args: never; Returns: string }
+      get_loyalty_settings: {
+        Args: { _company_id: string }
+        Returns: {
+          earn_rate: number
+          enabled: boolean
+          redeem_value: number
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_permissions: { Args: { _user_id: string }; Returns: string[] }
       get_user_stores: {

@@ -24,6 +24,9 @@ export interface ReceiptData {
   amountTendered?: number;
   changeGiven?: number;
   debitCardAmount?: number;
+  payments?: Array<{ method: string; amount: number; reference?: string }>;
+  change?: number;
+  balanceDue?: number;
 }
 
 export interface CompanyInfo {
@@ -210,7 +213,6 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
       <div className="text-black mb-2">
         <span className="text-[9px]">{sale.date}</span>
       </div>
-
       {/* Customer & Cashier */}
       <div className="border-t border-black mb-2" />
       <div className="space-y-1 mb-2">
@@ -224,6 +226,10 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         )}
       </div>
 
+      <div className="text-[8.5px] text-muted-foreground uppercase tracking-wider mb-1 font-bold">
+        Items
+      </div>
+
       {/* Items Table Header */}
       <div className="border-t border-black mb-1" />
       <div className="flex justify-between text-[8px] text-black uppercase tracking-wider mb-1 font-bold">
@@ -235,25 +241,22 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mb-1`} />
       
       {/* Items */}
-      {sale.items.map((item, i) => {
-        const factor = item.unitFactor || 1;
-        return (
-          <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-black py-0.5">
-            <div className="flex-1">
-              <div className="text-[9px]">{item.name}</div>
-            </div>
-            <div className="w-12 text-center text-[9px] text-black">
-              {item.qty}
-            </div>
-            <div className="w-16 text-right text-[9px] text-black">
-              {formatCurrency(item.price)}
-            </div>
-            <div className="w-16 text-right text-[9px] font-semibold">
-              {formatCurrency(item.price * item.qty)}
-            </div>
+      {sale.items.map((item, i) => (
+        <div key={item.lineKey || `${item.name}-${i}`} className="flex justify-between items-baseline text-black py-0.5">
+          <div className="flex-1">
+            <div className="text-[9px]">{item.name} {item.unitName ? `(${item.unitName})` : ''}</div>
           </div>
-        );
-      })}
+          <div className="w-12 text-center text-[9px] text-black">
+            {item.qty}
+          </div>
+          <div className="w-16 text-right text-[9px] text-black">
+            {formatCurrency(item.price)}
+          </div>
+          <div className="w-16 text-right text-[9px] font-semibold">
+            {formatCurrency(item.price * item.qty)}
+          </div>
+        </div>
+      ))}
       
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
       
@@ -277,32 +280,60 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <span>RECEIPT TOTAL</span>
         <span>{formatCurrency(sale.total)}</span>
       </div>
-
       {/* Payment Section */}
       <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
       <div className="space-y-1">
-        {sale.amountTendered !== undefined && (
+        {sale.discount ? (
           <div className="flex justify-between text-black">
-            <span className="text-[9px]">Amount Tendered</span>
-            <span className="text-[9px]">{formatCurrency(sale.amountTendered)}</span>
+            <span className="text-[9px]">Total Sales Discounts</span>
+            <span className="text-[9px]">-{formatCurrency(sale.discount)}</span>
+          </div>
+        ) : null}
+
+        {sale.payments && sale.payments.length > 0 ? (
+          <div className="space-y-0.5">
+            {sale.payments.map((p, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-black">
+                  <span className="text-[9px]">{methodLabel(p.method)}</span>
+                  <span className="text-[9px]">{formatCurrency(p.amount)}</span>
+                </div>
+                {p.reference && <p className="text-[8px] text-muted-foreground/80 pl-1">ref: {p.reference}</p>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Payment Method</span>
+            <span className="text-[9px]">{methodLabel(sale.method)}</span>
           </div>
         )}
-        {sale.changeGiven !== undefined && (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Change Given</span>
-            <span className="text-[9px]">{formatCurrency(sale.changeGiven)}</span>
-          </div>
-        )}
+
         {sale.debitCardAmount !== undefined && (
           <div className="flex justify-between text-black">
             <span className="text-[9px]">Debit Card</span>
             <span className="text-[9px]">{formatCurrency(sale.debitCardAmount)}</span>
           </div>
         )}
-        {sale.discount && (
+
+        {typeof sale.amountTendered === "number" && sale.amountTendered > 0 && (
           <div className="flex justify-between text-black">
-            <span className="text-[9px]">Total Sales Discounts</span>
-            <span className="text-[9px]">-{formatCurrency(sale.discount)}</span>
+            <span className="text-[9px]">Amount Tendered</span>
+            <span className="text-[9px]">{formatCurrency(sale.amountTendered)}</span>
+          </div>
+        )}
+
+        {(sale.changeGiven !== undefined || sale.change !== undefined) && (
+          <div className="flex justify-between text-black">
+            <span className="text-[9px]">Change Given</span>
+            <span className="text-[9px]">{formatCurrency(sale.changeGiven ?? sale.change ?? 0)}</span>
+          </div>
+        )}
+
+        {typeof sale.balanceDue === "number" && sale.balanceDue > 0 && (
+          <div className="flex justify-between font-bold text-black">
+            <span className="text-[9px]">Balance Due</span>
+            <span className="text-[9px]">{formatCurrency(sale.balanceDue)}</span>
           </div>
         )}
       </div>

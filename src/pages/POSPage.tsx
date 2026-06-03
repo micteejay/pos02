@@ -13,6 +13,7 @@ import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate"
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
 import { toast } from "sonner";
+import PaymentDialog, { type PaymentLine } from "@/components/PaymentDialog";
 import {
   Search, Plus, Minus, X, ShoppingCart, CreditCard, Banknote, Smartphone,
   Trash2, Receipt, Barcode, Tag, Check, Package, Percent, DollarSign, Printer,
@@ -89,6 +90,7 @@ export default function POSPage() {
   const [showScanner, setShowScanner] = useState(false);
   const [editingPriceKey, setEditingPriceKey] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>("");
+  const [showPayment, setShowPayment] = useState(false);
 
   const handlePriceSave = useCallback((lineKey: string) => {
     const parsedPrice = parseFloat(tempPrice);
@@ -242,7 +244,7 @@ export default function POSPage() {
     if (order) { setCart(order.cart); setCustomerName(order.customer); setHeldOrders(prev => prev.filter(o => o.id !== id)); setShowHeld(false); }
   };
 
-  const completeSale = async () => {
+  const completeSale = async (paymentResult?: { payments: PaymentLine[]; amountTendered: number; change: number; balanceDue: number }) => {
     // Resolve customer: explicit picker selection wins; otherwise look up / create by name
     let resolvedId = customerId;
     let resolvedName = customerName || "Walk-in";
@@ -258,6 +260,8 @@ export default function POSPage() {
     });
 
     // Record sale (qty stored in selling units; consumer shows label with unit name)
+    const payments = paymentResult?.payments || [];
+    const primaryMethod = payments[0]?.method || paymentMethod;
     addSale({
       items: cart.map(i => ({
         name: `${i.name} (${i.unitName})`,
@@ -268,11 +272,16 @@ export default function POSPage() {
         unitName: i.unitName,
         baseQty: i.qty * i.unitFactor,
       })),
-      total, customer: resolvedName, method: paymentMethod, store: activeStore,
+      total, customer: resolvedName, method: primaryMethod, store: activeStore,
       createdBy: user?.name || "System", createdByRole: user?.role || "",
       customerId: resolvedId,
       customerEmail: resolvedEmail || null,
       customerPhone: resolvedPhone || null,
+      subtotal, tax, discount: discountAmount,
+      payments,
+      amountTendered: paymentResult?.amountTendered ?? total,
+      change: paymentResult?.change ?? 0,
+      balanceDue: paymentResult?.balanceDue ?? 0,
     });
 
     const saleId = `TXN-${9300 + Math.floor(Math.random() * 100)}`;
@@ -297,8 +306,23 @@ export default function POSPage() {
       });
       toast.info("High-value sale flagged for manager approval");
     }
-    setCompletedSale({ id: saleId, total, subtotal, tax, discount: discountAmount, items: [...cart], customer: resolvedName, method: paymentMethod, date: dateStr });
+    setCompletedSale({
+      id: saleId,
+      total,
+      subtotal,
+      tax,
+      discount: discountAmount,
+      items: [...cart],
+      customer: resolvedName,
+      method: primaryMethod,
+      date: dateStr,
+      payments,
+      amountTendered: paymentResult?.amountTendered ?? total,
+      change: paymentResult?.change ?? 0,
+      balanceDue: paymentResult?.balanceDue ?? 0,
+    } as any);
     setCart([]); setCustomerName(""); setCustomerId(null); setCustomerEmail(""); setCustomerPhone(""); setDiscountPercent(0);
+    setShowPayment(false);
     // Queue focus re-activation
     setTimeout(() => searchInputRef.current?.focus(), 100);
   };
@@ -488,7 +512,7 @@ export default function POSPage() {
                   </button>
                 ))}
               </div>
-              <button onClick={completeSale} className="w-full py-4 mt-1 rounded-xl bg-gradient-to-r from-primary to-primary/85 hover:from-primary/95 hover:to-primary/90 text-primary-foreground font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]">
+              <button onClick={() => setShowPayment(true)} className="w-full py-4 mt-1 rounded-xl bg-gradient-to-r from-primary to-primary/85 hover:from-primary/95 hover:to-primary/90 text-primary-foreground font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]">
                 <DollarSign className="w-4.5 h-4.5" />Charge {formatCurrency(total)}
               </button>
             </div>
@@ -535,6 +559,17 @@ export default function POSPage() {
       )}
 
       <BarcodeScanner open={showScanner} onClose={() => setShowScanner(false)} onScan={handleBarcodeScan} />
+
+      <PaymentDialog
+        open={showPayment}
+        total={total}
+        customerName={customerName || "Walk-in"}
+        customerSelected={!!customerId}
+        formatCurrency={formatCurrency}
+        currencySymbol={settings.currencySymbol}
+        onCancel={() => setShowPayment(false)}
+        onConfirm={(result) => completeSale(result)}
+      />
     </AppLayout>
   );
 }

@@ -686,7 +686,9 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
   const selectInventoryItem = (i: number, sku: string) => {
     const inv = inventoryItems.find(item => item.sku === sku);
     if (inv) {
-      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: inv.price.toString(), inventory_item_id: inv.id, unitName: inv.baseUnit || "pcs", unitFactor: 1 } : item));
+      // Prefill with COST (purchase) price, falling back to selling price if not set
+      const purchasePrice = (Number(inv.costPrice) > 0 ? inv.costPrice : inv.price).toString();
+      setItems(prev => prev.map((item, idx) => idx === i ? { ...item, name: inv.name, unitPrice: purchasePrice, inventory_item_id: inv.id, unitName: inv.baseUnit || "pcs", unitFactor: 1 } : item));
     }
   };
 
@@ -694,11 +696,12 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
     const item = items[i];
     const inv = inventoryItems.find(it => it.id === item.inventory_item_id);
     if (!inv) return;
+    const baseCost = Number(inv.costPrice) > 0 ? Number(inv.costPrice) : Number(inv.price);
     if (unitName === (inv.baseUnit || "pcs")) {
-      updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", 1); updateItem(i, "unitPrice", inv.price.toString()); return;
+      updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", 1); updateItem(i, "unitPrice", baseCost.toString()); return;
     }
     const u = (inv.units || []).find((x: any) => x.name === unitName);
-    if (u) { updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", u.factor); updateItem(i, "unitPrice", u.price.toString()); }
+    if (u) { updateItem(i, "unitName", unitName); updateItem(i, "unitFactor", u.factor); updateItem(i, "unitPrice", (baseCost * u.factor).toString()); }
   };
 
   const total = items.reduce((s, i) => s + (parseFloat(i.unitPrice) || 0) * (parseInt(i.qty) || 0), 0);
@@ -739,10 +742,13 @@ function NewPOForm({ suppliers, formatCurrency, inventoryItems, warehouseNames, 
               );
             })()}
             <div className="grid grid-cols-7 gap-2">
-              <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Or type item name" className="col-span-3 h-8 text-xs" />
+              <Input value={item.name} onChange={(e) => updateItem(i, "name", e.target.value)} placeholder="Item name (new or existing)" className="col-span-3 h-8 text-xs" />
               <Input type="number" value={item.qty} onChange={(e) => updateItem(i, "qty", e.target.value)} placeholder="Qty" className="col-span-1 h-8 text-xs" />
-              <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value)} placeholder="Price" className="col-span-3 h-8 text-xs" />
+              <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, "unitPrice", e.target.value)} placeholder="Purchase price" className="col-span-3 h-8 text-xs" title="Purchase (cost) price per unit" />
             </div>
+            {!item.inventory_item_id && item.name && (
+              <p className="text-[10px] text-primary/80 mt-1">+ Will create new inventory item "{item.name}" with this purchase price.</p>
+            )}
           </div>
         ))}
         <button onClick={addItem} className="text-xs text-primary mt-2 hover:underline">+ Add item</button>
