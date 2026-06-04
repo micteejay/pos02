@@ -284,7 +284,15 @@ export default function UsersPage() {
       {/* Edit User Modal */}
       {editingUser && (
         <Modal title="Edit User" onClose={() => setEditingUser(null)}>
-          <EditUserForm user={editingUser} roles={roles} storeNames={storeNames} departmentNames={departmentNames} onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }} onCancel={() => setEditingUser(null)} />
+          <EditUserForm
+            user={editingUser}
+            roles={roles}
+            storeNames={storeNames}
+            departmentNames={departmentNames}
+            isSelf={editingUser.id === authUser?.id}
+            onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }}
+            onCancel={() => setEditingUser(null)}
+          />
         </Modal>
       )}
 
@@ -394,8 +402,11 @@ function AddUserForm({ roles, storeNames, departmentNames, onAdd, onCancel }: { 
   );
 }
 
-function EditUserForm({ user, roles, storeNames, departmentNames, onSave, onCancel }: { user: AppUser; roles: AppRole[]; storeNames: string[]; departmentNames: string[]; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
+function EditUserForm({ user, roles, storeNames, departmentNames, isSelf, onSave, onCancel }: { user: AppUser; roles: AppRole[]; storeNames: string[]; departmentNames: string[]; isSelf?: boolean; onSave: (u: Partial<AppUser>) => void; onCancel: () => void }) {
   const [name, setName] = useState(user.name); const [email, setEmail] = useState(user.email); const [role, setRole] = useState(user.role); const [status, setStatus] = useState(user.status); const [department, setDepartment] = useState(user.department); const [store, setStore] = useState(user.store);
+  const adminRoles = ["Super Admin", "Admin"];
+  const isCurrentlyAdmin = adminRoles.includes(user.role);
+  const lockRole = isSelf && isCurrentlyAdmin;
 
   return (
     <div className="space-y-3">
@@ -405,12 +416,13 @@ function EditUserForm({ user, roles, storeNames, departmentNames, onSave, onCanc
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="text-xs font-medium text-muted-foreground">Role</label>
-          <select value={role} onChange={(e) => setRole(e.target.value)} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <select value={role} onChange={(e) => setRole(e.target.value)} disabled={lockRole} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:opacity-60 disabled:cursor-not-allowed">
             {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
           </select>
+          {lockRole && <p className="mt-1 text-[10px] text-warning">You cannot remove your own admin role.</p>}
         </div>
         <div><label className="text-xs font-medium text-muted-foreground">Status</label>
-          <select value={status} onChange={(e) => setStatus(e.target.value as AppUser["status"])} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
+          <select value={status} onChange={(e) => setStatus(e.target.value as AppUser["status"])} disabled={isSelf} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:opacity-60 disabled:cursor-not-allowed">
             <option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
           </select>
         </div>
