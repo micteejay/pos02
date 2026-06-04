@@ -13,6 +13,8 @@ import CommandPalette from "./components/CommandPalette";
 import AIChatAssistant from "./components/AIChatAssistant";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoadingFallback from "./components/LoadingFallback";
+import PermissionGuard from "./components/PermissionGuard";
+import type { Permission } from "./hooks/use-app-settings";
 
 // Lazy-loaded pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -70,6 +72,14 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function Guarded({ permission, children }: { permission: Permission; children: React.ReactNode }) {
+  return (
+    <ProtectedRoute>
+      <PermissionGuard permission={permission}>{children}</PermissionGuard>
+    </ProtectedRoute>
+  );
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -79,24 +89,24 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/setup-company" element={<SetupRoute><CompanySetupPage /></SetupRoute>} />
         <Route path="/install" element={<InstallPage />} />
-        <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-        <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
-        <Route path="/documents" element={<ProtectedRoute><DocumentsPage /></ProtectedRoute>} />
-        <Route path="/workflows" element={<ProtectedRoute><WorkflowsPage /></ProtectedRoute>} />
-        <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
-        <Route path="/inventory" element={<ProtectedRoute><InventoryPage /></ProtectedRoute>} />
-        <Route path="/sales" element={<ProtectedRoute><SalesPage /></ProtectedRoute>} />
-        <Route path="/pos" element={<ProtectedRoute><POSPage /></ProtectedRoute>} />
-        <Route path="/reports" element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
-        <Route path="/supply" element={<ProtectedRoute><SupplyPage /></ProtectedRoute>} />
-        <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
-        <Route path="/organization" element={<ProtectedRoute><OrganizationPage /></ProtectedRoute>} />
-        <Route path="/audit" element={<ProtectedRoute><AuditLogPage /></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/" element={<Guarded permission="pages.dashboard"><Index /></Guarded>} />
+        <Route path="/chat" element={<Guarded permission="pages.chat"><ChatPage /></Guarded>} />
+        <Route path="/documents" element={<Guarded permission="pages.documents"><DocumentsPage /></Guarded>} />
+        <Route path="/workflows" element={<Guarded permission="pages.workflows"><WorkflowsPage /></Guarded>} />
+        <Route path="/users" element={<Guarded permission="pages.users"><UsersPage /></Guarded>} />
+        <Route path="/notifications" element={<Guarded permission="pages.notifications"><NotificationsPage /></Guarded>} />
+        <Route path="/inventory" element={<Guarded permission="pages.inventory"><InventoryPage /></Guarded>} />
+        <Route path="/sales" element={<Guarded permission="pages.sales"><SalesPage /></Guarded>} />
+        <Route path="/pos" element={<Guarded permission="pages.pos"><POSPage /></Guarded>} />
+        <Route path="/reports" element={<Guarded permission="pages.reports"><ReportsPage /></Guarded>} />
+        <Route path="/supply" element={<Guarded permission="pages.supply"><SupplyPage /></Guarded>} />
+        <Route path="/approvals" element={<Guarded permission="pages.approvals"><ApprovalsPage /></Guarded>} />
+        <Route path="/organization" element={<Guarded permission="pages.organization"><OrganizationPage /></Guarded>} />
+        <Route path="/audit" element={<Guarded permission="pages.audit"><AuditLogPage /></Guarded>} />
+        <Route path="/settings" element={<Guarded permission="pages.settings"><SettingsPage /></Guarded>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-        <Route path="/invoices" element={<ProtectedRoute><InvoicePage /></ProtectedRoute>} />
-        <Route path="/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
+        <Route path="/invoices" element={<Guarded permission="pages.documents"><InvoicePage /></Guarded>} />
+        <Route path="/customers" element={<Guarded permission="pages.sales"><CustomersPage /></Guarded>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>

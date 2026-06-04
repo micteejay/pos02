@@ -375,6 +375,18 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
     };
 
     fetchData();
+
+    // Live refresh when any role or user_role changes — so permission edits
+    // take effect across the app without a re-login.
+    const channel = supabase
+      .channel("rbac-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "roles" }, () => fetchData())
+      .on("postgres_changes", { event: "*", schema: "public", table: "user_roles" }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [authUser]);
 
   const currentUser: AppUser = users.find(u => u.id === authUser?.id) || {
