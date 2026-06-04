@@ -546,17 +546,26 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Stores ---
   const addStore = useCallback(async (store: Omit<OrgStore, "id">) => {
+    if (!user?.companyId) {
+      toast({ title: "Company not set up", description: "Finish company setup before creating stores.", variant: "destructive" });
+      return;
+    }
     const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
     const { data, error } = await supabase.from("stores").insert({
       name: store.name, type: store.type, address: store.address || null,
       phone: store.phone || null, email: store.email || null,
       status: (statusMap[store.status] || store.status.toLowerCase()) as any,
-      company_id: user?.companyId || null,
+      company_id: user.companyId,
     }).select().single();
-    if (data && !error) {
-      setStores(prev => [...prev, { ...store, id: data.id }]);
+    if (error) {
+      toast({ title: "Could not create store", description: error.message, variant: "destructive" });
+      return;
     }
-  }, []);
+    if (data) {
+      setStores(prev => [...prev, { ...store, id: data.id }]);
+      toast({ title: "Store created", description: store.name });
+    }
+  }, [user?.companyId]);
 
   const updateStore = useCallback(async (id: string, updates: Partial<OrgStore>) => {
     const statusMap: Record<string, string> = { Active: "active", Maintenance: "maintenance", Closed: "closed" };
@@ -578,17 +587,26 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Warehouses ---
   const addWarehouse = useCallback(async (wh: Omit<OrgWarehouse, "id">) => {
+    if (!user?.companyId) {
+      toast({ title: "Company not set up", description: "Finish company setup before creating warehouses.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.from("warehouses").insert({
       name: wh.name, location: wh.location || null,
       capacity: wh.capacity || null, sqft: wh.sqft || null,
       zones: wh.zones || null,
       manager_id: wh.managerId || null,
-      company_id: user?.companyId || null,
+      company_id: user.companyId,
     }).select().single();
-    if (data && !error) {
-      setWarehouses(prev => [...prev, { ...wh, id: data.id }]);
+    if (error) {
+      toast({ title: "Could not create warehouse", description: error.message, variant: "destructive" });
+      return;
     }
-  }, []);
+    if (data) {
+      setWarehouses(prev => [...prev, { ...wh, id: data.id }]);
+      toast({ title: "Warehouse created", description: wh.name });
+    }
+  }, [user?.companyId]);
 
   const updateWarehouse = useCallback(async (id: string, updates: Partial<OrgWarehouse>) => {
     const payload: any = {};
