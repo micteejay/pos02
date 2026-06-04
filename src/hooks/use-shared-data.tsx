@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { computeStockStatus, getStockThreshold } from "@/lib/stock-status";
+import { toast } from "@/hooks/use-toast";
 
 export interface ItemUnit {
   /** Unit name e.g. "Box", "Carton", "Pack" */
