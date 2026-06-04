@@ -626,15 +626,24 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Departments ---
   const addDepartment = useCallback(async (dept: Omit<OrgDepartment, "id">) => {
+    if (!user?.companyId) {
+      toast({ title: "Company not set up", description: "Finish company setup before creating departments.", variant: "destructive" });
+      return;
+    }
     const { data, error } = await supabase.from("departments").insert({
       name: dept.name, budget: parseFloat(dept.budget) || 0,
       teams: dept.teams || [],
-      company_id: user?.companyId || null,
+      company_id: user.companyId,
     }).select().single();
-    if (data && !error) {
-      setDepartments(prev => [...prev, { ...dept, id: data.id }]);
+    if (error) {
+      toast({ title: "Could not create department", description: error.message, variant: "destructive" });
+      return;
     }
-  }, []);
+    if (data) {
+      setDepartments(prev => [...prev, { ...dept, id: data.id }]);
+      toast({ title: "Department created", description: dept.name });
+    }
+  }, [user?.companyId]);
 
   const updateDepartment = useCallback(async (id: string, updates: Partial<OrgDepartment>) => {
     const payload: any = {};
