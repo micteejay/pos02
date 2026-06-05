@@ -102,7 +102,7 @@ export function PermissionApprovalsProvider({ children }: { children: ReactNode 
           await updateUser(p.user_id, { status: p.new_status });
           break;
         case "role_create":
-          await addRole({ name: p.name, description: p.description || "", color: p.color || "bg-muted text-muted-foreground", permissions: p.permissions || [] });
+          await addRole({ name: p.name, description: p.description || "", color: p.color || "bg-muted text-muted-foreground", permissions: p.permissions || [], isSystem: false });
           break;
         case "role_delete":
           await deleteRole(p.role_id);
