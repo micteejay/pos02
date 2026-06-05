@@ -149,6 +149,45 @@ export default function UsersPage() {
           ))}
         </div>
 
+        {/* Pending permission-change requests (admins only) */}
+        {isApprover && pending.length > 0 && (
+          <div className="glass-card rounded-xl p-4 border border-warning/30">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              <h3 className="text-sm font-semibold text-foreground">Pending permission requests</h3>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning">{pending.length}</span>
+            </div>
+            <div className="space-y-2">
+              {pending.map(r => {
+                const isOwn = r.requested_by === authUser?.id;
+                const canSelfApprove = !isOwn; // others not allowed to auto-approve their own
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/30">
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{r.summary}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Requested by {r.requested_by_name || "user"} · {new Date(r.created_at).toLocaleString()} · {r.change_type.replace(/_/g, " ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        disabled={!canSelfApprove}
+                        onClick={() => approve(r.id)}
+                        title={canSelfApprove ? "Approve" : "You can't approve your own request"}
+                        className="px-3 py-1.5 rounded-md bg-success text-success-foreground text-xs font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >Approve</button>
+                      <button
+                        onClick={() => reject(r.id)}
+                        className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium hover:opacity-90"
+                      >Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
           {tabs.map((t) => (
