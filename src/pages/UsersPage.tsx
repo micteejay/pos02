@@ -257,7 +257,7 @@ export default function UsersPage() {
                       <button onClick={() => setEditingRole(role)} className="p-1.5 rounded-md hover:bg-muted"><Edit2 className="w-4 h-4 text-muted-foreground" /></button>
                     )}
                     {hasPermission("roles.delete") && !role.isSystem && (
-                      <button onClick={() => deleteRole(role.id)} className="p-1.5 rounded-md hover:bg-destructive/10"><Trash2 className="w-4 h-4 text-destructive" /></button>
+                      <button onClick={() => { if (confirm(`${isSuperAdmin ? "Delete" : "Request deletion of"} role "${role.name}"?`)) requestRoleDelete(role); }} className="p-1.5 rounded-md hover:bg-destructive/10"><Trash2 className="w-4 h-4 text-destructive" /></button>
                     )}
                   </div>
                 </div>
@@ -345,8 +345,8 @@ export default function UsersPage() {
 
       {/* Add Role Modal */}
       {showAddRole && (
-        <Modal title="Create Role" onClose={() => setShowAddRole(false)}>
-          <RoleForm onSave={(data) => { addRole(data); setShowAddRole(false); }} onCancel={() => setShowAddRole(false)} />
+        <Modal title={isSuperAdmin ? "Create Role" : "Request New Role"} onClose={() => setShowAddRole(false)}>
+          <RoleForm onSave={async (data) => { await requestRoleCreate(data); setShowAddRole(false); }} onCancel={() => setShowAddRole(false)} />
         </Modal>
       )}
 
