@@ -100,13 +100,12 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
   const ColumnHeader = () => (
     <>
-      <div className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="text-right">QTY</span>
-        <span>DESCRIPTION</span>
-        <span className="text-right">PRICE</span>
-        <span className="text-right">TOTAL</span>
+      <div className="grid grid-cols-[1fr_6ch_4ch_7ch] gap-2 text-[11px] font-bold text-black mb-1">
+        <span>Desc</span>
+        <span className="text-right">UPrice</span>
+        <span className="text-right">Qty</span>
+        <span className="text-right">Amt</span>
       </div>
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
     </>
   );
 
@@ -206,12 +205,10 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
   return (
     <div
       ref={ref}
-      className={`border-2 border-black bg-white font-mono ${fontSizeClass} leading-snug ${sizeClasses} mx-auto w-full receipt-container`}
+      className={`bg-white text-black font-sans ${fontSizeClass} leading-snug ${sizeClasses} mx-auto w-full receipt-container`}
     >
-      {(isModern || isBranded) && <div className="h-1 rounded-full bg-primary mb-3" />}
-
       {/* Header Section */}
-      <div className="text-center mb-3">
+      <div className="text-center mb-2">
         {company?.logoUrl && (
           <img 
             src={company.logoUrl} 
@@ -219,38 +216,31 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             className="mx-auto mb-2 h-12 w-auto object-contain max-w-full"
           />
         )}
-        <p className="font-bold text-black text-sm tracking-[0.2em]">CASH RECEIPT</p>
-        <p className="font-bold text-black text-lg mb-1 tracking-wide">{headerText}</p>
-        {!isCompact && company && (
-          <p className="text-black text-[9px] mb-0.5">
+        <p className="font-bold text-black text-base leading-tight tracking-wide">{headerText}</p>
+        {settings?.receiptTagline && (
+          <p className="text-black text-[10px] leading-tight">… {settings.receiptTagline}</p>
+        )}
+        {company && (company.address || company.city) && (
+          <p className="text-black text-[10px] leading-tight">
             {[company.address, company.city].filter(Boolean).join(", ")}
           </p>
         )}
-        {company?.phone && <p className="text-black text-[9px]">Tel: {company.phone}</p>}
-      </div>
-
-      {!isMinimal && <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mb-2`} />}
-
-      <div className="flex justify-between text-black mb-0.5">
-        <span>RECEIPT: {sale.id}</span>
-        {sale.workstation && <span>WORKSTATION: {sale.workstation}</span>}
-      </div>
-      
-      <div className="flex justify-between text-black mb-0.5">
-        <span>DATE: {sale.date?.split(',')[0] || sale.date}</span>
-        {sale.date?.includes(',') && (
-          <span>TIME: {sale.date.split(',').slice(1).join(',').trim()}</span>
+        {company?.phone && (
+          <p className="text-black text-[10px] leading-tight">{company.phone}</p>
         )}
       </div>
 
-      <div className="flex justify-between text-black mb-2">
-        <span>CUSTOMER: {sale.customer}</span>
-        {sale.cashier && <span>CASHIER: {sale.cashier}</span>}
+      {/* Left-aligned meta */}
+      <div className="mb-2 space-y-[2px]">
+        {sale.cashier && <p className="text-black"><span className="font-semibold">Sales Rep/Cashier:</span> {sale.cashier}</p>}
+        {sale.date && <p className="text-black"><span className="font-semibold">Date:</span> {sale.date}</p>}
+        <p className="text-black"><span className="font-semibold">Customer:</span> {sale.customer}</p>
+        <p className="text-black"><span className="font-semibold">Payment Method:</span> {methodLabel(sale.method)}</p>
       </div>
 
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mb-1`} />
+      <p className="text-center text-black mb-1"><span className="font-semibold">Receipt No:</span> {sale.id}</p>
 
-      {/* Initial column header (first chunk) */}
+      {/* Column header */}
       <ColumnHeader />
 
       {/* Items — paginated into sections that repeat the column header and
@@ -271,14 +261,14 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             {chunk.map((item, i) => (
               <div
                 key={item.lineKey || `${item.name}-${startIdx + i}`}
-                className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-black py-[1px] items-start break-inside-avoid"
+                className="grid grid-cols-[1fr_6ch_4ch_7ch] gap-2 text-black py-[2px] items-start break-inside-avoid"
               >
-                <span className="text-right tabular-nums">{item.qty}</span>
-                <span className="break-words leading-tight">
+                <span className="break-words leading-tight text-left">
                   {item.name}
                   {item.unitName ? ` (${item.unitName})` : ""}
                 </span>
                 <span className="text-right tabular-nums">{formatCurrency(item.price)}</span>
+                <span className="text-right tabular-nums">{item.qty}</span>
                 <span className="text-right tabular-nums">{formatCurrency(item.price * item.qty)}</span>
               </div>
             ))}
@@ -292,91 +282,41 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         </p>
       )}
 
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2 break-before-avoid`} />
-      
-      {/* Summary Section */}
-      <div className="space-y-1">
-        {sale.subtotal !== undefined && (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Subtotal</span>
-            <span className="text-[9px]">{formatCurrency(sale.subtotal)}</span>
-          </div>
-        )}
-        <div className="flex justify-between text-black">
-          <span className="text-[9px]">Local Sales Tax</span>
-          <span className="text-[9px]">{sale.tax ? `${((sale.tax / sale.subtotal) * 100).toFixed(0)}% Tax ${formatCurrency(sale.tax)}` : "0% Tax N0.00"}</span>
-        </div>
-      </div>
-      
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
-      
-      <div className="flex justify-between font-bold text-black text-sm pt-1">
-        <span>RECEIPT TOTAL</span>
-        <span>{formatCurrency(sale.total)}</span>
-      </div>
-      {/* Payment Section */}
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black my-2`} />
-      <div className="space-y-1">
-        {sale.discount ? (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Total Sales Discounts</span>
-            <span className="text-[9px]">-{formatCurrency(sale.discount)}</span>
-          </div>
-        ) : null}
-
-        {sale.payments && sale.payments.length > 0 ? (
-          <div className="space-y-0.5">
-            {sale.payments.map((p, i) => (
-              <div key={i}>
-                <div className="flex justify-between text-black">
-                  <span className="text-[9px]">{methodLabel(p.method)}</span>
-                  <span className="text-[9px]">{formatCurrency(p.amount)}</span>
-                </div>
-                {p.reference && <p className="text-[8px] text-muted-foreground/80 pl-1">ref: {p.reference}</p>}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Payment Method</span>
-            <span className="text-[9px]">{methodLabel(sale.method)}</span>
-          </div>
-        )}
-
-        {sale.debitCardAmount !== undefined && (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Debit Card</span>
-            <span className="text-[9px]">{formatCurrency(sale.debitCardAmount)}</span>
-          </div>
-        )}
-
+      {/* Totals — left-aligned, bold, mirroring the supplied template */}
+      <div className="mt-3 space-y-[2px] text-black font-bold text-[12px]">
+        <p>Total: {formatCurrency(sale.total)}</p>
         {typeof sale.amountTendered === "number" && sale.amountTendered > 0 && (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Amount Tendered</span>
-            <span className="text-[9px]">{formatCurrency(sale.amountTendered)}</span>
-          </div>
+          <p>Amt Paid: {formatCurrency(sale.amountTendered)}</p>
         )}
-
-        {(sale.changeGiven !== undefined || sale.change !== undefined) && (
-          <div className="flex justify-between text-black">
-            <span className="text-[9px]">Change Given</span>
-            <span className="text-[9px]">{formatCurrency(sale.changeGiven ?? sale.change ?? 0)}</span>
-          </div>
+        {!sale.amountTendered && (
+          <p>Amt Paid: {formatCurrency(sale.total - (sale.balanceDue || 0))}</p>
         )}
-
-        {typeof sale.balanceDue === "number" && sale.balanceDue > 0 && (
-          <div className="flex justify-between font-bold text-black">
-            <span className="text-[9px]">Balance Due</span>
-            <span className="text-[9px]">{formatCurrency(sale.balanceDue)}</span>
-          </div>
-        )}
+        <p>Cust Balance: {formatCurrency(sale.balanceDue ?? 0)}</p>
+        {(sale.changeGiven ?? sale.change) ? (
+          <p>Change: {formatCurrency(sale.changeGiven ?? sale.change ?? 0)}</p>
+        ) : null}
+        {sale.discount ? (
+          <p className="font-normal text-[10px]">Discount: -{formatCurrency(sale.discount)}</p>
+        ) : null}
+        {sale.tax ? (
+          <p className="font-normal text-[10px]">Tax: {formatCurrency(sale.tax)}</p>
+        ) : null}
       </div>
-      
+
       {/* Footer */}
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-black mt-3 pt-2 text-center`}>
-        {footerText && <p className="text-black text-[9px] mb-2 font-semibold">{footerText}</p>}
+      <div className="mt-4 text-black">
+        {settings?.receiptReturnPolicy ? (
+          <p className="text-[10px] mb-2">{settings.receiptReturnPolicy}</p>
+        ) : (
+          <p className="text-[10px] mb-2">Item(s) received in good condition cannot be refunded</p>
+        )}
+        {footerText ? (
+          <p className="text-center text-[11px] font-semibold">{footerText}</p>
+        ) : (
+          <p className="text-center text-[11px] font-semibold">Thank you for your patronage.</p>
+        )}
         {showBarcode && (
-          <div className="flex flex-col items-center mt-2 barcode-container">
+          <div className="flex flex-col items-center mt-3 barcode-container">
             <div className="w-48 h-12 bg-white border-2 border-black flex items-center justify-center mb-1 p-2">
               <div className="flex gap-px">
                 {[2,1,3,1,2,1,1,3,2,1,1,2,3,1,2,1,3,1,1,2,1,3,2,1,1,3,1,2,1,2,3,1,2,1,1,3,2,1,2,1,1,3,1,2,1,2,3,1].map((width, i) => (
@@ -395,8 +335,6 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
           </div>
         )}
       </div>
-      
-      {settings?.receiptReturnPolicy && <p className="text-black text-[8px] mt-2">{settings.receiptReturnPolicy}</p>}
     </div>
   );
 });

@@ -71,41 +71,39 @@ export function generateReceiptText(
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
 
-  // Title banner (CASH RECEIPT / INVOICE) then store details.
-  text += center(isInvoice ? "INVOICE" : "CASH RECEIPT") + "\n";
-  text += center(headerText) + "\n";
-
+  // Centered company header block matching the printed receipt template.
+  text += center(headerText.toUpperCase()) + "\n";
+  if (settings?.receiptTagline) {
+    for (const w of wrap(`... ${settings.receiptTagline}`, width)) text += center(w) + "\n";
+  }
   if (!isMinimal) {
     if (company?.address) {
       const addressLine = [company.address, company.city].filter(Boolean).join(", ");
       for (const w of wrap(addressLine, width)) text += center(w) + "\n";
     }
-    if (company?.phone) text += center(`Tel: ${company.phone}`) + "\n";
+    if (company?.phone) text += center(company.phone) + "\n";
   }
 
-  if (!isCompact) text += "\n";
+  text += "\n";
 
-  // Meta block: cashier / receipt id on the left, date/time on the right.
-  const dateStr = sale.date || "";
-  const [datePart, ...timeParts] = dateStr.split(",");
-  const timePart = timeParts.join(",").trim();
-  text += line(isInvoice ? `INVOICE: ${sale.id}` : `RECEIPT: ${sale.id}`, datePart || "") + "\n";
-  if (timePart) text += line("", `TIME: ${timePart}`) + "\n";
-  text += line(`CUSTOMER: ${sale.customer}`, "") + "\n";
+  if (sale.cashier) text += `Sales Rep/Cashier: ${sale.cashier}\n`;
+  if (sale.date) text += `Date: ${sale.date}\n`;
+  text += `Customer: ${sale.customer}\n`;
+  const methodLbl0 = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
+  text += `Payment Method: ${methodLbl0}\n\n`;
+  text += center(`Receipt No: ${sale.id}`) + "\n";
 
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-
-  // Column widths — match the supermarket receipt layout: QTY | DESC | PRICE | TOTAL
-  const qtyW = 3;
-  const priceW = Math.max(8, Math.floor(width * 0.22));
-  const totalW = Math.max(9, Math.floor(width * 0.24));
-  const descW = Math.max(8, width - qtyW - priceW - totalW - 2); // 2 single-space gaps
+  // Column widths — Desc | UPrice | Qty | Amt (matches the printed template)
+  const priceW = Math.max(8, Math.floor(width * 0.20));
+  const qtyW = 4;
+  const totalW = Math.max(8, Math.floor(width * 0.20));
+  const descW = Math.max(8, width - priceW - qtyW - totalW - 3);
 
   const padRight = (s: string, w: number) => (s.length >= w ? s.slice(0, w) : s + " ".repeat(w - s.length));
   const padLeft = (s: string, w: number) => (s.length >= w ? s.slice(s.length - w) : " ".repeat(w - s.length) + s);
 
-  const row = (qty: string, desc: string, price: string, total: string) =>
-    padLeft(qty, qtyW) + " " + padRight(desc, descW) + " " + padLeft(price, priceW) + padLeft(total, totalW);
+  const row = (desc: string, price: string, qty: string, total: string) =>
+    padRight(desc, descW) + " " + padLeft(price, priceW) + " " + padLeft(qty, qtyW) + " " + padLeft(total, totalW);
 
   // Items — paginated into sections of PAGE_SIZE so long receipts repeat
   // the column header and stay readable when many items are printed.
@@ -117,8 +115,7 @@ export function generateReceiptText(
   if (chunks.length === 0) chunks.push([]);
 
   const emitHeader = () => {
-    text += row("QTY", "DESCRIPTION", "PRICE", "TOTAL") + "\n";
-    text += divider + "\n";
+    text += row("Desc", "UPrice", "Qty", "Amt") + "\n";
   };
 
   chunks.forEach((chunk, ci) => {
@@ -131,9 +128,9 @@ export function generateReceiptText(
       const priceStr = formatCurrency(item.price);
       const totalStr = formatCurrency(item.price * item.qty);
       const descLines = wrap(item.unitName ? `${item.name} (${item.unitName})` : item.name, descW);
-      text += row(String(item.qty), descLines[0] ?? "", priceStr, totalStr) + "\n";
+      text += row(descLines[0] ?? "", priceStr, String(item.qty), totalStr) + "\n";
       for (let i = 1; i < descLines.length; i++) {
-        text += row("", descLines[i], "", "") + "\n";
+        text += row(descLines[i], "", "", "") + "\n";
       }
     }
   });
@@ -142,55 +139,31 @@ export function generateReceiptText(
     text += center(`-- end of items (${sale.items.length} total) --`) + "\n";
   }
 
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  if (sale.subtotal !== undefined) {
-    text += line("Subtotal", formatCurrency(sale.subtotal)) + "\n";
-  }
-  if (sale.tax) {
-    const taxRate = sale.subtotal ? ((sale.tax / sale.subtotal) * 100).toFixed(0) : "0";
-    text += line(`Tax (${taxRate}%)`, formatCurrency(sale.tax)) + "\n";
-  }
-  if (sale.discount) {
-    text += line("Discount", `-${formatCurrency(sale.discount)}`) + "\n";
-  }
-  
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  text += line(isInvoice ? "TOTAL DUE" : "TOTAL", formatCurrency(sale.total)) + "\n";
-  // Payments breakdown
-  const payments: Array<{ method: string; amount: number; reference?: string }> = Array.isArray(sale.payments)
-    ? sale.payments
-    : [];
-  if (payments.length > 0) {
-    text += divider + "\n";
-    for (const p of payments) {
-      const lbl = p.method === "card" ? "Card" : p.method === "cash" ? "Cash" : p.method === "mobile" ? "Mobile" : p.method === "transfer" ? "Transfer" : p.method;
-      text += line(lbl, formatCurrency(p.amount)) + "\n";
-      if (p.reference) text += `  ref: ${p.reference}`.slice(0, width) + "\n";
-    }
-  } else {
-    const methodLabel = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
-    text += line("Payment Method", methodLabel) + "\n";
-  }
+  text += "\n";
+  // Totals — left-aligned, mirrors the printed template
+  text += `Total: ${formatCurrency(sale.total)}\n`;
   const amountTendered = sale.amountTendered;
   const change = sale.changeGiven ?? sale.change;
-  const balanceDue = sale.balanceDue;
-  if (typeof amountTendered === "number" && amountTendered > 0) {
-    text += line("Amount Tendered", formatCurrency(amountTendered)) + "\n";
-  }
+  const balanceDue = sale.balanceDue ?? 0;
+  const paid = typeof amountTendered === "number" && amountTendered > 0
+    ? amountTendered
+    : sale.total - balanceDue;
+  text += `Amt Paid: ${formatCurrency(paid)}\n`;
+  text += `Cust Balance: ${formatCurrency(balanceDue)}\n`;
   if (typeof change === "number" && change > 0) {
-    text += line("Change Given", formatCurrency(change)) + "\n";
+    text += `Change: ${formatCurrency(change)}\n`;
   }
-  if (typeof balanceDue === "number" && balanceDue > 0) {
-    text += line("BALANCE DUE", formatCurrency(balanceDue)) + "\n";
+  if (sale.discount) text += `Discount: -${formatCurrency(sale.discount)}\n`;
+  if (sale.tax) {
+    const taxRate = sale.subtotal ? ((sale.tax / sale.subtotal) * 100).toFixed(0) : "0";
+    text += `Tax (${taxRate}%): ${formatCurrency(sale.tax)}\n`;
   }
-  if (footerText) {
-    if (!isCompact) text += "\n";
-    for (const w of wrap(footerText, width)) text += center(w) + "\n";
-  }
-  
-  if (settings?.receiptReturnPolicy && !isCompact) {
-    for (const w of wrap(settings.receiptReturnPolicy, width)) text += center(w) + "\n";
-  }
+
+  text += "\n";
+  const policy = settings?.receiptReturnPolicy || "Item(s) received in good condition cannot be refunded";
+  for (const w of wrap(policy, width)) text += w + "\n";
+  text += "\n";
+  text += center(footerText || "Thank you for your patronage.") + "\n";
 
   return text;
 }
