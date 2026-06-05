@@ -337,7 +337,17 @@ export default function UsersPage() {
             storeNames={storeNames}
             departmentNames={departmentNames}
             isSelf={editingUser.id === authUser?.id}
-            onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }}
+            onSave={async (updates) => {
+              const u = editingUser;
+              const sensitive: Partial<typeof updates> = {};
+              const safe: any = { ...updates };
+              if (updates.role && updates.role !== u.role) { sensitive.role = updates.role; delete safe.role; }
+              if (updates.status && updates.status !== u.status) { sensitive.status = updates.status; delete safe.status; }
+              if (Object.keys(safe).length) await updateUser(u.id, safe);
+              if (sensitive.role) await requestUserRoleChange(u, sensitive.role as string);
+              if (sensitive.status) await requestUserStatusChange(u, sensitive.status as string);
+              setEditingUser(null);
+            }}
             onCancel={() => setEditingUser(null)}
           />
         </Modal>
