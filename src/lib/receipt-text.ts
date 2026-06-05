@@ -139,55 +139,31 @@ export function generateReceiptText(
     text += center(`-- end of items (${sale.items.length} total) --`) + "\n";
   }
 
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  if (sale.subtotal !== undefined) {
-    text += line("Subtotal", formatCurrency(sale.subtotal)) + "\n";
-  }
-  if (sale.tax) {
-    const taxRate = sale.subtotal ? ((sale.tax / sale.subtotal) * 100).toFixed(0) : "0";
-    text += line(`Tax (${taxRate}%)`, formatCurrency(sale.tax)) + "\n";
-  }
-  if (sale.discount) {
-    text += line("Discount", `-${formatCurrency(sale.discount)}`) + "\n";
-  }
-  
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
-  text += line(isInvoice ? "TOTAL DUE" : "TOTAL", formatCurrency(sale.total)) + "\n";
-  // Payments breakdown
-  const payments: Array<{ method: string; amount: number; reference?: string }> = Array.isArray(sale.payments)
-    ? sale.payments
-    : [];
-  if (payments.length > 0) {
-    text += divider + "\n";
-    for (const p of payments) {
-      const lbl = p.method === "card" ? "Card" : p.method === "cash" ? "Cash" : p.method === "mobile" ? "Mobile" : p.method === "transfer" ? "Transfer" : p.method;
-      text += line(lbl, formatCurrency(p.amount)) + "\n";
-      if (p.reference) text += `  ref: ${p.reference}`.slice(0, width) + "\n";
-    }
-  } else {
-    const methodLabel = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
-    text += line("Payment Method", methodLabel) + "\n";
-  }
+  text += "\n";
+  // Totals — left-aligned, mirrors the printed template
+  text += `Total: ${formatCurrency(sale.total)}\n`;
   const amountTendered = sale.amountTendered;
   const change = sale.changeGiven ?? sale.change;
-  const balanceDue = sale.balanceDue;
-  if (typeof amountTendered === "number" && amountTendered > 0) {
-    text += line("Amount Tendered", formatCurrency(amountTendered)) + "\n";
-  }
+  const balanceDue = sale.balanceDue ?? 0;
+  const paid = typeof amountTendered === "number" && amountTendered > 0
+    ? amountTendered
+    : sale.total - balanceDue;
+  text += `Amt Paid: ${formatCurrency(paid)}\n`;
+  text += `Cust Balance: ${formatCurrency(balanceDue)}\n`;
   if (typeof change === "number" && change > 0) {
-    text += line("Change Given", formatCurrency(change)) + "\n";
+    text += `Change: ${formatCurrency(change)}\n`;
   }
-  if (typeof balanceDue === "number" && balanceDue > 0) {
-    text += line("BALANCE DUE", formatCurrency(balanceDue)) + "\n";
+  if (sale.discount) text += `Discount: -${formatCurrency(sale.discount)}\n`;
+  if (sale.tax) {
+    const taxRate = sale.subtotal ? ((sale.tax / sale.subtotal) * 100).toFixed(0) : "0";
+    text += `Tax (${taxRate}%): ${formatCurrency(sale.tax)}\n`;
   }
-  if (footerText) {
-    if (!isCompact) text += "\n";
-    for (const w of wrap(footerText, width)) text += center(w) + "\n";
-  }
-  
-  if (settings?.receiptReturnPolicy && !isCompact) {
-    for (const w of wrap(settings.receiptReturnPolicy, width)) text += center(w) + "\n";
-  }
+
+  text += "\n";
+  const policy = settings?.receiptReturnPolicy || "Item(s) received in good condition cannot be refunded";
+  for (const w of wrap(policy, width)) text += w + "\n";
+  text += "\n";
+  text += center(footerText || "Thank you for your patronage.") + "\n";
 
   return text;
 }
