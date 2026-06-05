@@ -115,8 +115,7 @@ export function generateReceiptText(
   if (chunks.length === 0) chunks.push([]);
 
   const emitHeader = () => {
-    text += row("QTY", "DESCRIPTION", "PRICE", "TOTAL") + "\n";
-    text += divider + "\n";
+    text += row("Desc", "UPrice", "Qty", "Amt") + "\n";
   };
 
   chunks.forEach((chunk, ci) => {
@@ -129,9 +128,9 @@ export function generateReceiptText(
       const priceStr = formatCurrency(item.price);
       const totalStr = formatCurrency(item.price * item.qty);
       const descLines = wrap(item.unitName ? `${item.name} (${item.unitName})` : item.name, descW);
-      text += row(String(item.qty), descLines[0] ?? "", priceStr, totalStr) + "\n";
+      text += row(descLines[0] ?? "", priceStr, String(item.qty), totalStr) + "\n";
       for (let i = 1; i < descLines.length; i++) {
-        text += row("", descLines[i], "", "") + "\n";
+        text += row(descLines[i], "", "", "") + "\n";
       }
     }
   });
