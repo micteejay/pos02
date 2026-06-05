@@ -8,6 +8,7 @@ import { ThemeProvider } from "./hooks/use-theme";
 import { AppSettingsProvider } from "./hooks/use-app-settings";
 import { AppEventsProvider } from "./hooks/use-app-events";
 import { SharedDataProvider } from "./hooks/use-shared-data";
+import { PermissionApprovalsProvider } from "./hooks/use-permission-approvals";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
 import CommandPalette from "./components/CommandPalette";
 import AIChatAssistant from "./components/AIChatAssistant";
@@ -121,6 +122,7 @@ const App = () => (
           <AppSettingsProvider>
             <AppEventsProvider>
               <SharedDataProvider>
+                <PermissionApprovalsProvider>
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
@@ -130,6 +132,7 @@ const App = () => (
                     <AIChatAssistant />
                   </BrowserRouter>
                 </TooltipProvider>
+                </PermissionApprovalsProvider>
               </SharedDataProvider>
             </AppEventsProvider>
           </AppSettingsProvider>
