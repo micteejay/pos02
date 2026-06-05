@@ -6,6 +6,7 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useStoreAccess } from "@/hooks/use-store-access";
 import { useAudit } from "@/hooks/use-audit";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissionApprovals } from "@/hooks/use-permission-approvals";
 import {
   Users, Shield, Plus, Search, MoreHorizontal, Mail, X, Check, Trash2, Edit2,
   ChevronRight, ChevronDown, Lock, Eye, EyeOff, UserPlus, Settings, AlertTriangle,
@@ -54,12 +55,49 @@ export default function UsersPage() {
   const { canCreateUsersForStore, getStoreOptionsForUserCreation, isAdminOrSuper } = useStoreAccess();
   const { logAction } = useAudit();
   const { user: authUser } = useAuth();
+  const { pending, isApprover, isSuperAdmin, submit, approve, reject } = usePermissionApprovals();
   const [tab, setTab] = useState<Tab>("users");
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddRole, setShowAddRole] = useState(false);
   const [editingRole, setEditingRole] = useState<AppRole | null>(null);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+
+  // Sensitive-change router: Super Admin applies directly; others submit a request.
+  const requestUserRoleChange = async (u: AppUser, newRole: string) => {
+    if (u.role === newRole) return;
+    if (isSuperAdmin) { await updateUser(u.id, { role: newRole as any }); return; }
+    await submit({
+      change_type: "user_role_change",
+      payload: { user_id: u.id, new_role: newRole, old_role: u.role },
+      summary: `Change ${u.name} from ${u.role} to ${newRole}`,
+    });
+  };
+  const requestUserStatusChange = async (u: AppUser, newStatus: string) => {
+    if (u.status === newStatus) return;
+    if (isSuperAdmin) { await updateUser(u.id, { status: newStatus as any }); return; }
+    await submit({
+      change_type: "user_status_change",
+      payload: { user_id: u.id, new_status: newStatus, old_status: u.status },
+      summary: `${newStatus === "suspended" ? "Suspend" : newStatus === "active" ? "Reactivate" : "Set inactive on"} ${u.name}`,
+    });
+  };
+  const requestRoleCreate = async (data: any) => {
+    if (isSuperAdmin) { await addRole(data); return; }
+    await submit({
+      change_type: "role_create",
+      payload: data,
+      summary: `Create role "${data.name}" with ${data.permissions?.length || 0} permissions`,
+    });
+  };
+  const requestRoleDelete = async (role: AppRole) => {
+    if (isSuperAdmin) { await deleteRole(role.id); return; }
+    await submit({
+      change_type: "role_delete",
+      payload: { role_id: role.id, name: role.name },
+      summary: `Delete role "${role.name}"`,
+    });
+  };
 
   const filteredUsers = useMemo(() =>
     users.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())),
@@ -110,6 +148,45 @@ export default function UsersPage() {
             </div>
           ))}
         </div>
+
+        {/* Pending permission-change requests (admins only) */}
+        {isApprover && pending.length > 0 && (
+          <div className="glass-card rounded-xl p-4 border border-warning/30">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              <h3 className="text-sm font-semibold text-foreground">Pending permission requests</h3>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-warning/10 text-warning">{pending.length}</span>
+            </div>
+            <div className="space-y-2">
+              {pending.map(r => {
+                const isOwn = r.requested_by === authUser?.id;
+                const canSelfApprove = !isOwn; // others not allowed to auto-approve their own
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-muted/30">
+                    <div className="min-w-0">
+                      <p className="text-sm text-foreground truncate">{r.summary}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Requested by {r.requested_by_name || "user"} · {new Date(r.created_at).toLocaleString()} · {r.change_type.replace(/_/g, " ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        disabled={!canSelfApprove}
+                        onClick={() => approve(r.id)}
+                        title={canSelfApprove ? "Approve" : "You can't approve your own request"}
+                        className="px-3 py-1.5 rounded-md bg-success text-success-foreground text-xs font-medium hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >Approve</button>
+                      <button
+                        onClick={() => reject(r.id)}
+                        className="px-3 py-1.5 rounded-md bg-destructive text-destructive-foreground text-xs font-medium hover:opacity-90"
+                      >Reject</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
@@ -174,6 +251,15 @@ export default function UsersPage() {
                         {hasPermission("users.delete") && user.id !== authUser?.id && (
                           <button onClick={() => { if (confirm(`Delete user "${user.name}"? This cannot be undone.`)) deleteUser(user.id); }} className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                         )}
+                        {hasPermission("users.edit") && user.id !== authUser?.id && (
+                          <button
+                            title={user.status === "suspended" ? "Reactivate" : "Suspend"}
+                            onClick={() => requestUserStatusChange(user, user.status === "suspended" ? "active" : "suspended")}
+                            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                          >
+                            <Lock className={`w-3.5 h-3.5 ${user.status === "suspended" ? "text-success" : "text-warning"}`} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -210,7 +296,7 @@ export default function UsersPage() {
                       <button onClick={() => setEditingRole(role)} className="p-1.5 rounded-md hover:bg-muted"><Edit2 className="w-4 h-4 text-muted-foreground" /></button>
                     )}
                     {hasPermission("roles.delete") && !role.isSystem && (
-                      <button onClick={() => deleteRole(role.id)} className="p-1.5 rounded-md hover:bg-destructive/10"><Trash2 className="w-4 h-4 text-destructive" /></button>
+                      <button onClick={() => { if (confirm(`${isSuperAdmin ? "Delete" : "Request deletion of"} role "${role.name}"?`)) requestRoleDelete(role); }} className="p-1.5 rounded-md hover:bg-destructive/10"><Trash2 className="w-4 h-4 text-destructive" /></button>
                     )}
                   </div>
                 </div>
@@ -290,7 +376,17 @@ export default function UsersPage() {
             storeNames={storeNames}
             departmentNames={departmentNames}
             isSelf={editingUser.id === authUser?.id}
-            onSave={(updates) => { updateUser(editingUser.id, updates); setEditingUser(null); }}
+            onSave={async (updates) => {
+              const u = editingUser;
+              const sensitive: Partial<typeof updates> = {};
+              const safe: any = { ...updates };
+              if (updates.role && updates.role !== u.role) { sensitive.role = updates.role; delete safe.role; }
+              if (updates.status && updates.status !== u.status) { sensitive.status = updates.status; delete safe.status; }
+              if (Object.keys(safe).length) await updateUser(u.id, safe);
+              if (sensitive.role) await requestUserRoleChange(u, sensitive.role as string);
+              if (sensitive.status) await requestUserStatusChange(u, sensitive.status as string);
+              setEditingUser(null);
+            }}
             onCancel={() => setEditingUser(null)}
           />
         </Modal>
@@ -298,8 +394,8 @@ export default function UsersPage() {
 
       {/* Add Role Modal */}
       {showAddRole && (
-        <Modal title="Create Role" onClose={() => setShowAddRole(false)}>
-          <RoleForm onSave={(data) => { addRole(data); setShowAddRole(false); }} onCancel={() => setShowAddRole(false)} />
+        <Modal title={isSuperAdmin ? "Create Role" : "Request New Role"} onClose={() => setShowAddRole(false)}>
+          <RoleForm onSave={async (data) => { await requestRoleCreate(data); setShowAddRole(false); }} onCancel={() => setShowAddRole(false)} />
         </Modal>
       )}
 

@@ -1306,6 +1306,57 @@ export type Database = {
           },
         ]
       }
+      permission_change_requests: {
+        Row: {
+          applied_at: string | null
+          change_type: string
+          company_id: string
+          created_at: string
+          id: string
+          payload: Json
+          requested_by: string
+          requested_by_name: string | null
+          review_notes: string | null
+          reviewed_by: string | null
+          reviewed_by_name: string | null
+          status: string
+          summary: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          change_type: string
+          company_id: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          requested_by?: string
+          requested_by_name?: string | null
+          review_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          status?: string
+          summary: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          change_type?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          payload?: Json
+          requested_by?: string
+          requested_by_name?: string | null
+          review_notes?: string | null
+          reviewed_by?: string | null
+          reviewed_by_name?: string | null
+          status?: string
+          summary?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar: string | null
