@@ -212,6 +212,15 @@ export default function UsersPage() {
                         {hasPermission("users.delete") && user.id !== authUser?.id && (
                           <button onClick={() => { if (confirm(`Delete user "${user.name}"? This cannot be undone.`)) deleteUser(user.id); }} className="p-1.5 rounded-md hover:bg-destructive/10 transition-colors"><Trash2 className="w-3.5 h-3.5 text-destructive" /></button>
                         )}
+                        {hasPermission("users.edit") && user.id !== authUser?.id && (
+                          <button
+                            title={user.status === "suspended" ? "Reactivate" : "Suspend"}
+                            onClick={() => requestUserStatusChange(user, user.status === "suspended" ? "active" : "suspended")}
+                            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                          >
+                            <Lock className={`w-3.5 h-3.5 ${user.status === "suspended" ? "text-success" : "text-warning"}`} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
