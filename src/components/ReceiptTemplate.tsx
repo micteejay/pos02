@@ -100,13 +100,12 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
   const ColumnHeader = () => (
     <>
-      <div className="grid grid-cols-[2ch_1fr_5ch_6ch] gap-1 text-[9px] uppercase tracking-wider font-bold text-muted-foreground mb-1">
-        <span className="text-right">QTY</span>
-        <span>DESCRIPTION</span>
-        <span className="text-right">PRICE</span>
-        <span className="text-right">TOTAL</span>
+      <div className="grid grid-cols-[1fr_6ch_4ch_7ch] gap-2 text-[11px] font-bold text-black mb-1">
+        <span>Desc</span>
+        <span className="text-right">UPrice</span>
+        <span className="text-right">Qty</span>
+        <span className="text-right">Amt</span>
       </div>
-      <div className={`border-t ${isThermal ? "border-dashed" : ""} border-border mb-1`} />
     </>
   );
 
