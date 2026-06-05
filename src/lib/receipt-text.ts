@@ -93,17 +93,17 @@ export function generateReceiptText(
   text += `Payment Method: ${methodLbl0}\n\n`;
   text += center(`Receipt No: ${sale.id}`) + "\n";
 
-  // Column widths — match the supermarket receipt layout: QTY | DESC | PRICE | TOTAL
-  const qtyW = 3;
-  const priceW = Math.max(8, Math.floor(width * 0.22));
-  const totalW = Math.max(9, Math.floor(width * 0.24));
-  const descW = Math.max(8, width - qtyW - priceW - totalW - 2); // 2 single-space gaps
+  // Column widths — Desc | UPrice | Qty | Amt (matches the printed template)
+  const priceW = Math.max(8, Math.floor(width * 0.20));
+  const qtyW = 4;
+  const totalW = Math.max(8, Math.floor(width * 0.20));
+  const descW = Math.max(8, width - priceW - qtyW - totalW - 3);
 
   const padRight = (s: string, w: number) => (s.length >= w ? s.slice(0, w) : s + " ".repeat(w - s.length));
   const padLeft = (s: string, w: number) => (s.length >= w ? s.slice(s.length - w) : " ".repeat(w - s.length) + s);
 
-  const row = (qty: string, desc: string, price: string, total: string) =>
-    padLeft(qty, qtyW) + " " + padRight(desc, descW) + " " + padLeft(price, priceW) + padLeft(total, totalW);
+  const row = (desc: string, price: string, qty: string, total: string) =>
+    padRight(desc, descW) + " " + padLeft(price, priceW) + " " + padLeft(qty, qtyW) + " " + padLeft(total, totalW);
 
   // Items — paginated into sections of PAGE_SIZE so long receipts repeat
   // the column header and stay readable when many items are printed.
