@@ -71,29 +71,27 @@ export function generateReceiptText(
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
 
-  // Title banner (CASH RECEIPT / INVOICE) then store details.
-  text += center(isInvoice ? "INVOICE" : "CASH RECEIPT") + "\n";
-  text += center(headerText) + "\n";
-
+  // Centered company header block matching the printed receipt template.
+  text += center(headerText.toUpperCase()) + "\n";
+  if (settings?.receiptTagline) {
+    for (const w of wrap(`... ${settings.receiptTagline}`, width)) text += center(w) + "\n";
+  }
   if (!isMinimal) {
     if (company?.address) {
       const addressLine = [company.address, company.city].filter(Boolean).join(", ");
       for (const w of wrap(addressLine, width)) text += center(w) + "\n";
     }
-    if (company?.phone) text += center(`Tel: ${company.phone}`) + "\n";
+    if (company?.phone) text += center(company.phone) + "\n";
   }
 
-  if (!isCompact) text += "\n";
+  text += "\n";
 
-  // Meta block: cashier / receipt id on the left, date/time on the right.
-  const dateStr = sale.date || "";
-  const [datePart, ...timeParts] = dateStr.split(",");
-  const timePart = timeParts.join(",").trim();
-  text += line(isInvoice ? `INVOICE: ${sale.id}` : `RECEIPT: ${sale.id}`, datePart || "") + "\n";
-  if (timePart) text += line("", `TIME: ${timePart}`) + "\n";
-  text += line(`CUSTOMER: ${sale.customer}`, "") + "\n";
-
-  text += isInvoice ? thickDivider + "\n" : divider + "\n";
+  if (sale.cashier) text += `Sales Rep/Cashier: ${sale.cashier}\n`;
+  if (sale.date) text += `Date: ${sale.date}\n`;
+  text += `Customer: ${sale.customer}\n`;
+  const methodLbl0 = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
+  text += `Payment Method: ${methodLbl0}\n\n`;
+  text += center(`Receipt No: ${sale.id}`) + "\n";
 
   // Column widths — match the supermarket receipt layout: QTY | DESC | PRICE | TOTAL
   const qtyW = 3;
