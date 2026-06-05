@@ -6,6 +6,7 @@ import { useSharedData } from "@/hooks/use-shared-data";
 import { useStoreAccess } from "@/hooks/use-store-access";
 import { useAudit } from "@/hooks/use-audit";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissionApprovals } from "@/hooks/use-permission-approvals";
 import {
   Users, Shield, Plus, Search, MoreHorizontal, Mail, X, Check, Trash2, Edit2,
   ChevronRight, ChevronDown, Lock, Eye, EyeOff, UserPlus, Settings, AlertTriangle,
@@ -54,12 +55,49 @@ export default function UsersPage() {
   const { canCreateUsersForStore, getStoreOptionsForUserCreation, isAdminOrSuper } = useStoreAccess();
   const { logAction } = useAudit();
   const { user: authUser } = useAuth();
+  const { pending, isApprover, isSuperAdmin, submit, approve, reject } = usePermissionApprovals();
   const [tab, setTab] = useState<Tab>("users");
   const [search, setSearch] = useState("");
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAddRole, setShowAddRole] = useState(false);
   const [editingRole, setEditingRole] = useState<AppRole | null>(null);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
+
+  // Sensitive-change router: Super Admin applies directly; others submit a request.
+  const requestUserRoleChange = async (u: AppUser, newRole: string) => {
+    if (u.role === newRole) return;
+    if (isSuperAdmin) { await updateUser(u.id, { role: newRole as any }); return; }
+    await submit({
+      change_type: "user_role_change",
+      payload: { user_id: u.id, new_role: newRole, old_role: u.role },
+      summary: `Change ${u.name} from ${u.role} to ${newRole}`,
+    });
+  };
+  const requestUserStatusChange = async (u: AppUser, newStatus: string) => {
+    if (u.status === newStatus) return;
+    if (isSuperAdmin) { await updateUser(u.id, { status: newStatus as any }); return; }
+    await submit({
+      change_type: "user_status_change",
+      payload: { user_id: u.id, new_status: newStatus, old_status: u.status },
+      summary: `${newStatus === "suspended" ? "Suspend" : newStatus === "active" ? "Reactivate" : "Set inactive on"} ${u.name}`,
+    });
+  };
+  const requestRoleCreate = async (data: any) => {
+    if (isSuperAdmin) { await addRole(data); return; }
+    await submit({
+      change_type: "role_create",
+      payload: data,
+      summary: `Create role "${data.name}" with ${data.permissions?.length || 0} permissions`,
+    });
+  };
+  const requestRoleDelete = async (role: AppRole) => {
+    if (isSuperAdmin) { await deleteRole(role.id); return; }
+    await submit({
+      change_type: "role_delete",
+      payload: { role_id: role.id, name: role.name },
+      summary: `Delete role "${role.name}"`,
+    });
+  };
 
   const filteredUsers = useMemo(() =>
     users.filter(u => !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())),
