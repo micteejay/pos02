@@ -238,7 +238,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <p className="text-black"><span className="font-semibold">Payment Method:</span> {methodLabel(sale.method)}</p>
       </div>
 
-      <p className="text-center text-black mb-1"><span className="font-semibold">Receipt No:</span> {sale.id}</p>
+      <p className="text-center text-black mb-1"><span className="font-semibold">{settings?.receiptNumberLabel || "Receipt No"}:</span> {sale.id}</p>
 
       {/* Column header */}
       <ColumnHeader />
