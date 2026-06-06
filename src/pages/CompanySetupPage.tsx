@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, CompanyProfile } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase } from "lucide-react";
 
@@ -10,9 +12,54 @@ const currencyMap: Record<string, string> = {
 };
 
 export default function CompanySetupPage() {
-  const { saveCompanyProfile } = useAuth();
+  const { saveCompanyProfile, user } = useAuth();
   const { updateSettings } = useAppSettings();
   const navigate = useNavigate();
+
+  // Staff users created under an existing company should never see the
+  // onboarding form. If we can find their company via any assignment,
+  // backfill the link and push them to the dashboard.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      // 1) Try stores assigned to this user
+      const { data: assignment } = await supabase
+        .from("user_store_assignments")
+        .select("store_id, stores(company_id)")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      const companyFromStore = (assignment as any)?.stores?.company_id;
+
+      // 2) Try profile.store_id / department_id
+      let inferredCompanyId: string | null = companyFromStore || null;
+      if (!inferredCompanyId) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("store_id, department_id")
+          .eq("id", user.id)
+          .maybeSingle();
+        if (prof?.store_id) {
+          const { data: s } = await supabase.from("stores").select("company_id").eq("id", prof.store_id).maybeSingle();
+          inferredCompanyId = s?.company_id || null;
+        }
+        if (!inferredCompanyId && prof?.department_id) {
+          const { data: d } = await supabase.from("departments").select("company_id").eq("id", prof.department_id).maybeSingle();
+          inferredCompanyId = d?.company_id || null;
+        }
+      }
+
+      if (cancelled) return;
+      if (inferredCompanyId) {
+        await supabase.from("profiles").update({ company_id: inferredCompanyId }).eq("id", user.id);
+        toast.success("Linked to your company — welcome!");
+        // Hard reload so AuthProvider re-fetches the company profile cleanly
+        window.location.replace("/");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<CompanyProfile>({
