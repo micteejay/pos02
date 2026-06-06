@@ -335,14 +335,7 @@ export default function SalesPage() {
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
               <button onClick={() => {
                 if (reprintSale) {
-                  const text = generateReceiptText(
-                    reprintSale,
-                    companyProfile,
-                    formatCurrency,
-                    settings,
-                    "Reprinted copy"
-                  );
-                  printText(text, `Receipt ${reprintSale.id}`);
+                  printNode(reprintRef.current, `Receipt ${reprintSale.id}`, { paperWidth: settings.paperWidth });
                 }
               }} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
                 <Printer className="w-4 h-4" /> Print
