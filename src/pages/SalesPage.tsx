@@ -7,8 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { toast } from "sonner";
-import { printNode, printText } from "@/lib/print";
-import { generateReceiptText } from "@/lib/receipt-text";
+import { printNode } from "@/lib/print";
 import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
 import EmptyState from "@/components/EmptyState";
 import TableSkeleton, { CardGridSkeleton } from "@/components/TableSkeleton";
@@ -335,14 +334,7 @@ export default function SalesPage() {
               <button onClick={() => setReprintSale(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
               <button onClick={() => {
                 if (reprintSale) {
-                  const text = generateReceiptText(
-                    reprintSale,
-                    companyProfile,
-                    formatCurrency,
-                    settings,
-                    "Reprinted copy"
-                  );
-                  printText(text, `Receipt ${reprintSale.id}`);
+                  printNode(reprintRef.current, `Receipt ${reprintSale.id}`, { paperWidth: settings.paperWidth });
                 }
               }} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
                 <Printer className="w-4 h-4" /> Print

@@ -12,8 +12,10 @@ export interface AppSettings {
   taxRate: number;
   receiptStyle: string;
   receiptHeader: string;
+  receiptTagline: string;
   receiptFooter: string;
   receiptReturnPolicy: string;
+  receiptNumberLabel: string;
   paperWidth: string;
   fontSize: string;
   showQRCode: boolean;
@@ -158,8 +160,10 @@ const allPermissions: Permission[] = [
 
 const defaultSettings: AppSettings = {
   appName: "Enterprise Hub", currency: "USD", currencySymbol: "$", taxRate: 8,
-  receiptStyle: "modern", receiptHeader: "", receiptFooter: "Thank you for your purchase!",
+  receiptStyle: "modern", receiptHeader: "", receiptTagline: "",
+  receiptFooter: "Thank you for your purchase!",
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
+  receiptNumberLabel: "Receipt No",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
   dateFormat: "MM/DD/YYYY", timeFormat: "12h",
@@ -307,8 +311,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             ...prev,
             receiptStyle: r.receiptStyle || prev.receiptStyle,
             receiptHeader: r.receiptHeader ?? prev.receiptHeader,
+            receiptTagline: r.receiptTagline ?? prev.receiptTagline,
             receiptFooter: r.receiptFooter ?? prev.receiptFooter,
             receiptReturnPolicy: r.receiptReturnPolicy ?? prev.receiptReturnPolicy,
+            receiptNumberLabel: r.receiptNumberLabel || prev.receiptNumberLabel,
             paperWidth: r.paperWidth || prev.paperWidth,
             fontSize: r.fontSize || prev.fontSize,
             showQRCode: r.showQRCode ?? prev.showQRCode,
@@ -411,7 +417,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const next = { ...prev, ...updates };
       // Persist to Supabase
       const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl", "dateFormat", "timeFormat"];
-      const receiptKeys = ["receiptStyle", "receiptHeader", "receiptFooter", "receiptReturnPolicy", "paperWidth", "fontSize", "showQRCode"];
+      const receiptKeys = ["receiptStyle", "receiptHeader", "receiptTagline", "receiptFooter", "receiptReturnPolicy", "receiptNumberLabel", "paperWidth", "fontSize", "showQRCode"];
       const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy", "autoLockScreen", "ipWhitelist", "maxLoginAttempts"];
       const notificationKeys = ["notifyEmail", "notifyPush", "notifySms", "notifyLowStock", "notifyNewOrder", "notifyApproval"];
       const businessKeys = ["lowStockThreshold", "autoReorderEnabled", "requireApprovalAbove", "defaultPaymentMethod", "allowNegativeStock"];
@@ -476,6 +482,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const addUser = useCallback(async (user: Omit<AppUser, "id"> & { password?: string; username?: string }): Promise<{ success: boolean; error?: string }> => {
     try {
+      if (!authUser?.companyId) {
+        return { success: false, error: "Your account is not linked to a company. Open Company Setup first." };
+      }
       const res = await supabase.functions.invoke("create-user", {
         body: {
           username: user.username || user.email,
@@ -484,7 +493,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           role: user.role,
           department: user.department,
           store: user.store,
-          companyId: authUser?.companyId || null,
+          companyId: authUser.companyId,
         },
       });
       if (res.error) {
@@ -512,7 +521,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       console.error("Failed to create user:", err);
       return { success: false, error: err?.message || "Failed to create user" };
     }
-  }, []);
+  }, [authUser?.companyId]);
 
   const updateUser = useCallback(async (id: string, updates: Partial<AppUser>) => {
     const payload: any = {};

@@ -7,8 +7,7 @@ import { useSharedData, type ItemUnit, type InventoryItem } from "@/hooks/use-sh
 import { useAuth } from "@/hooks/use-auth";
 import { useCustomers } from "@/hooks/use-customers";
 import CustomerPicker from "@/components/CustomerPicker";
-import { printNode, printText } from "@/lib/print";
-import { generateReceiptText } from "@/lib/receipt-text";
+import { printNode } from "@/lib/print";
 import ReceiptTemplate, { type ReceiptData } from "@/components/ReceiptTemplate";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { useBarcodeScanner } from "@/hooks/use-barcode-scanner";
@@ -556,13 +555,7 @@ export default function POSPage() {
               <button onClick={() => { setCompletedSale(null); setTimeout(() => searchInputRef.current?.focus(), 100); }} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">New Sale</button>
               <button
                 onClick={() => {
-                  const text = generateReceiptText(
-                    completedSale as ReceiptData,
-                    companyProfile,
-                    formatCurrency,
-                    settings
-                  );
-                  printText(text, `Receipt ${completedSale.id}`);
+                  printNode(receiptRef.current, `Receipt ${completedSale.id}`, { paperWidth: settings.paperWidth });
                 }}
                 className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1"
               >

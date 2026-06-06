@@ -660,6 +660,8 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-semibold text-foreground mb-4">Receipt Content</h3>
                   <div className="space-y-3">
                     <div><label className="text-xs font-medium text-muted-foreground">Header Text</label><Input value={settings.receiptHeader} onChange={(e) => updateSettings({ receiptHeader: e.target.value })} className="mt-1" /></div>
+                    <div><label className="text-xs font-medium text-muted-foreground">Tagline (under header)</label><Input value={settings.receiptTagline || ""} onChange={(e) => updateSettings({ receiptTagline: e.target.value })} placeholder="e.g. providing you with assorted drinks" className="mt-1" /></div>
+                    <div><label className="text-xs font-medium text-muted-foreground">Receipt Number Label</label><Input value={settings.receiptNumberLabel || ""} onChange={(e) => updateSettings({ receiptNumberLabel: e.target.value })} placeholder="Receipt No" className="mt-1" /></div>
                     <div><label className="text-xs font-medium text-muted-foreground">Footer Message</label><Input value={settings.receiptFooter} onChange={(e) => updateSettings({ receiptFooter: e.target.value })} className="mt-1" /></div>
                     <div><label className="text-xs font-medium text-muted-foreground">Return Policy Note</label><Input value={settings.receiptReturnPolicy} onChange={(e) => updateSettings({ receiptReturnPolicy: e.target.value })} className="mt-1" /></div>
                   </div>
@@ -669,7 +671,9 @@ export default function SettingsPage() {
                   <div className="space-y-3">
                     <div><label className="text-xs font-medium text-muted-foreground">Paper Width</label>
                       <select value={settings.paperWidth} onChange={(e) => updateSettings({ paperWidth: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                        <option>80mm (Standard)</option><option>58mm (Compact)</option><option>A4 (Full Page)</option>
+                        <option value="80mm">80mm (Standard thermal)</option>
+                        <option value="58mm">58mm (Compact thermal)</option>
+                        <option value="A4">A4 (Full page)</option>
                       </select>
                     </div>
                     <div><label className="text-xs font-medium text-muted-foreground">Font Size</label>
