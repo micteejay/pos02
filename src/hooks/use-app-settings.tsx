@@ -12,8 +12,10 @@ export interface AppSettings {
   taxRate: number;
   receiptStyle: string;
   receiptHeader: string;
+  receiptTagline: string;
   receiptFooter: string;
   receiptReturnPolicy: string;
+  receiptNumberLabel: string;
   paperWidth: string;
   fontSize: string;
   showQRCode: boolean;
