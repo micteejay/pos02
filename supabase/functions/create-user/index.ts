@@ -72,8 +72,32 @@ Deno.serve(async (req) => {
       companyId = callerProfile?.company_id || null;
     }
 
-    // Update profile with name and company_id (trigger should have created it)
-    await adminClient.from("profiles").update({ name, email, company_id: companyId }).eq("id", userId);
+    if (!companyId) {
+      // Roll back the orphan auth user so the admin can retry cleanly.
+      await adminClient.auth.admin.deleteUser(userId);
+      return new Response(
+        JSON.stringify({ error: "Your account is not linked to a company. Open Company Setup first, then create users." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Update profile with name and company_id (trigger should have created it).
+    // We retry briefly because the auth → profiles trigger is async.
+    let profileUpdated = false;
+    for (let attempt = 0; attempt < 5 && !profileUpdated; attempt++) {
+      const { error: updErr, data: updRow } = await adminClient
+        .from("profiles")
+        .update({ name, email, company_id: companyId })
+        .eq("id", userId)
+        .select("id")
+        .maybeSingle();
+      if (!updErr && updRow) { profileUpdated = true; break; }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    if (!profileUpdated) {
+      // Fallback: insert the row directly if the trigger never fired.
+      await adminClient.from("profiles").upsert({ id: userId, name, email, company_id: companyId });
+    }
 
     // Assign role if specified
     if (role) {
