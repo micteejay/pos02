@@ -671,7 +671,9 @@ export default function SettingsPage() {
                   <div className="space-y-3">
                     <div><label className="text-xs font-medium text-muted-foreground">Paper Width</label>
                       <select value={settings.paperWidth} onChange={(e) => updateSettings({ paperWidth: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                        <option>80mm (Standard)</option><option>58mm (Compact)</option><option>A4 (Full Page)</option>
+                        <option value="80mm">80mm (Standard thermal)</option>
+                        <option value="58mm">58mm (Compact thermal)</option>
+                        <option value="A4">A4 (Full page)</option>
                       </select>
                     </div>
                     <div><label className="text-xs font-medium text-muted-foreground">Font Size</label>
