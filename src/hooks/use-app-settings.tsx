@@ -160,8 +160,10 @@ const allPermissions: Permission[] = [
 
 const defaultSettings: AppSettings = {
   appName: "Enterprise Hub", currency: "USD", currencySymbol: "$", taxRate: 8,
-  receiptStyle: "modern", receiptHeader: "", receiptFooter: "Thank you for your purchase!",
+  receiptStyle: "modern", receiptHeader: "", receiptTagline: "",
+  receiptFooter: "Thank you for your purchase!",
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",
+  receiptNumberLabel: "Receipt No",
   paperWidth: "80mm", fontSize: "Medium", showQRCode: true, language: "en",
   timezone: "UTC-05:00 Eastern", logoUrl: "",
   dateFormat: "MM/DD/YYYY", timeFormat: "12h",
