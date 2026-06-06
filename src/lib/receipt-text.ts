@@ -91,7 +91,8 @@ export function generateReceiptText(
   text += `Customer: ${sale.customer}\n`;
   const methodLbl0 = sale.method === "card" ? "Credit Card" : sale.method === "cash" ? "Cash" : sale.method === "mobile" ? "Mobile Pay" : sale.method;
   text += `Payment Method: ${methodLbl0}\n\n`;
-  text += center(`Receipt No: ${sale.id}`) + "\n";
+  const numberLabel = settings?.receiptNumberLabel || "Receipt No";
+  text += center(`${numberLabel}: ${sale.id}`) + "\n";
 
   // Column widths — Desc | UPrice | Qty | Amt (matches the printed template)
   const priceW = Math.max(8, Math.floor(width * 0.20));
