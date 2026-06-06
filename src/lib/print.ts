@@ -27,7 +27,22 @@ function getSelectedPrinter(): string {
  * Build a minimal standalone HTML string from a DOM node.
  * Captures computed CSS variables from :root so colors render correctly.
  */
-function nodeToHtml(node: HTMLElement, title: string): string {
+function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): string {
+  // Translate user-facing paper width into a CSS page size
+  const pageSize = (() => {
+    const pw = (paperWidth || "").toLowerCase();
+    if (pw.includes("58")) return "58mm auto";
+    if (pw.includes("80")) return "80mm auto";
+    if (pw.includes("a4")) return "A4";
+    return "auto";
+  })();
+  const bodyMaxWidth = (() => {
+    const pw = (paperWidth || "").toLowerCase();
+    if (pw.includes("58")) return "58mm";
+    if (pw.includes("80")) return "80mm";
+    if (pw.includes("a4")) return "210mm";
+    return "100%";
+  })();
   // Inline ALL stylesheets (resolved to absolute URLs) so Tailwind/utility
   // classes still apply inside the iframe/print window. Inline <style> blocks
   // are copied verbatim; <link rel="stylesheet"> is rewritten with an absolute
@@ -55,6 +70,10 @@ function nodeToHtml(node: HTMLElement, title: string): string {
   <base href="${base}" />
   ${styleLinks}
   <style>
+    /* Paper / page sizing — driven by Settings → Receipt → Paper Width */
+    @page { size: ${pageSize}; margin: 2mm; }
+    html, body { width: ${bodyMaxWidth} !important; max-width: ${bodyMaxWidth} !important; }
+    .receipt-container { width: 100% !important; max-width: 100% !important; }
     /* Override all theme colors with black for printing */
     :root { 
       --background: 255 255 255;
@@ -140,7 +159,8 @@ function nodeToHtml(node: HTMLElement, title: string): string {
  */
 export async function printNode(
   node: HTMLElement | null,
-  title = "Print"
+  title = "Print",
+  opts?: { paperWidth?: string }
 ): Promise<void> {
   if (!node) return;
 
@@ -149,7 +169,7 @@ export async function printNode(
   // --- Path 1: Silent native print via tauri-plugin-printer-v2 ---
   if (isTauri() && selectedPrinter) {
     try {
-      const html = nodeToHtml(node, title);
+      const html = nodeToHtml(node, title, opts?.paperWidth);
       await printHtml({ id: `pos-${Date.now()}`, html, printer: selectedPrinter } as any);
       return; // done — completely silent
     } catch (err) {
@@ -159,7 +179,7 @@ export async function printNode(
   }
 
   // --- Path 2: Fallback ---
-  const html = nodeToHtml(node, title);
+  const html = nodeToHtml(node, title, opts?.paperWidth);
   await printHtmlString(html, title);
 }
 
