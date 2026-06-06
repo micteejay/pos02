@@ -311,8 +311,10 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             ...prev,
             receiptStyle: r.receiptStyle || prev.receiptStyle,
             receiptHeader: r.receiptHeader ?? prev.receiptHeader,
+            receiptTagline: r.receiptTagline ?? prev.receiptTagline,
             receiptFooter: r.receiptFooter ?? prev.receiptFooter,
             receiptReturnPolicy: r.receiptReturnPolicy ?? prev.receiptReturnPolicy,
+            receiptNumberLabel: r.receiptNumberLabel || prev.receiptNumberLabel,
             paperWidth: r.paperWidth || prev.paperWidth,
             fontSize: r.fontSize || prev.fontSize,
             showQRCode: r.showQRCode ?? prev.showQRCode,
@@ -415,7 +417,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const next = { ...prev, ...updates };
       // Persist to Supabase
       const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl", "dateFormat", "timeFormat"];
-      const receiptKeys = ["receiptStyle", "receiptHeader", "receiptFooter", "receiptReturnPolicy", "paperWidth", "fontSize", "showQRCode"];
+      const receiptKeys = ["receiptStyle", "receiptHeader", "receiptTagline", "receiptFooter", "receiptReturnPolicy", "receiptNumberLabel", "paperWidth", "fontSize", "showQRCode"];
       const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy", "autoLockScreen", "ipWhitelist", "maxLoginAttempts"];
       const notificationKeys = ["notifyEmail", "notifyPush", "notifySms", "notifyLowStock", "notifyNewOrder", "notifyApproval"];
       const businessKeys = ["lowStockThreshold", "autoReorderEnabled", "requireApprovalAbove", "defaultPaymentMethod", "allowNegativeStock"];
