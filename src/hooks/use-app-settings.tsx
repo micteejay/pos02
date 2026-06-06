@@ -482,6 +482,9 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
 
   const addUser = useCallback(async (user: Omit<AppUser, "id"> & { password?: string; username?: string }): Promise<{ success: boolean; error?: string }> => {
     try {
+      if (!authUser?.companyId) {
+        return { success: false, error: "Your account is not linked to a company. Open Company Setup first." };
+      }
       const res = await supabase.functions.invoke("create-user", {
         body: {
           username: user.username || user.email,
@@ -490,7 +493,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
           role: user.role,
           department: user.department,
           store: user.store,
-          companyId: authUser?.companyId || null,
+          companyId: authUser.companyId,
         },
       });
       if (res.error) {
@@ -518,7 +521,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       console.error("Failed to create user:", err);
       return { success: false, error: err?.message || "Failed to create user" };
     }
-  }, []);
+  }, [authUser?.companyId]);
 
   const updateUser = useCallback(async (id: string, updates: Partial<AppUser>) => {
     const payload: any = {};
