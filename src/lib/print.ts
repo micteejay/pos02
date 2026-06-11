@@ -43,6 +43,10 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
     if (pw.includes("a4")) return "210mm";
     return "100%";
   })();
+
+  const pw = (paperWidth || "").toLowerCase();
+  const isThermal = pw.includes("58") || pw.includes("80");
+
   // Inline ALL stylesheets (resolved to absolute URLs) so Tailwind/utility
   // classes still apply inside the iframe/print window. Inline <style> blocks
   // are copied verbatim; <link rel="stylesheet"> is rewritten with an absolute
@@ -71,7 +75,7 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
   ${styleLinks}
   <style>
     /* Paper / page sizing — driven by Settings → Receipt → Paper Width */
-    @page { size: ${pageSize}; margin: 2mm; }
+    @page { size: ${pageSize}; margin: ${isThermal ? "2mm" : "12mm"}; }
     html, body { width: ${bodyMaxWidth} !important; max-width: ${bodyMaxWidth} !important; }
     .receipt-container { width: 100% !important; max-width: 100% !important; }
     /* Override all theme colors with black for printing */
@@ -86,13 +90,14 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
     }
     
     html, body {
-      margin: 0; padding: 4px;
+      margin: 0; padding: ${isThermal ? "4px" : "0"};
       width: 100%; max-width: 100%;
       background: #fff !important; color: #000 !important;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+      ${isThermal ? 'font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;' : ''}
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     
+    ${isThermal ? `
     /* Thermal Printer Anti-Blur Optimizations */
     * {
       color: #000 !important; /* Force pure black to prevent dithering */
@@ -119,6 +124,7 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
     .text-\\[10px\\] { font-size: 12px !important; line-height: 1.2 !important; }
     .text-xs { font-size: 13px !important; line-height: 1.3 !important; }
     .text-sm { font-size: 14px !important; line-height: 1.4 !important; }
+    ` : ''}
     
     @media print { .no-print { display: none !important; } }
 
@@ -127,6 +133,7 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
      * Single source of truth for page margins and outer spacing so
      * both templates render with identical geometry on every printer.
      * ============================================================ */
+    ${!isThermal ? `
     @page { size: A4; margin: 12mm; }
     .print-doc {
       box-sizing: border-box;
@@ -147,6 +154,7 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
       .print-doc { page-break-inside: auto; }
       .print-doc tr, .print-doc td { page-break-inside: avoid; }
     }
+    ` : ''}
   </style>
 </head>
 <body>${node.outerHTML}</body>

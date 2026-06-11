@@ -100,11 +100,18 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
   const ColumnHeader = () => (
     <>
-      <div className="grid grid-cols-[1fr_6ch_4ch_7ch] gap-2 text-[11px] font-bold text-black mb-1">
-        <span>Desc</span>
-        <span className="text-right">UPrice</span>
-        <span className="text-right">Qty</span>
-        <span className="text-right">Amt</span>
+      <div 
+        className="text-[11px] font-bold text-black mb-1"
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 9ch 4ch 9ch",
+          gap: "8px",
+        }}
+      >
+        <span style={{ textAlign: "left" }}>Desc</span>
+        <span style={{ textAlign: "right" }}>UPrice</span>
+        <span style={{ textAlign: "right" }}>Qty</span>
+        <span style={{ textAlign: "right" }}>Amt</span>
       </div>
     </>
   );
@@ -261,15 +268,20 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             {chunk.map((item, i) => (
               <div
                 key={item.lineKey || `${item.name}-${startIdx + i}`}
-                className="grid grid-cols-[1fr_6ch_4ch_7ch] gap-2 text-black py-[2px] items-start break-inside-avoid"
+                className="text-black py-[2px] items-start break-inside-avoid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 9ch 4ch 9ch",
+                  gap: "8px",
+                }}
               >
-                <span className="break-words leading-tight text-left">
+                <span className="break-words leading-tight" style={{ textAlign: "left" }}>
                   {item.name}
                   {item.unitName ? ` (${item.unitName})` : ""}
                 </span>
-                <span className="text-right tabular-nums">{formatCurrency(item.price)}</span>
-                <span className="text-right tabular-nums">{item.qty}</span>
-                <span className="text-right tabular-nums">{formatCurrency(item.price * item.qty)}</span>
+                <span className="tabular-nums" style={{ textAlign: "right" }}>{formatCurrency(item.price)}</span>
+                <span className="tabular-nums" style={{ textAlign: "right" }}>{item.qty}</span>
+                <span className="tabular-nums" style={{ textAlign: "right" }}>{formatCurrency(item.price * item.qty)}</span>
               </div>
             ))}
           </Fragment>
