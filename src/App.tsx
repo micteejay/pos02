@@ -19,6 +19,7 @@ import PermissionGuard from "./components/PermissionGuard";
 import type { Permission } from "./hooks/use-app-settings";
 
 // Tauri Updater imports
+import { isTauri } from "@tauri-apps/api/core";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
@@ -123,6 +124,7 @@ const App = () => {
   useEffect(() => {
     const checkForUpdates = async () => {
       try {
+        if (!isTauri()) return;
         const update = await check();
         if (update) {
           sonnerToast(`Update available: ${update.version}`, {

@@ -11,6 +11,7 @@ import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, Plus, Trash2, ArrowUp, ArrowDown,
   Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi, Printer, RefreshCw, CheckCircle2,
 } from "lucide-react";
+import { isTauri } from "@tauri-apps/api/core";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
@@ -217,6 +218,10 @@ export default function SettingsPage() {
 
   const handleManualUpdateCheck = async () => {
     try {
+      if (!isTauri()) {
+        toast.info("Application updates are only available in the desktop app.");
+        return;
+      }
       toast.loading("Checking for updates...", { id: "update-check" });
       const update = await check();
       if (update) {

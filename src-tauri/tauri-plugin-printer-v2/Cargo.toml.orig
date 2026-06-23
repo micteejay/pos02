@@ -1,0 +1,24 @@
+[package]
+name = "tauri-plugin-printer-v2"
+version = "0.2.4"
+authors = [ "chen-collab" ]
+description = "Tauri plugin for printing"
+edition = "2021"
+rust-version = "1.77.2"
+exclude = ["/examples", "/dist-js",  "/node_modules"]
+links = "tauri-plugin-printer"
+license = "MIT"
+repository = "https://github.com/chen-collab/tauri-plugin-printer"
+keywords = ["tauri", "plugin", "printer"]
+categories = ["api-bindings", "development-tools"]
+email = "18668070425@163.com"
+
+[dependencies]
+tauri = { version = "2.7.0" }
+serde = "1.0"
+thiserror = "2"
+base64 = "0.22"
+tempfile = "3.8"
+
+[build-dependencies]
+tauri-plugin = { version = "2.3.1", features = ["build"] }
