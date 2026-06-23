@@ -34,6 +34,7 @@ export interface AppSettings {
   // Notification preferences
   notifyEmail: boolean;
   notifyPush: boolean;
+  notifyInApp: boolean;
   notifySms: boolean;
   notifyLowStock: boolean;
   notifyNewOrder: boolean;
@@ -169,7 +170,7 @@ const defaultSettings: AppSettings = {
   dateFormat: "MM/DD/YYYY", timeFormat: "12h",
   twoFactorEnabled: false, sessionTimeout: "30 minutes", passwordPolicy: "Strong (12+ chars, mixed case, symbols)",
   autoLockScreen: false, ipWhitelist: "", maxLoginAttempts: 5,
-  notifyEmail: true, notifyPush: true, notifySms: false,
+  notifyEmail: true, notifyPush: true, notifyInApp: true, notifySms: false,
   notifyLowStock: true, notifyNewOrder: true, notifyApproval: true,
   lowStockThreshold: 10, autoReorderEnabled: false, requireApprovalAbove: 5000,
   defaultPaymentMethod: "cash", allowNegativeStock: false,
@@ -338,6 +339,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
             ...prev,
             notifyEmail: n.notifyEmail ?? prev.notifyEmail,
             notifyPush: n.notifyPush ?? prev.notifyPush,
+            notifyInApp: n.notifyInApp ?? prev.notifyInApp,
             notifySms: n.notifySms ?? prev.notifySms,
             notifyLowStock: n.notifyLowStock ?? prev.notifyLowStock,
             notifyNewOrder: n.notifyNewOrder ?? prev.notifyNewOrder,
@@ -419,7 +421,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       const generalKeys = ["appName", "currency", "currencySymbol", "taxRate", "language", "timezone", "logoUrl", "dateFormat", "timeFormat"];
       const receiptKeys = ["receiptStyle", "receiptHeader", "receiptTagline", "receiptFooter", "receiptReturnPolicy", "receiptNumberLabel", "paperWidth", "fontSize", "showQRCode"];
       const securityKeys = ["twoFactorEnabled", "sessionTimeout", "passwordPolicy", "autoLockScreen", "ipWhitelist", "maxLoginAttempts"];
-      const notificationKeys = ["notifyEmail", "notifyPush", "notifySms", "notifyLowStock", "notifyNewOrder", "notifyApproval"];
+      const notificationKeys = ["notifyEmail", "notifyPush", "notifyInApp", "notifySms", "notifyLowStock", "notifyNewOrder", "notifyApproval"];
       const businessKeys = ["lowStockThreshold", "autoReorderEnabled", "requireApprovalAbove", "defaultPaymentMethod", "allowNegativeStock"];
       const dataKeys = ["auditRetentionDays", "autoBackupEnabled", "backupFrequency", "dataExportFormat"];
 
@@ -642,6 +644,7 @@ export function AppSettingsProvider({ children }: { children: ReactNode }) {
       settings.notifyNewOrder,
       settings.notifyApproval,
       settings.notifyPush,
+      settings.notifyInApp,
       settings.notifySms,
       settings.notifyEmail,
     ],

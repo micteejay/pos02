@@ -27,3 +27,29 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+
+        // Configure Kotlin compilation target dynamically to match Java 17
+        project.tasks.configureEach { task ->
+            if (task.class.name.contains('KotlinCompile') || task.class.name.contains('KotlinJvmCompile')) {
+                try {
+                    task.kotlinOptions {
+                        jvmTarget = '17'
+                    }
+                } catch (Exception e) {
+                    // Fallback or ignore
+                }
+            }
+        }
+    }
+}

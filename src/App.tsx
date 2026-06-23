@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast as sonnerToast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -16,6 +17,10 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import LoadingFallback from "./components/LoadingFallback";
 import PermissionGuard from "./components/PermissionGuard";
 import type { Permission } from "./hooks/use-app-settings";
+
+// Tauri Updater imports
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 // Lazy-loaded pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -114,32 +119,76 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppSettingsProvider>
-            <AppEventsProvider>
-              <SharedDataProvider>
-                <PermissionApprovalsProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <Sonner />
-                  <BrowserRouter>
-                    <CommandPalette />
-                    <AppRoutes />
-                    <AIChatAssistant />
-                  </BrowserRouter>
-                </TooltipProvider>
-                </PermissionApprovalsProvider>
-              </SharedDataProvider>
-            </AppEventsProvider>
-          </AppSettingsProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
-);
+const App = () => {
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const update = await check();
+        if (update) {
+          sonnerToast(`Update available: ${update.version}`, {
+            duration: 10000,
+            action: {
+              label: "Update & Restart",
+              onClick: async () => {
+                let downloaded = 0;
+                let contentLength = 0;
+                sonnerToast.loading("Downloading update...");
+                
+                await update.downloadAndInstall((event) => {
+                  switch (event.event) {
+                    case 'Started':
+                      contentLength = event.data.contentLength || 0;
+                      break;
+                    case 'Progress':
+                      downloaded += event.data.chunkLength;
+                      console.log(`Downloaded ${downloaded} of ${contentLength}`);
+                      break;
+                    case 'Finished':
+                      sonnerToast.success("Update installed, restarting...");
+                      break;
+                  }
+                });
+                
+                await relaunch();
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Failed to check for updates on startup:", error);
+      }
+    };
+    
+    checkForUpdates();
+  }, []);
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppSettingsProvider>
+              <AppEventsProvider>
+                <SharedDataProvider>
+                  <PermissionApprovalsProvider>
+                  <TooltipProvider>
+                    <Toaster />
+                    <Sonner />
+                    <BrowserRouter>
+                      <CommandPalette />
+                      <AppRoutes />
+                      <AIChatAssistant />
+                    </BrowserRouter>
+                  </TooltipProvider>
+                  </PermissionApprovalsProvider>
+                </SharedDataProvider>
+              </AppEventsProvider>
+            </AppSettingsProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

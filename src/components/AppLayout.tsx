@@ -4,6 +4,7 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "sonner";
 import { Menu, Building2 } from "lucide-react";
+import PrintActionsSheet from "./PrintActionsSheet";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -40,9 +41,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Menu className="w-5 h-5 text-foreground" />
         </button>
         <div className="flex items-center gap-2 ml-3">
-          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-xs">{settings.appName.charAt(0)}</span>
-          </div>
+          {settings.logoUrl || "/logo.png" ? (
+            <img src={settings.logoUrl || "/logo.png"} alt="Logo" className="w-7 h-7 rounded-lg object-cover" />
+          ) : (
+            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-xs">{settings.appName.charAt(0)}</span>
+            </div>
+          )}
           <span className="text-sm font-semibold text-foreground">{settings.appName}</span>
         </div>
         {companyProfile?.name && (
@@ -79,6 +84,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <main className="lg:ml-[260px] transition-all duration-300 p-4 pt-16 sm:p-6 sm:pt-20 lg:p-8 lg:pt-16">
         {children}
       </main>
+      <PrintActionsSheet />
     </div>
   );
 }

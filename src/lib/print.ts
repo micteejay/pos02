@@ -8,6 +8,7 @@
  *  2. Otherwise, fall back to the CSS in-page print dialog (window.print).
  */
 import { printHtml } from "tauri-plugin-printer-v2";
+import { Capacitor } from "@capacitor/core";
 
 /** Check if we're running inside Tauri */
 function isTauri(): boolean {
@@ -168,9 +169,24 @@ function nodeToHtml(node: HTMLElement, title: string, paperWidth?: string): stri
 export async function printNode(
   node: HTMLElement | null,
   title = "Print",
-  opts?: { paperWidth?: string }
+  opts?: { paperWidth?: string; bypassIntercept?: boolean }
 ): Promise<void> {
   if (!node) return;
+
+  // Intercept on Capacitor Native Platform to show the Share/Download bottom sheet
+  if (Capacitor.isNativePlatform() && !opts?.bypassIntercept) {
+    window.dispatchEvent(
+      new CustomEvent("app:show-print-sheet", {
+        detail: {
+          node,
+          html: nodeToHtml(node, title, opts?.paperWidth),
+          title,
+          opts,
+        },
+      })
+    );
+    return;
+  }
 
   const selectedPrinter = getSelectedPrinter();
 
@@ -242,8 +258,22 @@ export async function printText(
  */
 export async function printHtmlString(
   html: string,
-  title = "Print"
+  title = "Print",
+  bypassIntercept = false
 ): Promise<void> {
+  // Intercept on Capacitor Native Platform to show the Share/Download bottom sheet
+  if (Capacitor.isNativePlatform() && !bypassIntercept) {
+    window.dispatchEvent(
+      new CustomEvent("app:show-print-sheet", {
+        detail: {
+          html,
+          title,
+        },
+      })
+    );
+    return;
+  }
+
   const selectedPrinter = getSelectedPrinter();
 
   // --- Path 1: Silent native print ---

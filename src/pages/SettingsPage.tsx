@@ -11,6 +11,8 @@ import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, Plus, Trash2, ArrowUp, ArrowDown,
   Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi, Printer, RefreshCw, CheckCircle2,
 } from "lucide-react";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 type Tab = "general" | "business" | "receipt" | "integrations" | "security" | "data" | "workflows";
 
@@ -92,9 +94,13 @@ function ReceiptPreview({ style, settings, formatCurrency }: ReceiptPreviewProps
       {(isModern || isBranded) && <div className="h-1 rounded-full bg-primary mb-3" />}
       <div className={`${isMinimal ? "text-left" : "text-center"} mb-3`}>
         {!isMinimal && !isCompact && (
-          <div className={`w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm ${isMinimal ? "" : "mx-auto"} mb-1`}>
-            {settings.appName.charAt(0)}
-          </div>
+          settings.logoUrl || "/logo.png" ? (
+            <img src={settings.logoUrl || "/logo.png"} alt="Logo" className={`w-8 h-8 rounded-lg object-cover ${isMinimal ? "" : "mx-auto"} mb-1`} />
+          ) : (
+            <div className={`w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold text-sm ${isMinimal ? "" : "mx-auto"} mb-1`}>
+              {settings.appName.charAt(0)}
+            </div>
+          )
         )}
         <p className="font-bold text-foreground text-xs">{settings.receiptHeader || settings.appName}</p>
         {!isCompact && <p className="text-muted-foreground">123 Main St, Metro City</p>}
@@ -207,6 +213,32 @@ export default function SettingsPage() {
     logAction("settings.update", "Settings", "all", "Settings saved");
     toast.success("Settings saved successfully");
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleManualUpdateCheck = async () => {
+    try {
+      toast.loading("Checking for updates...", { id: "update-check" });
+      const update = await check();
+      if (update) {
+        toast.dismiss("update-check");
+        toast(`Update available: ${update.version}`, {
+          duration: 10000,
+          action: {
+            label: "Install",
+            onClick: async () => {
+              toast.loading("Installing update...");
+              await update.downloadAndInstall();
+              await relaunch();
+            }
+          }
+        });
+      } else {
+        toast.success("You are on the latest version", { id: "update-check" });
+      }
+    } catch (err) {
+      toast.error("Failed to check for updates", { id: "update-check" });
+      console.error(err);
+    }
   };
 
   // Active sessions
@@ -433,8 +465,8 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center gap-6 mb-4">
                 <div className="w-20 h-20 rounded-2xl bg-primary/10 border-2 border-dashed border-primary/30 flex items-center justify-center overflow-hidden">
-                  {settings.logoUrl ? (
-                    <img src={settings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  {settings.logoUrl || "/logo.png" ? (
+                    <img src={settings.logoUrl || "/logo.png"} alt="Logo" className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-2xl font-bold text-primary">{settings.appName.charAt(0)}</span>
                   )}
@@ -546,7 +578,8 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {([
                   { key: "notifyEmail" as const, label: "Email", desc: "Receive updates via email" },
-                  { key: "notifyPush" as const, label: "Push", desc: "Browser push notifications" },
+                  { key: "notifyPush" as const, label: "Push Notifications", desc: "Show native device banners" },
+                  { key: "notifyInApp" as const, label: "In-App Notifications", desc: "Show alerts in notification center" },
                   { key: "notifySms" as const, label: "SMS Alerts", desc: "Critical alerts via SMS" },
                   { key: "notifyLowStock" as const, label: "Low Stock", desc: "Alert when stock is low" },
                   { key: "notifyNewOrder" as const, label: "New Orders", desc: "Notify on new orders" },
@@ -556,6 +589,23 @@ export default function SettingsPage() {
                     <ToggleSwitch enabled={settings[n.key]} onToggle={() => updateSettings({ [n.key]: !settings[n.key] })} />
                   </SettingRow>
                 ))}
+              </div>
+            </div>
+
+            {/* Application Updates */}
+            <div className="glass-card rounded-xl p-6 lg:col-span-2">
+              <div className="flex items-center gap-2 mb-4">
+                <RefreshCw className="w-4 h-4 text-primary" />
+                <h3 className="text-sm font-semibold text-foreground">Application Updates</h3>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Version {settings.version || "0.1.0"}</p>
+                  <p className="text-xs text-muted-foreground">Check for and install the latest updates.</p>
+                </div>
+                <button onClick={handleManualUpdateCheck} className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-lg text-sm font-medium">
+                  Check for Updates
+                </button>
               </div>
             </div>
           </div>

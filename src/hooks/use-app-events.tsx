@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { formatAppDate } from "@/lib/format-date";
+import { LocalNotifications } from "@capacitor/local-notifications";
+import { Capacitor } from "@capacitor/core";
 
 export type NotificationType = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
 
@@ -144,6 +146,17 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
     fetchWorkflowConfig();
   }, []);
 
+  // Request native local notifications permissions on setup
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      LocalNotifications.requestPermissions().then((status) => {
+        console.log("[Notifications] Permission status:", status.display);
+      }).catch(err => {
+        console.error("[Notifications] Permission request failed:", err);
+      });
+    }
+  }, []);
+
   // Fetch notifications and approvals from Supabase
   useEffect(() => {
     if (!user) return;
@@ -208,11 +221,30 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       .channel("notifications-realtime")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
         const n = payload.new as any;
-        setNotifications(prev => [{
-          id: n.id, type: n.type, title: n.title, message: n.message || "",
-          time: "Just now", read: false, link: n.link || undefined,
-          targetRoles: n.target_roles || undefined,
-        }, ...prev]);
+        // Respect in-app notification preference
+        if (settings.notifyInApp) {
+          setNotifications(prev => [{
+            id: n.id, type: n.type, title: n.title, message: n.message || "",
+            time: "Just now", read: false, link: n.link || undefined,
+            targetRoles: n.target_roles || undefined,
+          }, ...prev]);
+        }
+
+        // Trigger native local notification if enabled in push settings
+        if (Capacitor.isNativePlatform() && settings.notifyPush && shouldSendNotification(n.type)) {
+          LocalNotifications.schedule({
+            notifications: [
+              {
+                title: n.title,
+                body: n.message || "",
+                id: Math.floor(Math.random() * 100000),
+                schedule: { at: new Date(Date.now() + 50) },
+              }
+            ]
+          }).catch((err) => {
+            console.error("[Notifications] Schedule failed:", err);
+          });
+        }
       })
       .subscribe();
 
