@@ -23,6 +23,10 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const checkForUpdates = async () => {
       if (!isTauri()) return;
+      if (import.meta.env.DEV) {
+        console.log("Skipping automatic update check in development mode");
+        return;
+      }
       try {
         setIsChecking(true);
         const u = await check();
@@ -32,7 +36,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
           toast(`New update available: ${u.version}`, { duration: 5000 });
         }
       } catch (error) {
-        console.error("Failed to check for updates:", error);
+        console.warn("Failed to check for updates (this is normal if no releases are published yet):", error);
       } finally {
         setIsChecking(false);
       }

@@ -135,7 +135,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
   // Fetch workflow config from app_settings
   useEffect(() => {
     const fetchWorkflowConfig = async () => {
-      const { data } = await supabase.from("app_settings").select("*").eq("key", "workflow_stages").single();
+      const { data } = await supabase.from("app_settings").select("*").eq("key", "workflow_stages").maybeSingle();
       if (data?.value) {
         try {
           const val = typeof data.value === "string" ? JSON.parse(data.value) : data.value;

@@ -240,8 +240,13 @@ export default function SettingsPage() {
       } else {
         toast.success("You are on the latest version", { id: "update-check" });
       }
-    } catch (err) {
-      toast.error("Failed to check for updates", { id: "update-check" });
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes("Could not fetch a valid release JSON") || errMsg.includes("404")) {
+        toast.success("You are on the latest version (no remote releases found)", { id: "update-check" });
+      } else {
+        toast.error(`Failed to check for updates: ${errMsg}`, { id: "update-check" });
+      }
       console.error(err);
     }
   };
@@ -320,7 +325,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (activeTab !== "workflows") return;
-    supabase.from("app_settings").select("*").eq("key", "workflow_stages").single().then(({ data }) => {
+    supabase.from("app_settings").select("*").eq("key", "workflow_stages").maybeSingle().then(({ data }) => {
       if (data?.value) {
         try {
           const val = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
