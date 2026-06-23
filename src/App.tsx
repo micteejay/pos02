@@ -18,10 +18,8 @@ import LoadingFallback from "./components/LoadingFallback";
 import PermissionGuard from "./components/PermissionGuard";
 import type { Permission } from "./hooks/use-app-settings";
 
-// Tauri Updater imports
 import { isTauri } from "@tauri-apps/api/core";
-import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { UpdateProvider } from "./hooks/use-updater";
 
 // Lazy-loaded pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -121,48 +119,6 @@ function AppRoutes() {
 }
 
 const App = () => {
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      try {
-        if (!isTauri()) return;
-        const update = await check();
-        if (update) {
-          sonnerToast(`Update available: ${update.version}`, {
-            duration: 10000,
-            action: {
-              label: "Update & Restart",
-              onClick: async () => {
-                let downloaded = 0;
-                let contentLength = 0;
-                sonnerToast.loading("Downloading update...");
-                
-                await update.downloadAndInstall((event) => {
-                  switch (event.event) {
-                    case 'Started':
-                      contentLength = event.data.contentLength || 0;
-                      break;
-                    case 'Progress':
-                      downloaded += event.data.chunkLength;
-                      console.log(`Downloaded ${downloaded} of ${contentLength}`);
-                      break;
-                    case 'Finished':
-                      sonnerToast.success("Update installed, restarting...");
-                      break;
-                  }
-                });
-                
-                await relaunch();
-              }
-            }
-          });
-        }
-      } catch (error) {
-        console.error("Failed to check for updates on startup:", error);
-      }
-    };
-    
-    checkForUpdates();
-  }, []);
 
   return (
     <ErrorBoundary>
@@ -172,8 +128,9 @@ const App = () => {
             <AppSettingsProvider>
               <AppEventsProvider>
                 <SharedDataProvider>
-                  <PermissionApprovalsProvider>
-                  <TooltipProvider>
+                  <UpdateProvider>
+                    <PermissionApprovalsProvider>
+                    <TooltipProvider>
                     <Toaster />
                     <Sonner />
                     <BrowserRouter>
@@ -181,8 +138,9 @@ const App = () => {
                       <AppRoutes />
                       <AIChatAssistant />
                     </BrowserRouter>
-                  </TooltipProvider>
-                  </PermissionApprovalsProvider>
+                    </TooltipProvider>
+                    </PermissionApprovalsProvider>
+                  </UpdateProvider>
                 </SharedDataProvider>
               </AppEventsProvider>
             </AppSettingsProvider>

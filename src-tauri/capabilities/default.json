@@ -14,6 +14,8 @@
     "printer:allow-print-pdf",
     "printer:allow-get-jobs",
     "printer:allow-create-temp-file",
-    "printer:allow-remove-temp-file"
+    "printer:allow-remove-temp-file",
+    "updater:default",
+    "process:default"
   ]
 }

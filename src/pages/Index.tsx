@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   ArrowUpRight, Clock, AlertTriangle, CheckCircle2, MessageSquare, FileText,
-  Truck, GitBranch, Building2,
+  Truck, GitBranch, Building2, Download, Loader2
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
@@ -13,6 +13,7 @@ import AppLayout from "@/components/AppLayout";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useSharedData } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
+import { useUpdater } from "@/hooks/use-updater";
 import AISalesInsights from "@/components/AISalesInsights";
 
 const colorMap = {
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const { formatCurrency, settings, users } = useAppSettings();
   const { inventory, sales, stores, warehouses } = useSharedData();
   const { approvalItems, notifications } = useAppEvents();
+  const { update, installUpdate, isDownloading, downloadProgress } = useUpdater();
 
   if (user?.role === "Sales Rep") {
     return <Navigate to="/pos" replace />;
@@ -266,6 +268,33 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Floating Update Button */}
+      {update && (
+        <div className="fixed bottom-6 right-6 z-50 animate-bounce-in">
+          <button
+            onClick={installUpdate}
+            disabled={isDownloading}
+            className="flex items-center gap-3 bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-3 rounded-full shadow-lg shadow-primary/30 transition-all hover:-translate-y-1"
+          >
+            {isDownloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5 animate-bounce" />
+            )}
+            <div className="text-left flex flex-col">
+              <span className="text-sm font-bold leading-tight">
+                {isDownloading ? "Downloading..." : "Update Available"}
+              </span>
+              <span className="text-[10px] opacity-80 leading-tight">
+                {isDownloading 
+                  ? `${downloadProgress}% completed` 
+                  : `Version ${update.version} is ready`}
+              </span>
+            </div>
+          </button>
+        </div>
+      )}
     </AppLayout>
   );
 }
