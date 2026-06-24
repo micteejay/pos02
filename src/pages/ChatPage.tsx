@@ -193,6 +193,7 @@ export default function ChatPage() {
           sender_name: senderName,
           avatar: senderName.split(" ").map((n: string) => n[0]).join("").slice(0, 2),
           time: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+          dateStr: new Date(m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
           text: m.content,
           channel_id: m.channel_id,
           reactions: m.reactions
@@ -226,6 +227,7 @@ export default function ChatPage() {
           return [...prev, {
             id: m.id, sender_id: m.sender_id, sender_name: "...", avatar: "?",
             time: new Date(m.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+            dateStr: new Date(m.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
             text: m.content, channel_id: m.channel_id,
             reactions: [], pinned: m.is_pinned, edited: m.edited, replyTo: m.reply_to,
           }];
