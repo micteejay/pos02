@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { MessageSquare, Hash, Users, Search, Send, Smile, Paperclip, Plus, Pin, X, Trash2, Edit2, Bell, BellOff, FileText, Loader2, UserPlus, Check, Download, Image, Eye } from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
+import EmptyState from "@/components/EmptyState";
 
 interface Message {
   id: string; sender_id: string; sender_name: string; avatar: string; time: string; text: string; channel_id: string;
@@ -813,8 +813,9 @@ export default function ChatPage() {
                     )}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            );
+          })}
             <div ref={messagesEndRef} />
           </div>
 

@@ -191,10 +191,15 @@ export async function printNode(
   const selectedPrinter = getSelectedPrinter();
 
   // --- Path 1: Silent native print via tauri-plugin-printer-v2 ---
-  if (isTauri() && selectedPrinter) {
+  if (isTauri()) {
     try {
       const html = nodeToHtml(node, title, opts?.paperWidth);
-      await printHtml({ id: `pos-${Date.now()}`, html, printer: selectedPrinter } as any);
+      await printHtml({ 
+        id: `pos-${Date.now()}`, 
+        html, 
+        printer: selectedPrinter || "default",
+        remove_after_print: true 
+      } as any);
       return; // done — completely silent
     } catch (err) {
       console.error("[printNode] Native print failed, falling back to dialog:", err);
@@ -277,9 +282,14 @@ export async function printHtmlString(
   const selectedPrinter = getSelectedPrinter();
 
   // --- Path 1: Silent native print ---
-  if (isTauri() && selectedPrinter) {
+  if (isTauri()) {
     try {
-      await printHtml({ id: `pos-${Date.now()}`, html, printer: selectedPrinter } as any);
+      await printHtml({ 
+        id: `pos-${Date.now()}`, 
+        html, 
+        printer: selectedPrinter || "default",
+        remove_after_print: true 
+      } as any);
       return;
     } catch (err) {
       console.error("[printHtmlString] Native print failed, falling back to dialog:", err);
