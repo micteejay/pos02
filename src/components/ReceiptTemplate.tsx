@@ -58,9 +58,10 @@ const methodLabel = (m: string) =>
   m === "card" ? "Credit Card" : m === "cash" ? "Cash" : m === "mobile" ? "Mobile Pay" : m;
 
 const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTemplate(
-  { sale, company, formatCurrency, settings, overrideFooter, showBarcode, barcodeNumber },
+  { sale, company, formatCurrency: originalFormatCurrency, settings, overrideFooter, showBarcode, barcodeNumber },
   ref,
 ) {
+  const formatCurrency = (n: number) => originalFormatCurrency(n).replace(/\.00$/, '');
   const style = settings?.receiptStyle || "classic";
   const isModern = style === "modern";
   const isClassic = style === "classic";
@@ -69,21 +70,21 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
   const isCompact = style === "compact";
   const isThermal = style === "thermal";
   const isInvoice = style === "invoice";
-  
-  const receiptSize = settings?.receiptSize || 'medium';
+
+  const paperWidth = settings?.paperWidth || "80mm";
   const sizeClasses = {
-    small: 'max-w-[240px] p-3 text-[8px]',
-    medium: 'max-w-[280px] p-4 text-[10px]',
-    large: 'max-w-[320px] p-5 text-[12px]'
-  }[receiptSize];
-  
+    "58mm": "max-w-[220px] p-2",
+    "80mm": "max-w-[300px] p-4",
+    "A4": "max-w-[800px] p-8",
+  }[paperWidth as string] || "max-w-[300px] p-4";
+
   const customColors = settings?.customColors || {};
   const primaryColor = customColors.primary || 'currentColor';
   const backgroundColor = customColors.background || 'bg-white';
 
   const fontSizeClass =
-    settings?.fontSize === "Small" ? "text-[8px]" :
-    settings?.fontSize === "Large" ? "text-[12px]" : "text-[10px]";
+    settings?.fontSize === "Small" ? "text-[7.5px]" :
+      settings?.fontSize === "Large" ? "text-[10px]" : "text-[8.5px]";
 
   const headerText = settings?.receiptHeader || company?.name || "Receipt";
   const footerText = overrideFooter || settings?.receiptFooter;
@@ -100,35 +101,30 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
 
   const ColumnHeader = () => (
     <>
-      <div 
-        className="text-[11px] font-bold text-black mb-1"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 9ch 4ch 9ch",
-          gap: "8px",
-        }}
+      <div
+        className="text-[11px] font-bold text-black mb-1 flex justify-between"
       >
-        <span style={{ textAlign: "left" }}>Desc</span>
-        <span style={{ textAlign: "right" }}>UPrice</span>
-        <span style={{ textAlign: "right" }}>Qty</span>
-        <span style={{ textAlign: "right" }}>Amt</span>
+        <span style={{ width: "45%", textAlign: "left" }}>Desc</span>
+        <span style={{ width: "25%", textAlign: "left" }}>UPrice</span>
+        <span style={{ width: "10%", textAlign: "left" }}>Qty</span>
+        <span style={{ width: "20%", textAlign: "left" }}>Amt</span>
       </div>
     </>
   );
 
   if (isInvoice) {
     return (
-      <div 
-        ref={ref} 
+      <div
+        ref={ref}
         className={`bg-white border-2 border-black rounded-lg font-sans ${sizeClasses} leading-relaxed mx-auto w-full`}
       >
         {/* Invoice Header */}
         <div className="flex justify-between items-start mb-4">
           <div className="flex-1">
             {company?.logoUrl && (
-              <img 
-                src={company.logoUrl} 
-                alt="Company Logo" 
+              <img
+                src={company.logoUrl}
+                alt="Company Logo"
                 className="mb-2 h-12 w-auto object-contain"
               />
             )}
@@ -143,13 +139,13 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             <p className="text-black text-[10px]">{sale.date}</p>
           </div>
         </div>
-        
+
         {/* Bill To Section */}
         <div className="border-t-2 border-black pt-3 mb-4">
           <p className="font-semibold text-black text-[10px] mb-1">Bill To:</p>
           <p className="text-black text-[10px]">{sale.customer}</p>
         </div>
-        
+
         {/* Items Table */}
         <table className="w-full mb-4">
           <thead>
@@ -171,7 +167,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             ))}
           </tbody>
         </table>
-        
+
         {/* Totals Section */}
         <div className="border-t-2 border-black pt-3 space-y-1.5">
           {sale.subtotal !== undefined && (
@@ -197,7 +193,7 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             <span className="text-black">{formatCurrency(sale.total)}</span>
           </div>
         </div>
-        
+
         {/* Footer */}
         {(footerText || settings?.receiptReturnPolicy) && (
           <div className="mt-4 pt-3 border-t border-black text-center">
@@ -214,26 +210,27 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
       ref={ref}
       className={`bg-white text-black font-sans ${fontSizeClass} leading-snug ${sizeClasses} mx-auto w-full receipt-container`}
     >
+      {(isModern || isBranded) && <div className="h-1 bg-black mb-2" />}
       {/* Header Section */}
-      <div className="text-center mb-2">
-        {company?.logoUrl && (
-          <img 
-            src={company.logoUrl} 
-            alt="Company Logo" 
-            className="mx-auto mb-2 h-12 w-auto object-contain max-w-full"
+      <div className={`${isMinimal ? "text-left" : "text-center"} mb-2`}>
+        {!isMinimal && !isCompact && company?.logoUrl && (
+          <img
+            src={company.logoUrl}
+            alt="Company Logo"
+            className={`${isMinimal ? "mx-0" : "mx-auto"} mb-2 h-12 w-auto object-contain max-w-full`}
           />
         )}
         <p className="font-bold text-black text-base leading-tight tracking-wide">{headerText}</p>
         {settings?.receiptTagline && (
-          <p className="text-black text-[10px] leading-tight">… {settings.receiptTagline}</p>
+          <p className="text-black text-[10px] leading-tight mt-0.5">… {settings.receiptTagline}</p>
         )}
-        {company && (company.address || company.city) && (
-          <p className="text-black text-[10px] leading-tight">
+        {!isCompact && company && (company.address || company.city) && (
+          <p className="text-black text-[10px] leading-tight mt-0.5">
             {[company.address, company.city].filter(Boolean).join(", ")}
           </p>
         )}
-        {company?.phone && (
-          <p className="text-black text-[10px] leading-tight">{company.phone}</p>
+        {!isCompact && company?.phone && (
+          <p className="text-black text-[10px] leading-tight mt-0.5">{company.phone}</p>
         )}
       </div>
 
@@ -245,7 +242,9 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         <p className="text-black"><span className="font-semibold">Payment Method:</span> {methodLabel(sale.method)}</p>
       </div>
 
-      <p className="text-center text-black mb-1"><span className="font-semibold">{settings?.receiptNumberLabel || "Receipt No"}:</span> {sale.id}</p>
+      <p className={`${isMinimal ? "text-left" : "text-center"} text-black mb-1`}><span className="font-semibold">{settings?.receiptNumberLabel || "Receipt No"}:</span> {sale.id}</p>
+
+      {!isMinimal && <div className={`border-t ${isThermal ? "border-dashed" : "border-solid"} border-black mb-2`} />}
 
       {/* Column header */}
       <ColumnHeader />
@@ -268,20 +267,15 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
             {chunk.map((item, i) => (
               <div
                 key={item.lineKey || `${item.name}-${startIdx + i}`}
-                className="text-black py-[2px] items-start break-inside-avoid"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 9ch 4ch 9ch",
-                  gap: "8px",
-                }}
+                className="text-black py-[2px] items-start break-inside-avoid flex justify-between"
               >
-                <span className="break-words leading-tight" style={{ textAlign: "left" }}>
+                <span className="break-words leading-tight pr-1" style={{ width: "45%", textAlign: "left" }}>
                   {item.name}
                   {item.unitName ? ` (${item.unitName})` : ""}
                 </span>
-                <span className="tabular-nums" style={{ textAlign: "right" }}>{formatCurrency(item.price)}</span>
-                <span className="tabular-nums" style={{ textAlign: "right" }}>{item.qty}</span>
-                <span className="tabular-nums" style={{ textAlign: "right" }}>{formatCurrency(item.price * item.qty)}</span>
+                <span className="tabular-nums" style={{ width: "25%", textAlign: "left" }}>{formatCurrency(item.price)}</span>
+                <span className="tabular-nums" style={{ width: "10%", textAlign: "left" }}>{item.qty}</span>
+                <span className="tabular-nums" style={{ width: "20%", textAlign: "left" }}>{formatCurrency(item.price * item.qty)}</span>
               </div>
             ))}
           </Fragment>
@@ -294,44 +288,39 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
         </p>
       )}
 
-      {/* Totals — left-aligned, bold, mirroring the supplied template */}
-      <div className="mt-3 space-y-[2px] text-black font-bold text-[12px]">
-        <p>Total: {formatCurrency(sale.total)}</p>
-        {typeof sale.amountTendered === "number" && sale.amountTendered > 0 && (
-          <p>Amt Paid: {formatCurrency(sale.amountTendered)}</p>
-        )}
-        {!sale.amountTendered && (
-          <p>Amt Paid: {formatCurrency(sale.total - (sale.balanceDue || 0))}</p>
-        )}
-        <p>Cust Balance: {formatCurrency(sale.balanceDue ?? 0)}</p>
-        {(sale.changeGiven ?? sale.change) ? (
-          <p>Change: {formatCurrency(sale.changeGiven ?? sale.change ?? 0)}</p>
-        ) : null}
-        {sale.discount ? (
-          <p className="font-normal text-[10px]">Discount: -{formatCurrency(sale.discount)}</p>
-        ) : null}
-        {sale.tax ? (
-          <p className="font-normal text-[10px]">Tax: {formatCurrency(sale.tax)}</p>
-        ) : null}
+      {/* Totals — custom layout as requested */}
+      <div className="mt-3 text-black font-bold text-[12px]">
+        <div className="flex justify-between items-center mb-[2px]">
+          <p>Total: {formatCurrency(sale.total)}</p>
+          <p>Amt Paid: {formatCurrency(typeof sale.amountTendered === "number" && sale.amountTendered > 0 ? sale.amountTendered : (sale.total - (sale.balanceDue || 0)))}</p>
+        </div>
+        <div className="text-right space-y-[2px]">
+          <p>Cust Balance: {formatCurrency(sale.balanceDue ?? 0)}</p>
+          {(sale.changeGiven ?? sale.change) ? (
+            <p>Change: {formatCurrency(sale.changeGiven ?? sale.change ?? 0)}</p>
+          ) : null}
+          {sale.discount ? (
+            <p className="font-normal text-[10px]">Discount: -{formatCurrency(sale.discount)}</p>
+          ) : null}
+          {sale.tax ? (
+            <p className="font-normal text-[10px]">Tax: {formatCurrency(sale.tax)}</p>
+          ) : null}
+        </div>
       </div>
 
       {/* Footer */}
-      <div className="mt-4 text-black">
-        {settings?.receiptReturnPolicy ? (
+      <div className={`mt-4 pt-2 text-black ${!isMinimal ? `border-t ${isThermal ? "border-dashed" : "border-solid"} border-black` : ""}`}>
+        {!isCompact && settings?.receiptReturnPolicy && (
           <p className="text-[10px] mb-2">{settings.receiptReturnPolicy}</p>
-        ) : (
-          <p className="text-[10px] mb-2">Item(s) received in good condition cannot be refunded</p>
         )}
-        {footerText ? (
+        {footerText && (
           <p className="text-center text-[11px] font-semibold">{footerText}</p>
-        ) : (
-          <p className="text-center text-[11px] font-semibold">Thank you for your patronage.</p>
         )}
-        {showBarcode && (
+        {(showBarcode || settings?.showQRCode) && !isCompact && (
           <div className="flex flex-col items-center mt-3 barcode-container">
             <div className="w-48 h-12 bg-white border-2 border-black flex items-center justify-center mb-1 p-2">
               <div className="flex gap-px">
-                {[2,1,3,1,2,1,1,3,2,1,1,2,3,1,2,1,3,1,1,2,1,3,2,1,1,3,1,2,1,2,3,1,2,1,1,3,2,1,2,1,1,3,1,2,1,2,3,1].map((width, i) => (
+                {[2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 1, 1, 2, 1, 3, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1, 2, 1, 1, 3, 2, 1, 2, 1, 1, 3, 1, 2, 1, 2, 3, 1].map((width, i) => (
                   <div
                     key={i}
                     className="bg-black"

@@ -83,7 +83,7 @@ export default function POSPage() {
   useEffect(() => {
     setPaymentMethod(settings.defaultPaymentMethod || "cash");
   }, [settings.defaultPaymentMethod]);
-  const [completedSale, setCompletedSale] = useState<{ id: string; total: number; subtotal: number; tax: number; discount: number; items: CartItem[]; customer: string; method: string; date?: string } | null>(null);
+  const [completedSale, setCompletedSale] = useState<{ id: string; total: number; subtotal: number; tax: number; discount: number; items: CartItem[]; customer: string; method: string; date?: string; cashier?: string } | null>(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [heldOrders, setHeldOrders] = useState<{ id: string; cart: CartItem[]; customer: string }[]>([]);
   const [showHeld, setShowHeld] = useState(false);
@@ -317,6 +317,7 @@ export default function POSPage() {
       customer: resolvedName,
       method: primaryMethod,
       date: dateStr,
+      cashier: user?.name || user?.email || "System",
       payments,
       amountTendered: paymentResult?.amountTendered ?? total,
       change: paymentResult?.change ?? 0,

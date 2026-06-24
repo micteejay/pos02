@@ -208,6 +208,7 @@ export default function SalesPage() {
       discount: Number(data.discount || 0),
       customer: data.customer_name || "Walk-in",
       method: data.payment_method,
+      cashier: txn.rep,
       date: formatDateTime(data.created_at),
       items: (data.sales_transaction_items || []).map((i) => ({
         name: i.name,

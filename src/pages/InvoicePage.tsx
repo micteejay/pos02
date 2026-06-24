@@ -146,7 +146,7 @@ export default function InvoicePage() {
   };
 
   const handlePrint = () => {
-    printNode(printRef.current, `${form.type === "quote" ? "Quote" : "Invoice"} ${form.number}`);
+    printNode(printRef.current, `${form.type === "quote" ? "Quote" : "Invoice"} ${form.number}`, { paperWidth: "A4" });
   };
 
   const handleSaveAndRecord = async () => {
@@ -300,7 +300,7 @@ export default function InvoicePage() {
   /** Print a saved invoice as a receipt (uses preview render). */
   const printSaved = (inv: SavedInvoice) => {
     setPreviewInvoice(inv);
-    setTimeout(() => printNode(previewRef.current, `${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}`), 200);
+    setTimeout(() => printNode(previewRef.current, `${inv.type === "quote" ? "Quote" : "Receipt"} ${inv.number}`, { paperWidth: "A4" }), 200);
   };
 
   const subtotal = form.items.reduce((s, i) => s + i.qty * i.rate, 0);

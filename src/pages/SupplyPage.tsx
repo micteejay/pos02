@@ -678,20 +678,15 @@ export default function SupplyPage() {
                 expectedDelivery: printingPO.expectedDelivery,
                 total: printingPO.total,
                 approvedBy: printingPO.approvedBy,
-                items: printingPO.items.map((i) => ({
-                  name: i.name,
-                  qty: i.qty,
-                  unitPrice: i.unitPrice,
-                  unitName: i.unitName,
-                  unitFactor: i.unitFactor,
-                })),
+                items: printingPO.items,
               }}
               company={companyProfile}
               formatCurrency={formatCurrency}
+              settings={settings}
             />
             <div className="flex gap-2 mt-4">
               <button onClick={() => setPrintingPO(null)} className="flex-1 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted">Close</button>
-              <button onClick={() => printNode(printRef.current, `PO ${printingPO.po_number}`)} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
+              <button onClick={() => printNode(printRef.current, `PO ${printingPO.po_number}`, { paperWidth: "A4" })} className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 flex items-center justify-center gap-1">
                 <Printer className="w-4 h-4" /> Print
               </button>
             </div>

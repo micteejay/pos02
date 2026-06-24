@@ -27,6 +27,7 @@ interface Props {
   po: POPrintData;
   company?: CompanyInfo | null;
   formatCurrency: (n: number) => string;
+  settings?: any;
 }
 
 /**
@@ -35,7 +36,7 @@ interface Props {
  * from base values.
  */
 const POPrintTemplate = forwardRef<HTMLDivElement, Props>(function POPrintTemplate(
-  { po, company, formatCurrency },
+  { po, company, formatCurrency, settings },
   ref,
 ) {
   return (
@@ -46,8 +47,9 @@ const POPrintTemplate = forwardRef<HTMLDivElement, Props>(function POPrintTempla
       statusLabel={`Status: ${po.status}`}
       company={company}
       footer={po.approvedBy ? `Approved by: ${po.approvedBy}` : undefined}
+      settings={settings}
     >
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="flex justify-between gap-4 mb-4 text-black">
         <div>
           <p className="text-black">Supplier</p>
           <p className="font-semibold text-black">{po.supplier_name}</p>
@@ -61,7 +63,7 @@ const POPrintTemplate = forwardRef<HTMLDivElement, Props>(function POPrintTempla
         </div>
       </div>
 
-      <table className="w-full border-collapse mb-4">
+      <table className="w-full border-collapse mb-4 text-black text-left">
         <thead>
           <tr className="border-b border-black">
             <th className="text-left py-2 text-black">Item</th>

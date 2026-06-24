@@ -1,11 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   ArrowUpRight, Clock, AlertTriangle, CheckCircle2, MessageSquare, FileText,
-  Truck, GitBranch, Building2, Download, Loader2
+  Truck, GitBranch, Building2, Download, Loader2, Monitor, Smartphone
 } from "lucide-react";
+import { isTauri } from "@tauri-apps/api/core";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
@@ -33,6 +34,42 @@ export default function Dashboard() {
   if (user?.role === "Sales Rep") {
     return <Navigate to="/pos" replace />;
   }
+
+  const [downloadUrls, setDownloadUrls] = useState({ 
+    windows: "https://github.com/micteejay/pos02/releases/latest", 
+    mobile: "https://github.com/micteejay/pos02/releases/latest/download/app-release-unsigned.apk" 
+  });
+
+  useEffect(() => {
+    if (isTauri()) return;
+    fetch("https://api.github.com/repos/micteejay/pos02/releases/latest")
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.assets) {
+          let winUrl = "";
+          let mobUrl = downloadUrls.mobile;
+          
+          for (const asset of data.assets) {
+            // Find windows installer
+            if (asset.name.endsWith(".exe")) {
+              winUrl = asset.browser_download_url;
+            } else if (!winUrl && asset.name.endsWith(".msi")) {
+              winUrl = asset.browser_download_url;
+            }
+            // Find mobile APK
+            if (asset.name.endsWith(".apk") && asset.name.includes("release")) {
+              mobUrl = asset.browser_download_url;
+            }
+          }
+          
+          setDownloadUrls({
+            windows: winUrl || "https://github.com/micteejay/pos02/releases/latest",
+            mobile: mobUrl
+          });
+        }
+      })
+      .catch(err => console.error("Failed to fetch release assets:", err));
+  }, []);
 
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.total, 0), [sales]);
   const lowStockAlerts = useMemo(() => inventory.filter(i => i.status === "critical" || i.status === "low"), [inventory]);
@@ -78,14 +115,34 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">Welcome back. Here's your organization at a glance.</p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="w-3.5 h-3.5" />
-            <span>Last updated: just now</span>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+            {!isTauri() && (
+              <div className="flex items-center gap-2">
+                <a 
+                  href={downloadUrls.windows} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  Windows App
+                </a>
+                <a 
+                  href={downloadUrls.mobile}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  Mobile App
+                </a>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Last updated: just now</span>
+            </div>
           </div>
         </div>
 

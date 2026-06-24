@@ -16,6 +16,8 @@ interface PrintThemeProps {
   footer?: string;
   /** Body content (items table, totals, etc.) */
   children: ReactNode;
+  /** App settings to obey print sizing */
+  settings?: any;
 }
 
 /**
@@ -28,18 +30,27 @@ interface PrintThemeProps {
  *  - footer (optional note + generated timestamp)
  */
 const PrintTheme = forwardRef<HTMLDivElement, PrintThemeProps>(function PrintTheme(
-  { documentType, documentNumber, statusLabel, company, logoUrl, footer, children },
+  { documentType, documentNumber, statusLabel, company, logoUrl, footer, children, settings },
   ref,
 ) {
   const initial = (company?.name || documentType).charAt(0).toUpperCase();
+
+  const paperWidth = "A4"; // Forced to A4 for Invoices/POs
+  const isThermal = false;
+  const sizeClasses = "max-w-[800px] p-8";
+
+  const fontSizeClass =
+    settings?.fontSize === "Small" ? "text-[8px]" :
+    settings?.fontSize === "Large" ? "text-[12px]" : "text-[10px]";
+
   return (
     <div
       ref={ref}
-      className="bg-white text-black mx-auto print-doc"
+      className={`bg-white text-black mx-auto print-doc ${isThermal ? sizeClasses + " " + fontSizeClass : "w-full"}`}
       style={{
         fontFamily:
           'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        fontSize: "12px",
+        fontSize: isThermal ? "inherit" : "12px",
         lineHeight: 1.4,
       }}
     >

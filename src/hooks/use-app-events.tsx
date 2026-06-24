@@ -4,7 +4,9 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { formatAppDate } from "@/lib/format-date";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { PushNotifications } from "@capacitor/push-notifications";
 import { Capacitor } from "@capacitor/core";
+import { toast } from "sonner";
 
 export type NotificationType = "approval" | "inventory" | "chat" | "workflow" | "sales" | "supply" | "document" | "system" | "security";
 
@@ -150,10 +152,53 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       LocalNotifications.requestPermissions().then((status) => {
-        console.log("[Notifications] Permission status:", status.display);
+        console.log("[Notifications] Local Permission status:", status.display);
       }).catch(err => {
-        console.error("[Notifications] Permission request failed:", err);
+        console.error("[Notifications] Local Permission request failed:", err);
       });
+
+      // Also set up Push Notifications
+      PushNotifications.requestPermissions().then(result => {
+        if (result.receive === 'granted') {
+          // Register with Apple / Google to receive push via APNS/FCM
+          PushNotifications.register();
+        } else {
+          console.log("[Notifications] Push permission denied");
+        }
+      });
+
+      // On success, we should be able to receive notifications
+      PushNotifications.addListener('registration',
+        (token) => {
+          console.log('[Notifications] Push registration success, token: ' + token.value);
+        }
+      );
+
+      // Some issue with our setup and push will not work
+      PushNotifications.addListener('registrationError',
+        (error: any) => {
+          console.error('[Notifications] Error on registration: ' + JSON.stringify(error));
+        }
+      );
+
+      // Show us the notification payload if the app is open on our device
+      PushNotifications.addListener('pushNotificationReceived',
+        (notification) => {
+          console.log('[Notifications] Push received: ' + JSON.stringify(notification));
+          if (settings.notifyInApp) {
+             toast(notification.title || "New Notification", {
+               description: notification.body || "",
+             });
+          }
+        }
+      );
+
+      // Method called when tapping on a notification
+      PushNotifications.addListener('pushNotificationActionPerformed',
+        (notification) => {
+          console.log('[Notifications] Push action performed: ' + JSON.stringify(notification));
+        }
+      );
     }
   }, []);
 
@@ -228,6 +273,10 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
             time: "Just now", read: false, link: n.link || undefined,
             targetRoles: n.target_roles || undefined,
           }, ...prev]);
+          
+          toast(n.title, {
+            description: n.message || "",
+          });
         }
 
         // Trigger native local notification if enabled in push settings
