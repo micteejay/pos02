@@ -51,6 +51,9 @@ version = "0.22"
 [dependencies.serde]
 version = "1.0"
 
+[dependencies.serde_json]
+version = "1.0"
+
 [dependencies.tauri]
 version = "2.7.0"
 

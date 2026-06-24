@@ -26,7 +26,11 @@ impl<R: Runtime> Printer<R> {
     {
       Ok(crate::windows::get_printers())
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
+    {
+      Ok(crate::unix::get_printers())
+    }
+    #[cfg(not(any(target_os = "windows", unix)))]
     {
       Err(crate::Error::UnsupportedPlatform)
     }
@@ -37,7 +41,11 @@ impl<R: Runtime> Printer<R> {
     {
       Ok(crate::windows::get_printers_by_name(name))
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
+    {
+      Ok(crate::unix::get_printers_by_name(name))
+    }
+    #[cfg(not(any(target_os = "windows", unix)))]
     {
       Err(crate::Error::UnsupportedPlatform)
     }
@@ -48,7 +56,11 @@ impl<R: Runtime> Printer<R> {
     {
       Ok(crate::windows::print_html(options))
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(unix)]
+    {
+      Ok(crate::unix::print_html(options))
+    }
+    #[cfg(not(any(target_os = "windows", unix)))]
     {
       Err(crate::Error::UnsupportedPlatform)
     }

@@ -160,7 +160,7 @@ const allPermissions: Permission[] = [
 ];
 
 const defaultSettings: AppSettings = {
-  appName: "Enterprise Hub", currency: "USD", currencySymbol: "$", taxRate: 8,
+  appName: "Vite POS", currency: "USD", currencySymbol: "$", taxRate: 8,
   receiptStyle: "modern", receiptHeader: "", receiptTagline: "",
   receiptFooter: "Thank you for your purchase!",
   receiptReturnPolicy: "Returns accepted within 30 days with receipt.",

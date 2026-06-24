@@ -83,7 +83,9 @@ export default function AppSidebar({ onNavigate }: AppSidebarProps) {
     <aside className={`fixed top-0 left-0 h-screen bg-sidebar sidebar-glow z-40 flex flex-col transition-all duration-300 ${collapsed ? "w-[68px]" : "w-[260px]"}`}>
       <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border shrink-0">
         {settings.logoUrl || "/logo.png" ? (
-          <img src={settings.logoUrl || "/logo.png"} alt="Logo" className="w-8 h-8 rounded-lg object-cover shrink-0" />
+          <div className="bg-white rounded-lg w-8 h-8 flex items-center justify-center shrink-0">
+            <img src={settings.logoUrl || "/logo.png"} alt="Logo" className="w-6 h-6 object-contain" />
+          </div>
         ) : (
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <span className="text-primary-foreground font-bold text-sm">{settings.appName.charAt(0)}</span>

@@ -1,6 +1,5 @@
 mod declare;
 mod fsys;
-mod windows;
 
 use tauri::{
     plugin::{Builder, TauriPlugin},
@@ -98,10 +97,11 @@ fn remove_temp_file(filename: String) -> bool {
 #[tauri::command]
 // this will be accessible with `invoke('plugin:printer|get_printers')`.
 fn get_printers() -> String {
-    if cfg!(windows) {
-        return windows::get_printers();
-    }
-
+    #[cfg(windows)]
+    return windows::get_printers();
+    #[cfg(unix)]
+    return unix::get_printers();
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -114,10 +114,11 @@ fn get_printers() -> String {
 // this will be accessible with `invoke('plugin:printer|get_printer_by_name')`.
 fn get_printers_by_name(printername: String) -> String {
     println!("获取打印机列表: {}", printername);
-    if cfg!(windows) {
-        return windows::get_printers_by_name(printername);
-    }
-
+    #[cfg(windows)]
+    return windows::get_printers_by_name(printername);
+    #[cfg(unix)]
+    return unix::get_printers_by_name(printername);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -138,18 +139,14 @@ fn print_pdf(
     print_settings: String,
     remove_after_print: Option<bool>,
 ) -> String {
-     
-    if cfg!(windows) {
-        let options = declare::PrintOptions { 
-            id,
-            path,
-            printer,
-            print_settings,
-            remove_after_print,
-        };
-        return windows::print_pdf(options);
-    }
-
+    let options = declare::PrintOptions { 
+        id, path, printer, print_settings, remove_after_print 
+    };
+    #[cfg(windows)]
+    return windows::print_pdf(options);
+    #[cfg(unix)]
+    return unix::print_pdf(options);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -175,29 +172,25 @@ fn print_pdf_from_url(
     timeout_seconds: Option<u64>,
     temp_dir: Option<String>,
 ) -> String {
-     
-    if cfg!(windows) {
-        let options = PrintPdfUrlOptions { 
-            id,
-            url,
-            printer,
-            print_settings,
-            remove_after_print,
-            timeout_seconds,
-            temp_dir,
-        };
-        return windows::print_pdf_from_url(options);
-    }
-
+    let options = PrintPdfUrlOptions { 
+        id, url, printer, print_settings, remove_after_print, timeout_seconds, temp_dir 
+    };
+    #[cfg(windows)]
+    return windows::print_pdf_from_url(options);
+    #[cfg(unix)]
+    return unix::print_pdf_from_url(options);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|get_jobs')`.
 fn get_jobs(printername: String) -> String {
-    if cfg!(windows) {
-        return windows::get_jobs(printername);
-    }
+    #[cfg(windows)]
+    return windows::get_jobs(printername);
+    #[cfg(unix)]
+    return unix::get_jobs(printername);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -210,9 +203,11 @@ fn get_jobs(printername: String) -> String {
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|get_jobs_by_id')`.
 fn get_jobs_by_id(printername: String, jobid: String) -> String {
-    if cfg!(windows) {
-        return windows::get_jobs_by_id(printername, jobid);
-    }
+    #[cfg(windows)]
+    return windows::get_jobs_by_id(printername, jobid);
+    #[cfg(unix)]
+    return unix::get_jobs_by_id(printername, jobid);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -225,9 +220,11 @@ fn get_jobs_by_id(printername: String, jobid: String) -> String {
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|restart_job')`.
 fn resume_job(printername: String, jobid: String) -> String {
-    if cfg!(windows) {
-        return windows::resume_job(printername, jobid);
-    }
+    #[cfg(windows)]
+    return windows::resume_job(printername, jobid);
+    #[cfg(unix)]
+    return unix::resume_job(printername, jobid);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -240,9 +237,11 @@ fn resume_job(printername: String, jobid: String) -> String {
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|restart_job')`.
 fn restart_job(printername: String, jobid: String) -> String {
-    if cfg!(windows) {
-        return windows::restart_job(printername, jobid);
-    }
+    #[cfg(windows)]
+    return windows::restart_job(printername, jobid);
+    #[cfg(unix)]
+    return unix::restart_job(printername, jobid);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -255,9 +254,11 @@ fn restart_job(printername: String, jobid: String) -> String {
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|pause_job')`.
 fn pause_job(printername: String, jobid: String) -> String {
-    if cfg!(windows) {
-        return windows::pause_job(printername, jobid);
-    }
+    #[cfg(windows)]
+    return windows::pause_job(printername, jobid);
+    #[cfg(unix)]
+    return unix::pause_job(printername, jobid);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -270,9 +271,11 @@ fn pause_job(printername: String, jobid: String) -> String {
 #[tauri::command(rename_all = "snake_case")]
 // this will be accessible with `invoke('plugin:printer|remove_job')`.
 fn remove_job(printername: String, jobid: String) -> String {
-    if cfg!(windows) {
-        return windows::remove_job(printername, jobid);
-    }
+    #[cfg(windows)]
+    return windows::remove_job(printername, jobid);
+    #[cfg(unix)]
+    return unix::remove_job(printername, jobid);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -282,10 +285,11 @@ fn remove_job(printername: String, jobid: String) -> String {
  * @returns 打印机列表
  */
 pub fn custom_get_printers_by_name(printername: String) -> String {
-    if cfg!(windows) {
-        return windows::get_printers_by_name(printername);
-    }
-
+    #[cfg(windows)]
+    return windows::get_printers_by_name(printername);
+    #[cfg(unix)]
+    return unix::get_printers_by_name(printername);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -304,17 +308,14 @@ pub fn custom_print_pdf(
     print_settings: String,
     remove_after_print: Option<bool>,
 ) -> String {
-    if cfg!(windows) {
-        let options = declare::PrintOptions {
-            id,
-            path,
-            printer,
-            print_settings,
-            remove_after_print,
-        };
-        return windows::print_pdf(options);
-    }
-
+    let options = declare::PrintOptions {
+        id, path, printer, print_settings, remove_after_print,
+    };
+    #[cfg(windows)]
+    return windows::print_pdf(options);
+    #[cfg(unix)]
+    return unix::print_pdf(options);
+    #[cfg(not(any(windows, unix)))]
     return "Unsupported OS".to_string();
 }
 
@@ -323,6 +324,12 @@ pub fn custom_print_pdf(
  * @returns 初始化结果
  */
 /// Initializes the plugin.
+#[cfg(target_os = "windows")]
+pub mod windows;
+
+#[cfg(unix)]
+pub mod unix;
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
   if cfg!(windows) {
     windows::init_windows();
