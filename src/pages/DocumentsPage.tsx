@@ -197,6 +197,10 @@ export default function DocumentsPage() {
   // Derive virtual folders from document folder_paths
   const virtualFolders = useMemo(() => {
     const folderSet = new Set<string>();
+    const explicitFolders = new Set(
+      documents.filter(d => d.type === "folder" && d.folder === currentFolder).map(d => d.name)
+    );
+
     documents.forEach((d) => {
       const p = d.folder;
       if (p && p !== "/" && p !== currentFolder) {
@@ -205,10 +209,10 @@ export default function DocumentsPage() {
         if (p === prefix.slice(0, -1) || p.startsWith(prefix)) {
           const rest = p.slice(prefix.length);
           const nextFolder = rest.split("/")[0];
-          if (nextFolder) folderSet.add(nextFolder);
+          if (nextFolder && !explicitFolders.has(nextFolder)) folderSet.add(nextFolder);
         } else if (currentFolder === "/" && p.startsWith("/")) {
           const nextFolder = p.slice(1).split("/")[0];
-          if (nextFolder) folderSet.add(nextFolder);
+          if (nextFolder && !explicitFolders.has(nextFolder)) folderSet.add(nextFolder);
         }
       }
     });
@@ -253,7 +257,12 @@ export default function DocumentsPage() {
       name: newFolderName.trim(), type: "folder" as any,
       size_display: "0 items", folder_path: folderPath,
       author: user.id, source: null,
+      company_id: user.companyId || null,
     }).select().single();
+
+    if (error) {
+      console.error("Failed to create folder document:", error);
+    }
 
     if (data && !error) {
       // Also create in document_folders table
@@ -302,7 +311,13 @@ export default function DocumentsPage() {
         mime_type: file.type, folder_path: currentFolder,
         author: user.id, storage_path: storagePath,
         storage_bucket: "documents", source: "Upload",
+        company_id: user.companyId || null,
       }).select().single();
+
+      if (error) {
+        console.error("Failed to insert document record:", error);
+        toast.error(`Database error for ${file.name}: ${error.message}`);
+      }
 
       if (data && !error) {
         setDocuments(prev => [{
@@ -376,7 +391,16 @@ export default function DocumentsPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 animate-fade-in">
+      <div 
+        className="relative space-y-6 animate-fade-in min-h-[600px] flex flex-col"
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setDragOver(false);
+          }
+        }}
+        onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
+      >
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">Documents</h1>
@@ -404,12 +428,13 @@ export default function DocumentsPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex items-center gap-1 text-sm bg-muted/40 p-1.5 rounded-xl w-fit overflow-x-auto max-w-full">
           {breadcrumbs.map((crumb, i) => (
-            <div key={i} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
-              <button onClick={() => navigateBreadcrumb(i)} className={`px-1.5 py-0.5 rounded hover:bg-muted transition-colors ${i === breadcrumbs.length - 1 ? "text-foreground font-medium" : "text-muted-foreground"}`}>
-                {crumb === "/" ? "Root" : crumb}
+            <div key={i} className="flex items-center gap-1 shrink-0">
+              {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60" />}
+              <button onClick={() => navigateBreadcrumb(i)} className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${i === breadcrumbs.length - 1 ? "bg-background text-primary font-semibold shadow-sm" : "text-muted-foreground font-medium hover:text-foreground hover:bg-background/50"}`}>
+                <Folder className={`w-3.5 h-3.5 ${i === breadcrumbs.length - 1 ? "fill-primary/20" : ""}`} />
+                {crumb === "/" ? "Home" : crumb}
               </button>
             </div>
           ))}
@@ -428,17 +453,17 @@ export default function DocumentsPage() {
 
         {dragOver && (
           <div
-            className={`glass-card rounded-xl border-2 border-dashed ${dragOver ? "border-primary bg-primary/5 shadow-[0_0_30px_rgba(var(--primary-rgb),0.15)]" : "border-primary/40 hover:border-primary hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.1)]"} p-12 text-center cursor-pointer transition-all duration-300 group`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
+            className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 border-2 border-primary border-dashed rounded-xl m-2"
             onClick={() => fileInputRef.current?.click()}
           >
-            <div className={`w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center transition-all duration-500 ${dragOver ? "bg-primary text-primary-foreground scale-110" : "bg-primary/10 text-primary group-hover:scale-110 group-hover:bg-primary/20"}`}>
-              <Upload className="w-8 h-8" />
+            <div className="text-center cursor-pointer p-10 glass-card rounded-2xl w-full max-w-md shadow-2xl scale-105 transition-all">
+              <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center bg-primary text-primary-foreground shadow-lg animate-bounce">
+                <Upload className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Drop files to upload</h3>
+              <p className="text-sm text-muted-foreground">PDF, DOCX, XLSX, PNG, JPG up to 50MB</p>
+              <p className="text-xs font-medium text-primary mt-4">or click to browse files</p>
             </div>
-            <p className="text-sm font-medium text-foreground">Drop files here or click to upload</p>
-            <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, XLSX, PNG, JPG up to 50MB</p>
           </div>
         )}
 
@@ -451,11 +476,7 @@ export default function DocumentsPage() {
           </div>
         )}
 
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); handleFileSelect(e.dataTransfer.files); }}
-        >
+        <div className="flex-1 flex flex-col relative">
           {viewMode === "list" ? (
             <div className="glass-card rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
@@ -529,7 +550,15 @@ export default function DocumentsPage() {
                       );
                     })}
                     {currentDocs.length === 0 && virtualFolders.length === 0 && (
-                      <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-muted-foreground">{search ? "No files match your search." : "This folder is empty."}</td></tr>
+                      <tr><td colSpan={6} className="p-0 border-none">
+                        <div className="py-16">
+                          <EmptyState 
+                            icon={Folder} 
+                            title={search ? "No files found" : "Folder is empty"} 
+                            description={search ? "Try adjusting your search terms." : "Upload files or create folders to get started."}
+                          />
+                        </div>
+                      </td></tr>
                     )}
                   </tbody>
                 </table>
@@ -566,6 +595,15 @@ export default function DocumentsPage() {
                   </div>
                 );
               })}
+              {currentDocs.length === 0 && virtualFolders.length === 0 && (
+                <div className="col-span-full py-16">
+                  <EmptyState 
+                    icon={Folder} 
+                    title={search ? "No files found" : "Folder is empty"} 
+                    description={search ? "Try adjusting your search terms." : "Upload files or create folders to get started."}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -6,6 +6,7 @@ import { useSharedData, Expense } from "@/hooks/use-shared-data";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { useAuth } from "@/hooks/use-auth";
 import { useAudit } from "@/hooks/use-audit";
+import EmptyState from "@/components/EmptyState";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, Package, Users, ShoppingCart,
   Download, Calendar, FileText, PieChart as PieIcon, Printer,
@@ -37,24 +38,45 @@ export default function ReportsPage() {
   const { logAction } = useAudit();
   const [reportType, setReportType] = useState<ReportType>("overview");
   const [dateRange, setDateRange] = useState("6months");
+  const [eodStaffFilter, setEodStaffFilter] = useState("all");
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ category: "Rent", description: "", amount: "", store: "", recurring: false, recurringInterval: "monthly" as "daily" | "weekly" | "monthly" | "yearly" });
 
+  const filteredSales = useMemo(() => {
+    if (dateRange === "all") return sales;
+    const cutoff = new Date();
+    if (dateRange === "30days") cutoff.setDate(cutoff.getDate() - 30);
+    else if (dateRange === "3months") cutoff.setMonth(cutoff.getMonth() - 3);
+    else if (dateRange === "6months") cutoff.setMonth(cutoff.getMonth() - 6);
+    else if (dateRange === "1year") cutoff.setFullYear(cutoff.getFullYear() - 1);
+    return sales.filter(s => new Date(s.date) >= cutoff);
+  }, [sales, dateRange]);
+
+  const filteredExpenses = useMemo(() => {
+    if (dateRange === "all") return expenses;
+    const cutoff = new Date();
+    if (dateRange === "30days") cutoff.setDate(cutoff.getDate() - 30);
+    else if (dateRange === "3months") cutoff.setMonth(cutoff.getMonth() - 3);
+    else if (dateRange === "6months") cutoff.setMonth(cutoff.getMonth() - 6);
+    else if (dateRange === "1year") cutoff.setFullYear(cutoff.getFullYear() - 1);
+    return expenses.filter(e => new Date(e.date) >= cutoff);
+  }, [expenses, dateRange]);
+
   // Total operational expenses
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalExpenses = useMemo(() => filteredExpenses.reduce((s, e) => s + e.amount, 0), [filteredExpenses]);
 
   const expensesByCategory = useMemo(() => {
     const map: Record<string, number> = {};
-    expenses.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount; });
+    filteredExpenses.forEach(e => { map[e.category] = (map[e.category] || 0) + e.amount; });
     const colors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)", "hsl(280,60%,55%)", "hsl(0,72%,51%)", "hsl(45,90%,55%)", "hsl(190,70%,50%)"];
     return Object.entries(map).map(([name, value], i) => ({ name, value, color: colors[i % colors.length] }));
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   // Derive revenue data from actual sales + operational expenses
   const monthlyRevenue = useMemo(() => {
-    if (sales.length === 0 && expenses.length === 0) return [];
+    if (filteredSales.length === 0 && filteredExpenses.length === 0) return [];
     const grouped: Record<string, { revenue: number; costOfGoods: number; opExpenses: number }> = {};
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       const d = new Date(sale.date);
       const key = d.toLocaleDateString("en-US", { month: "short" });
       if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
@@ -68,7 +90,7 @@ export default function ReportsPage() {
       }, 0);
       grouped[key].costOfGoods += costTotal;
     });
-    expenses.forEach(exp => {
+    filteredExpenses.forEach(exp => {
       const d = new Date(exp.date);
       const key = d.toLocaleDateString("en-US", { month: "short" });
       if (!grouped[key]) grouped[key] = { revenue: 0, costOfGoods: 0, opExpenses: 0 };
@@ -80,25 +102,25 @@ export default function ReportsPage() {
       expenses: data.costOfGoods + data.opExpenses,
       profit: data.revenue - data.costOfGoods - data.opExpenses,
     }));
-  }, [sales, inventory, expenses]);
+  }, [filteredSales, inventory, filteredExpenses]);
 
   // Sales by store
   const salesByStore = useMemo(() => {
-    if (sales.length === 0) return [];
+    if (filteredSales.length === 0) return [];
     const counts: Record<string, number> = {};
-    sales.forEach(s => { counts[s.store] = (counts[s.store] || 0) + s.total; });
+    filteredSales.forEach(s => { counts[s.store] = (counts[s.store] || 0) + s.total; });
     const total = Object.values(counts).reduce((s, v) => s + v, 0);
     const colors = ["hsl(172,66%,50%)", "hsl(205,80%,55%)", "hsl(38,92%,50%)", "hsl(152,60%,45%)"];
     return Object.entries(counts).map(([name, value], i) => ({
       name, value: total > 0 ? Math.round((value / total) * 100) : 0, color: colors[i % colors.length],
     }));
-  }, [sales]);
+  }, [filteredSales]);
 
   // Top products from sales
   const topProducts = useMemo(() => {
-    if (sales.length === 0) return [];
+    if (filteredSales.length === 0) return [];
     const map: Record<string, { units: number; revenue: number }> = {};
-    sales.forEach(s => s.items.forEach(item => {
+    filteredSales.forEach(s => s.items.forEach(item => {
       if (!map[item.name]) map[item.name] = { units: 0, revenue: 0 };
       map[item.name].units += item.qty;
       map[item.name].revenue += item.qty * item.price;
@@ -107,7 +129,7 @@ export default function ReportsPage() {
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
-  }, [sales]);
+  }, [filteredSales]);
 
   // Warehouse utilization
   const warehouseUtil = useMemo(() => {
@@ -134,7 +156,7 @@ export default function ReportsPage() {
   // Gain/Loss data — cost vs revenue per item + operational expenses
   const gainLossData = useMemo(() => {
     const map: Record<string, { name: string; revenue: number; cost: number; units: number }> = {};
-    sales.forEach(s => s.items.forEach(item => {
+    filteredSales.forEach(s => s.items.forEach(item => {
       const invItem = inventory.find(i => i.sku === item.sku);
       const factor = item.unitFactor || 1;
       const totalBaseQty = item.baseQty || (item.qty * factor);
@@ -146,7 +168,7 @@ export default function ReportsPage() {
       map[item.name].units += item.qty;
     }));
     return Object.values(map).map(d => ({ ...d, profit: d.revenue - d.cost, margin: d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue * 100) : 0 }));
-  }, [sales, inventory]);
+  }, [filteredSales, inventory]);
 
   // Net gain/loss including operational expenses
   const netGainLoss = useMemo(() => {
@@ -157,8 +179,21 @@ export default function ReportsPage() {
   // End of Day summary — includes today's operational expenses
   const eodData = useMemo(() => {
     const today = new Date().toDateString();
-    const todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
-    const todayExpenses = expenses.filter(e => new Date(e.date).toDateString() === today);
+    let todaySales = sales.filter(s => new Date(s.date).toDateString() === today);
+    let todayExpenses = expenses.filter(e => new Date(e.date).toDateString() === today);
+
+    // Extract unique staff for the filter dropdown before filtering
+    const staffSet = new Set<string>();
+    todaySales.forEach(s => staffSet.add(s.createdBy));
+    todayExpenses.forEach(e => staffSet.add(e.createdBy));
+    const activeStaff = Array.from(staffSet).sort();
+
+    // Apply staff filter if selected
+    if (eodStaffFilter !== "all") {
+      todaySales = todaySales.filter(s => s.createdBy === eodStaffFilter);
+      todayExpenses = todayExpenses.filter(e => e.createdBy === eodStaffFilter);
+    }
+
     const totalRevenue = todaySales.reduce((s, sale) => s + sale.total, 0);
     const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((a, i) => a + i.qty, 0), 0);
     const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((a, item) => {
@@ -177,19 +212,19 @@ export default function ReportsPage() {
       byStaff[s.createdBy].sales++;
       byStaff[s.createdBy].revenue += s.total;
     });
-    return { sales: todaySales, totalRevenue, totalItems, totalCost, opExpenses: todayOpExpenses, profit: totalRevenue - totalCost - todayOpExpenses, byMethod, byStaff: Object.values(byStaff), count: todaySales.length, todayExpenses };
-  }, [sales, inventory, expenses]);
+    return { sales: todaySales, totalRevenue, totalItems, totalCost, opExpenses: todayOpExpenses, profit: totalRevenue - totalCost - todayOpExpenses, byMethod, byStaff: Object.values(byStaff), count: todaySales.length, todayExpenses, activeStaff };
+  }, [sales, inventory, expenses, eodStaffFilter]);
 
-  const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0);
+  const totalRevenue = filteredSales.reduce((s, sale) => s + sale.total, 0);
   const totalInventoryValue = inventory.reduce((s, i) => s + i.qty * i.price, 0);
   const totalInventoryCost = inventory.reduce((s, i) => s + i.qty * (i.costPrice || 0), 0);
 
   const stats = useMemo(() => [
-    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: sales.length > 0 ? `${sales.length} sales` : "—", trend: "up" as const, icon: DollarSign },
-    { label: "Total Orders", value: sales.length.toLocaleString(), change: "", trend: "up" as const, icon: ShoppingCart },
+    { label: "Total Revenue", value: formatCurrency(totalRevenue), change: filteredSales.length > 0 ? `${filteredSales.length} sales` : "—", trend: "up" as const, icon: DollarSign },
+    { label: "Total Orders", value: filteredSales.length.toLocaleString(), change: "", trend: "up" as const, icon: ShoppingCart },
     { label: "Inventory Value", value: formatCurrency(totalInventoryValue), change: `${inventory.length} items`, trend: "up" as const, icon: Package },
     { label: "Active Users", value: users.filter(u => u.status === "active").length.toString(), change: "", trend: "up" as const, icon: Users },
-  ], [formatCurrency, totalRevenue, sales, totalInventoryValue, inventory, users]);
+  ], [formatCurrency, totalRevenue, filteredSales, totalInventoryValue, inventory, users]);
 
   const allTabs: { key: ReportType; label: string; icon: React.ElementType }[] = [
     { key: "overview", label: "Overview", icon: BarChart3 },
@@ -233,7 +268,7 @@ export default function ReportsPage() {
         + `\n\nOperational Expenses\nCategory,Amount\n` + expensesByCategory.map(e => `${e.name},${e.value}`).join("\n")
         + `\n\nNet Gain/Loss,${netGainLoss}`;
     } else if (reportType === "expenses") {
-      csv = "ID,Date,Category,Description,Amount,Store,By\n" + expenses.map(e => `${e.id},${new Date(e.date).toLocaleDateString()},${e.category},${e.description},${e.amount},${e.store},${e.createdBy}`).join("\n");
+      csv = "ID,Date,Category,Description,Amount,Store,By\n" + filteredExpenses.map(e => `${e.id},${new Date(e.date).toLocaleDateString()},${e.category},${e.description},${e.amount},${e.store},${e.createdBy}`).join("\n");
     } else if (reportType === "eod") {
       csv = `End of Day Report - ${new Date().toLocaleDateString()}\nTotal Sales,${eodData.count}\nTotal Revenue,${eodData.totalRevenue}\nCost of Goods,${eodData.totalCost}\nOperational Expenses,${eodData.opExpenses}\nNet Profit,${eodData.profit}`;
     } else {
@@ -270,9 +305,9 @@ export default function ReportsPage() {
         <table><thead><tr><th>Product</th><th>Units</th><th>Revenue</th><th>Cost</th><th>Gross Profit</th><th>Margin</th></tr></thead><tbody>
         ${gainLossData.map(d => `<tr><td>${d.name}</td><td>${d.units}</td><td>${formatCurrency(d.revenue)}</td><td>${formatCurrency(d.cost)}</td><td class="${d.profit >= 0 ? '' : 'loss'}">${formatCurrency(d.profit)}</td><td>${d.margin.toFixed(1)}%</td></tr>`).join("")}
         </tbody></table>
-        ${expenses.length > 0 ? `<h3>Operational Expenses</h3>
+        ${filteredExpenses.length > 0 ? `<h3>Operational Expenses</h3>
         <table><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Store</th><th>Date</th><th>By</th></tr></thead><tbody>
-        ${expenses.map(e => `<tr><td>${e.category}</td><td>${e.description}</td><td>${formatCurrency(e.amount)}</td><td>${e.store}</td><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.createdBy}</td></tr>`).join("")}
+        ${filteredExpenses.map(e => `<tr><td>${e.category}</td><td>${e.description}</td><td>${formatCurrency(e.amount)}</td><td>${e.store}</td><td>${new Date(e.date).toLocaleDateString()}</td><td>${e.createdBy}</td></tr>`).join("")}
         </tbody></table>` : ''}
         <div class="stat-grid" style="margin-top:20px">
           <div class="stat-card"><div class="stat-value">${formatCurrency(grossProfit)}</div><div class="stat-label">Gross Profit</div></div>
@@ -317,7 +352,7 @@ export default function ReportsPage() {
       bodyContent = `${headerHtml}${statsHtml}
         <h3>All Sales</h3>
         <table><thead><tr><th>ID</th><th>Date</th><th>Customer</th><th>Items</th><th>Method</th><th>Total</th><th>By</th></tr></thead><tbody>
-        ${sales.map(s => `<tr><td>${s.id}</td><td>${new Date(s.date).toLocaleDateString()}</td><td>${s.customer}</td><td>${s.items.length}</td><td>${s.method}</td><td>${formatCurrency(s.total)}</td><td>${s.createdBy}</td></tr>`).join("")}
+        ${filteredSales.map(s => `<tr><td>${s.id}</td><td>${new Date(s.date).toLocaleDateString()}</td><td>${s.customer}</td><td>${s.items.length}</td><td>${s.method}</td><td>${formatCurrency(s.total)}</td><td>${s.createdBy}</td></tr>`).join("")}
         </tbody></table>`;
     } else {
       bodyContent = `${headerHtml}${statsHtml}`;
@@ -373,11 +408,20 @@ export default function ReportsPage() {
             <p className="text-sm text-muted-foreground mt-1">Analytics, insights, and performance metrics across all modules.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {reportType === "eod" && eodData.activeStaff.length > 0 && (
+              <select value={eodStaffFilter} onChange={(e) => setEodStaffFilter(e.target.value)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
+                <option value="all">All Staff</option>
+                {eodData.activeStaff.map(staff => (
+                  <option key={staff} value={staff}>{staff}</option>
+                ))}
+              </select>
+            )}
             <select value={dateRange} onChange={(e) => setDateRange(e.target.value)} className="h-9 rounded-lg border border-border bg-background px-3 text-sm text-foreground">
               <option value="30days">Last 30 Days</option>
               <option value="3months">Last 3 Months</option>
               <option value="6months">Last 6 Months</option>
               <option value="1year">Last Year</option>
+              <option value="all">All Time</option>
             </select>
             <button onClick={submitReportForApproval} className="flex items-center gap-2 px-3 py-2 bg-info/10 text-info rounded-lg text-sm font-medium hover:bg-info/20 transition-colors">
               <GitBranch className="w-4 h-4" />Workflow
@@ -422,10 +466,12 @@ export default function ReportsPage() {
         </div>
 
         {!hasData && (
-          <div className="glass-card rounded-xl p-10 text-center">
-            <BarChart3 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <h3 className="font-semibold text-foreground">No data to report</h3>
-            <p className="text-sm text-muted-foreground mt-1">Add inventory items and complete sales to generate reports.</p>
+          <div className="py-12">
+            <EmptyState 
+              icon={BarChart3} 
+              title="No data to report" 
+              description="Add inventory items and complete sales to generate reports." 
+            />
           </div>
         )}
 
@@ -561,9 +607,12 @@ export default function ReportsPage() {
                 </div>
               </>
             ) : (
-              <div className="glass-card rounded-xl p-10 text-center">
-                <DollarSign className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-muted-foreground">No sales data yet. Complete sales in POS to see charts.</p>
+              <div className="py-12">
+                <EmptyState 
+                  icon={DollarSign} 
+                  title="No sales data yet" 
+                  description="Complete sales in POS to see charts and trends." 
+                />
               </div>
             )}
           </div>

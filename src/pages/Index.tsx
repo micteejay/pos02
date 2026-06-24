@@ -7,6 +7,8 @@ import {
   Truck, GitBranch, Building2, Download, Loader2, Monitor, Smartphone
 } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
+import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
@@ -39,12 +41,16 @@ export default function Dashboard() {
     windows: "https://github.com/micteejay/pos02/releases/latest", 
     mobile: "https://github.com/micteejay/pos02/releases/latest/download/app-release-unsigned.apk" 
   });
+  const [mobileUpdate, setMobileUpdate] = useState<{ version: string; url: string } | null>(null);
 
   useEffect(() => {
     if (isTauri()) return;
-    fetch("https://api.github.com/repos/micteejay/pos02/releases/latest")
-      .then(res => res.json())
-      .then(data => {
+    
+    const checkUpdates = async () => {
+      try {
+        const res = await fetch("https://api.github.com/repos/micteejay/pos02/releases/latest");
+        const data = await res.json();
+        
         if (data && data.assets) {
           let winUrl = "";
           let mobUrl = downloadUrls.mobile;
@@ -66,9 +72,39 @@ export default function Dashboard() {
             windows: winUrl || "https://github.com/micteejay/pos02/releases/latest",
             mobile: mobUrl
           });
+
+          // Check native app version
+          if (Capacitor.isNativePlatform()) {
+            const info = await CapacitorApp.getInfo();
+            const currentVersion = info.version;
+            const latestVersion = data.tag_name ? data.tag_name.replace(/^v/, '') : null;
+            
+            if (latestVersion && currentVersion) {
+              const pa = latestVersion.split('.').map(Number);
+              const pb = currentVersion.split('.').map(Number);
+              let isNewer = false;
+              for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const na = pa[i] || 0;
+                const nb = pb[i] || 0;
+                if (na > nb) { isNewer = true; break; }
+                if (nb > na) { isNewer = false; break; }
+              }
+              
+              if (isNewer) {
+                setMobileUpdate({
+                  version: latestVersion,
+                  url: mobUrl
+                });
+              }
+            }
+          }
         }
-      })
-      .catch(err => console.error("Failed to fetch release assets:", err));
+      } catch (err) {
+        console.error("Failed to fetch release assets:", err);
+      }
+    };
+    
+    checkUpdates();
   }, []);
 
   const totalRevenue = useMemo(() => sales.reduce((s, sale) => s + sale.total, 0), [sales]);
@@ -121,7 +157,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground mt-1">Welcome back. Here's your organization at a glance.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
-            {!isTauri() && (
+            {!isTauri() && !Capacitor.isNativePlatform() && (
               <div className="flex items-center gap-2">
                 <a 
                   href={downloadUrls.windows} 
@@ -145,6 +181,27 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Mobile Update Banner */}
+        {mobileUpdate && Capacitor.isNativePlatform() && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <Download className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground text-sm">App Update Available</h3>
+                <p className="text-xs text-muted-foreground">Version {mobileUpdate.version} is ready to download.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => window.open(mobileUpdate.url, '_system')}
+              className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors"
+            >
+              Update Now
+            </button>
+          </div>
+        )}
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
