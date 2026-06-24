@@ -723,19 +723,29 @@ export default function ChatPage() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {!activeChannel ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <MessageSquare className="w-12 h-12 mb-3 opacity-30" /><p className="text-sm font-medium">Select a channel to start chatting</p>
+              <div className="h-full flex items-center justify-center">
+                <EmptyState icon={MessageSquare} title="Select a channel" description="Choose a channel or conversation to start chatting." />
               </div>
             ) : channelMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                <MessageSquare className="w-12 h-12 mb-3 opacity-30" /><p className="text-sm font-medium">No messages yet</p><p className="text-xs mt-1">Start the conversation!</p>
+              <div className="h-full flex items-center justify-center">
+                <EmptyState icon={MessageSquare} title="No messages yet" description="Be the first to start the conversation!" />
               </div>
-            ) : channelMessages.map(msg => {
+            ) : channelMessages.map((msg, index) => {
+              const prevMsg = index > 0 ? channelMessages[index - 1] : null;
+              const showDateDivider = !prevMsg || prevMsg.dateStr !== msg.dateStr;
               const isMe = msg.sender_id === userId;
               const replyMsg = msg.replyTo ? messages.find(m => m.id === msg.replyTo) : null;
               return (
-                <div key={msg.id} className={`flex gap-3 group ${isMe ? "flex-row-reverse" : ""}`}>
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${isMe ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+                <div key={msg.id}>
+                  {showDateDivider && msg.dateStr && (
+                    <div className="flex items-center justify-center my-6">
+                      <div className="bg-muted px-3 py-1 rounded-full text-xs font-medium text-muted-foreground border border-border">
+                        {msg.dateStr}
+                      </div>
+                    </div>
+                  )}
+                  <div className={`flex gap-3 group ${isMe ? "flex-row-reverse" : ""}`}>
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ${isMe ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
                     {msg.avatar}
                   </div>
                   <div className={`max-w-[70%] ${isMe ? "text-right" : ""}`}>
