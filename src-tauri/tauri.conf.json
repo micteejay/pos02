@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "MICTEEJAY POS",
+  "productName": "VITE POS",
   "version": "0.4.0",
   "identifier": "com.micteejay.pos",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "MICTEEJAY POS",
+        "title": "VITE POS",
         "width": 800,
         "height": 600,
         "resizable": true,
