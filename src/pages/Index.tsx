@@ -39,7 +39,7 @@ export default function Dashboard() {
 
   const [downloadUrls, setDownloadUrls] = useState({ 
     windows: "https://github.com/micteejay/pos02/releases/latest", 
-    mobile: "https://github.com/micteejay/pos02/releases/latest/download/app-release-unsigned.apk" 
+    mobile: "https://github.com/micteejay/pos02/releases/latest/download/app-debug.apk" 
   });
   const [mobileUpdate, setMobileUpdate] = useState<{ version: string; url: string } | null>(null);
 
@@ -63,7 +63,7 @@ export default function Dashboard() {
               winUrl = asset.browser_download_url;
             }
             // Find mobile APK
-            if (asset.name.endsWith(".apk") && asset.name.includes("release")) {
+            if (asset.name.endsWith(".apk") && asset.name.includes("debug")) {
               mobUrl = asset.browser_download_url;
             }
           }
