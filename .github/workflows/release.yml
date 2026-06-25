@@ -52,20 +52,6 @@ jobs:
           projectPath: "."
           args: "--target x86_64-pc-windows-msvc"
 
-      - name: List Bundle Contents
-        shell: pwsh
-        run: |
-          Write-Host "Listing bundle directory:"
-          Get-ChildItem -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle -Recurse | Select-Object FullName, Length
-
-      - name: Upload Windows Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: VITEPOSs-Windows
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/
-          if-no-files-found: error
-          retention-days: 30
-
   build-android:
     needs: build-windows
     permissions:
