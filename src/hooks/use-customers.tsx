@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { LocalCustomerRepository } from "@/lib/repositories";
 
 export interface Customer {
   id: string;
@@ -36,6 +37,8 @@ function mapRow(r: any): Customer {
   };
 }
 
+let customersHasPulledOnBoot = false;
+
 export function useCustomers() {
   const { user } = useAuth();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -44,11 +47,61 @@ export function useCustomers() {
   const fetchAll = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
-    const { data } = await supabase
-      .from("customers")
-      .select("*")
-      .order("name", { ascending: true });
-    setCustomers((data || []).map(mapRow));
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    const useOnline = !isTauriEnv || isOnline;
+
+    if (useOnline) {
+      const { data } = await supabase.from("customers").select("*").order("name", { ascending: true });
+      const mapped = (data || []).map(mapRow);
+
+      if (isTauriEnv && data) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          for (const c of data) {
+            await db.execute(
+              `INSERT OR REPLACE INTO customers (id, name, email, phone, address, city, notes, total_spend, total_orders, last_purchase_at, created_at, outstanding_balance, loyalty_points) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [c.id, c.name, c.email, c.phone, c.address, c.city, c.notes, c.total_spend || 0, c.total_orders || 0, c.last_purchase_at, c.created_at, c.outstanding_balance || 0, c.loyalty_points || 0]
+            );
+          }
+        } catch (e) {
+          console.error("[useCustomers] SQLite cache write failed:", e);
+        }
+      }
+
+      setCustomers(mapped);
+      setLoading(false);
+      return;
+    }
+
+    // Offline fallback for Tauri
+    let localCusts = await LocalCustomerRepository.getAll();
+    
+    // Bootstrap / Seed SQLite customers table from remote Supabase on first run
+    if (localCusts.length === 0) {
+      const { data } = await supabase.from("customers").select("*").order("name", { ascending: true });
+      if (data) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          for (const c of data) {
+            await db.execute(
+              `INSERT OR REPLACE INTO customers (id, name, email, phone, address, city, notes, total_spend, total_orders, last_purchase_at, created_at, outstanding_balance, loyalty_points) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              [c.id, c.name, c.email, c.phone, c.address, c.city, c.notes, c.total_spend || 0, c.total_orders || 0, c.last_purchase_at, c.created_at, c.outstanding_balance || 0, c.loyalty_points || 0]
+            );
+          }
+          localCusts = await LocalCustomerRepository.getAll();
+        } catch (e) {
+          console.error("[useCustomers] SQLite bootstrap seeding failed:", e);
+        }
+      }
+    }
+    
+    setCustomers(localCusts);
     setLoading(false);
   }, [user]);
 
@@ -63,9 +116,20 @@ export function useCustomers() {
 
   const addCustomer = useCallback(
     async (input: Partial<Customer> & { name: string }) => {
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+      if (isTauriEnv && !isOnline) {
+        const c = await LocalCustomerRepository.insert(input, user?.companyId || null, user?.id || null);
+        setCustomers((prev) => [c, ...prev]);
+        return { ok: true as const, customer: c };
+      }
+
+      const id = input.id || crypto.randomUUID();
       const { data, error } = await supabase
         .from("customers")
         .insert({
+          id,
           name: input.name.trim(),
           email: input.email?.trim() || null,
           phone: input.phone?.trim() || null,
@@ -79,6 +143,21 @@ export function useCustomers() {
         .single();
       if (error || !data) return { ok: false as const, error: error?.message };
       const c = mapRow(data);
+
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          await db.execute(
+            `INSERT OR REPLACE INTO customers (id, name, email, phone, address, city, notes, total_spend, total_orders, last_purchase_at, created_at, outstanding_balance, loyalty_points) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, c.name, c.email, c.phone, c.address, c.city, c.notes, 0, 0, null, c.createdAt, 0, 0]
+          );
+        } catch (e) {
+          console.error("[addCustomer] SQLite write failed:", e);
+        }
+      }
+
       setCustomers((prev) => [c, ...prev]);
       return { ok: true as const, customer: c };
     },
@@ -87,6 +166,15 @@ export function useCustomers() {
 
   const updateCustomer = useCallback(
     async (id: string, updates: Partial<Customer>) => {
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+      if (isTauriEnv && !isOnline) {
+        await LocalCustomerRepository.update(id, updates);
+        setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+        return { ok: true as const };
+      }
+
       const payload: any = {};
       if (updates.name !== undefined) payload.name = updates.name;
       if (updates.email !== undefined) payload.email = updates.email || null;
@@ -94,8 +182,33 @@ export function useCustomers() {
       if (updates.address !== undefined) payload.address = updates.address || null;
       if (updates.city !== undefined) payload.city = updates.city || null;
       if (updates.notes !== undefined) payload.notes = updates.notes || null;
+      
       const { error } = await supabase.from("customers").update(payload).eq("id", id);
       if (error) return { ok: false as const, error: error.message };
+
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const existing = await db.select<any[]>("SELECT * FROM customers WHERE id = ?", [id]);
+          if (existing.length > 0) {
+            const current = existing[0];
+            const name = updates.name !== undefined ? updates.name : current.name;
+            const email = updates.email !== undefined ? updates.email : current.email;
+            const phone = updates.phone !== undefined ? updates.phone : current.phone;
+            const address = updates.address !== undefined ? updates.address : current.address;
+            const city = updates.city !== undefined ? updates.city : current.city;
+            const notes = updates.notes !== undefined ? updates.notes : current.notes;
+            await db.execute(
+              `UPDATE customers SET name = ?, email = ?, phone = ?, address = ?, city = ?, notes = ? WHERE id = ?`,
+              [name, email, phone, address, city, notes, id]
+            );
+          }
+        } catch (e) {
+          console.error("[updateCustomer] SQLite update failed:", e);
+        }
+      }
+
       setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
       return { ok: true as const };
     },
@@ -103,12 +216,69 @@ export function useCustomers() {
   );
 
   const deleteCustomer = useCallback(async (id: string) => {
-    await supabase.from("customers").delete().eq("id", id);
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      const { getDb } = await import("@/lib/db");
+      const { enqueueSync } = await import("@/lib/sync-engine");
+      const db = await getDb();
+      await db.execute("DELETE FROM customers WHERE id = ?", [id]);
+      await enqueueSync("customers", "DELETE", { id });
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+      return;
+    }
+
+    const { error } = await supabase.from("customers").delete().eq("id", id);
+    if (!error) {
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          await db.execute("DELETE FROM customers WHERE id = ?", [id]);
+        } catch (e) {
+          console.error("[deleteCustomer] SQLite delete failed:", e);
+        }
+      }
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+    }
   }, []);
 
   /** Recompute totals from sales_transactions for this company. Useful after backfilling links. */
   const recomputeStats = useCallback(async () => {
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    const useOnline = !isTauriEnv || isOnline;
+
+    if (!useOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const db = await getDb();
+        const txs = await db.select<any[]>(
+          "SELECT customer_id, total, created_at FROM sales_transactions WHERE customer_id IS NOT NULL"
+        );
+        const agg = new Map<string, { spend: number; orders: number; last: string }>();
+        txs.forEach((t: any) => {
+          const cur = agg.get(t.customer_id) || { spend: 0, orders: 0, last: "" };
+          cur.spend += Number(t.total) || 0;
+          cur.orders += 1;
+          if (!cur.last || t.created_at > cur.last) cur.last = t.created_at;
+          agg.set(t.customer_id, cur);
+        });
+
+        for (const [id, v] of Array.from(agg.entries())) {
+          await db.execute(
+            "UPDATE customers SET total_spend = ?, total_orders = ?, last_purchase_at = ? WHERE id = ?",
+            [v.spend, v.orders, v.last || null, id]
+          );
+        }
+        await fetchAll();
+      } catch (e) {
+        console.error("[recomputeStats] Offline stats recompute failed:", e);
+      }
+      return;
+    }
+
     if (!user?.companyId) return;
     const { data: txs } = await supabase
       .from("sales_transactions")
@@ -132,6 +302,21 @@ export function useCustomers() {
         }).eq("id", id)
       )
     );
+    // Write back updated stats to SQLite cache
+    if (isTauriEnv) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const db = await getDb();
+        for (const [id, v] of Array.from(agg.entries())) {
+          await db.execute(
+            "UPDATE customers SET total_spend = ?, total_orders = ?, last_purchase_at = ? WHERE id = ?",
+            [v.spend, v.orders, v.last || null, id]
+          );
+        }
+      } catch (e) {
+        console.error("[recomputeStats] SQLite write back failed:", e);
+      }
+    }
     await fetchAll();
   }, [user, fetchAll]);
 

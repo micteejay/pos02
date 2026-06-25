@@ -331,7 +331,8 @@ pub mod windows;
 pub mod unix;
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
-  if cfg!(windows) {
+  #[cfg(target_os = "windows")]
+  {
     windows::init_windows();
   }
     Builder::new("printer")

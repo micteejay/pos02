@@ -110,10 +110,39 @@ export default function InventoryPage() {
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
-  // Fetch transfers from DB
+  // Fetch transfers from DB (online) or local cache (offline)
   useEffect(() => {
     const fetchTransfers = async () => {
       setTransfersLoading(true);
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+      const useOnline = !isTauriEnv || isOnline;
+
+      if (!useOnline) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const rows = await db.select<any[]>("SELECT * FROM stock_transfers ORDER BY created_at DESC");
+          setTransfers(rows.map((t: any) => ({
+            id: t.transfer_number,
+            dbId: t.id,
+            items: t.items_json || "Items",
+            from: warehouseNames.find((_: any, __: any, arr: any[]) => false) || t.from_store_id || "Unknown",
+            to: t.to_store_id || "Unknown",
+            fromId: t.from_store_id,
+            toId: t.to_store_id,
+            initiated: t.created_at ? new Date(t.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Unknown",
+            eta: "TBD",
+            status: t.status as Transfer["status"],
+            requester: t.created_by || "System",
+          })));
+        } catch (e) {
+          console.error("[InventoryPage] Offline transfer fetch failed:", e);
+        }
+        setTransfersLoading(false);
+        return;
+      }
+
       const { data } = await supabase
         .from("stock_transfers")
         .select("*, stock_transfer_items(*), from_wh:warehouses!stock_transfers_from_warehouse_id_fkey(name), to_wh:warehouses!stock_transfers_to_warehouse_id_fkey(name)")
@@ -123,6 +152,23 @@ export default function InventoryPage() {
         const profilesRes = await supabase.from("profiles").select("id, name");
         const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
         const rawTransfers = data as unknown as StockTransferQueryRow[];
+
+        // Cache to local DB
+        if (isTauriEnv) {
+          try {
+            const { getDb } = await import("@/lib/db");
+            const db = await getDb();
+            for (const t of rawTransfers) {
+              const itemsStr = (t.stock_transfer_items || []).map(i => `${i.name} ×${i.qty}`).join(", ") || "Items";
+              await db.execute(
+                `INSERT OR REPLACE INTO stock_transfers (id, transfer_number, from_store_id, to_store_id, status, items_json, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [t.id, t.transfer_number, t.from_warehouse_id, t.to_warehouse_id, t.status, itemsStr, t.requester, t.created_at]
+              );
+            }
+          } catch (e) {
+            console.error("[InventoryPage] SQLite transfer cache write failed:", e);
+          }
+        }
 
         setTransfers(rawTransfers.map((t) => {
           const items = (t.stock_transfer_items || []).map((i) => `${i.name} ×${i.qty}`).join(", ");
@@ -162,11 +208,40 @@ export default function InventoryPage() {
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key])), [hasPermission]);
 
   const addTransfer = async (tr: Transfer) => {
-    // Save to DB
-    const { data: tNum } = await supabase.rpc("generate_transfer_number");
-    const transferNumber = tNum || `TRF-${Date.now()}`;
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
     const fromWh = orgWarehouses.find(w => w.name === tr.from);
     const toWh = orgWarehouses.find(w => w.name === tr.to);
+    const now = new Date().toISOString();
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        const transferNumber = `TRF-${Date.now()}`;
+        const dbId = crypto.randomUUID();
+        await db.execute(
+          `INSERT OR REPLACE INTO stock_transfers (id, transfer_number, from_store_id, to_store_id, status, items_json, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [dbId, transferNumber, fromWh?.id || null, toWh?.id || null, "pending", tr.items, user?.id || null, now]
+        );
+        await enqueueSync("stock_transfers", "INSERT", {
+          id: dbId, transfer_number: transferNumber, from_warehouse_id: fromWh?.id || null,
+          to_warehouse_id: toWh?.id || null, status: "pending", requester: user?.id || null, notes: tr.items,
+        });
+        setTransfers(prev => [{ ...tr, id: transferNumber, dbId }, ...prev]);
+        addNotification({ type: "inventory", title: `Transfer ${transferNumber} created (offline)`, message: `${tr.items} from ${tr.from} → ${tr.to}`, link: "/approvals" });
+        toast.success("Transfer created offline");
+      } catch (e) {
+        console.error("[InventoryPage] Offline transfer create failed:", e);
+        toast.error("Failed to create transfer offline.");
+      }
+      return;
+    }
+
+    // Online path
+    const { data: tNum } = await supabase.rpc("generate_transfer_number");
+    const transferNumber = tNum || `TRF-${Date.now()}`;
 
     const { data: newTransfer, error } = await supabase.from("stock_transfers").insert({
       transfer_number: transferNumber,
@@ -178,6 +253,19 @@ export default function InventoryPage() {
     }).select().single();
 
     if (newTransfer && !error) {
+      // Cache to local DB
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          await db.execute(
+            `INSERT OR REPLACE INTO stock_transfers (id, transfer_number, from_store_id, to_store_id, status, items_json, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [newTransfer.id, transferNumber, fromWh?.id || null, toWh?.id || null, "pending", tr.items, user?.id || null, now]
+          );
+        } catch (e) {
+          console.error("[InventoryPage] SQLite transfer cache write failed:", e);
+        }
+      }
       setTransfers(prev => [{ ...tr, id: transferNumber, dbId: newTransfer.id }, ...prev]);
       addApprovalItem({
         title: `Transfer: ${tr.items}`,
@@ -197,7 +285,22 @@ export default function InventoryPage() {
   const updateTransferStatus = async (id: string, status: Transfer["status"]) => {
     const tr = transfers.find(t => t.id === id);
     if (!tr) return;
-    await supabase.from("stock_transfers").update({ status: status as Database["public"]["Enums"]["transfer_status"] }).eq("id", tr.dbId);
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        await db.execute("UPDATE stock_transfers SET status = ? WHERE id = ?", [status, tr.dbId]);
+        await enqueueSync("stock_transfers", "UPDATE", { id: tr.dbId, status });
+      } catch (e) {
+        console.error("[InventoryPage] Offline transfer status update failed:", e);
+      }
+    } else {
+      await supabase.from("stock_transfers").update({ status: status as Database["public"]["Enums"]["transfer_status"] }).eq("id", tr.dbId);
+    }
     setTransfers(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     if (status === "delivered") {
       addNotification({ type: "inventory", title: `Transfer ${id} delivered`, message: "Stock has been received at destination", link: "/inventory" });

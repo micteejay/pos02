@@ -194,12 +194,33 @@ export async function printNode(
   if (isTauri()) {
     try {
       const html = nodeToHtml(node, title, opts?.paperWidth);
-      await printHtml({ 
-        id: `pos-${Date.now()}`, 
-        html, 
+      const pw = (opts?.paperWidth || "").toLowerCase();
+      const isThermal = pw.includes("58") || pw.includes("80");
+      const widthNum = pw.includes("58") ? 58 : (pw.includes("80") ? 80 : undefined);
+      
+      const printOptions: any = {
+        id: `pos-${Date.now()}`,
+        html,
         printer: selectedPrinter || "default",
-        remove_after_print: true 
-      } as any);
+        print_settings: "",
+        remove_after_print: true
+      };
+
+      if (isThermal && widthNum) {
+        printOptions.page_width = widthNum;
+        printOptions.page_height = 200; // safe thermal height estimate (mm)
+        printOptions.margin = {
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          unit: "mm"
+        };
+      } else {
+        printOptions.page_size = "A4";
+      }
+
+      await printHtml(printOptions);
       return; // done — completely silent
     } catch (err) {
       console.error("[printNode] Native print failed, falling back to dialog:", err);
@@ -209,7 +230,7 @@ export async function printNode(
 
   // --- Path 2: Fallback ---
   const html = nodeToHtml(node, title, opts?.paperWidth);
-  await printHtmlString(html, title);
+  await printHtmlString(html, title, false, opts?.paperWidth);
 }
 
 /**
@@ -264,7 +285,8 @@ export async function printText(
 export async function printHtmlString(
   html: string,
   title = "Print",
-  bypassIntercept = false
+  bypassIntercept = false,
+  paperWidth?: string
 ): Promise<void> {
   // Intercept on Capacitor Native Platform to show the Share/Download bottom sheet
   if (Capacitor.isNativePlatform() && !bypassIntercept) {
@@ -284,12 +306,33 @@ export async function printHtmlString(
   // --- Path 1: Silent native print ---
   if (isTauri()) {
     try {
-      await printHtml({ 
-        id: `pos-${Date.now()}`, 
-        html, 
+      const pw = (paperWidth || "").toLowerCase();
+      const isThermal = pw.includes("58") || pw.includes("80");
+      const widthNum = pw.includes("58") ? 58 : (pw.includes("80") ? 80 : undefined);
+
+      const printOptions: any = {
+        id: `pos-${Date.now()}`,
+        html,
         printer: selectedPrinter || "default",
-        remove_after_print: true 
-      } as any);
+        print_settings: "",
+        remove_after_print: true
+      };
+
+      if (isThermal && widthNum) {
+        printOptions.page_width = widthNum;
+        printOptions.page_height = 200; // safe thermal height estimate (mm)
+        printOptions.margin = {
+          top: 0,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          unit: "mm"
+        };
+      } else {
+        printOptions.page_size = "A4";
+      }
+
+      await printHtml(printOptions);
       return;
     } catch (err) {
       console.error("[printHtmlString] Native print failed, falling back to dialog:", err);

@@ -33,16 +33,80 @@ export default function CustomerDetailDialog({ customerId, formatCurrency, onClo
     let active = true;
     (async () => {
       setLoading(true);
-      const [pRes, lRes, sRes] = await Promise.all([
-        supabase.from("customer_payments").select("id,amount,method,reference,note,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(25),
-        supabase.from("loyalty_transactions").select("id,points,type,reference_type,note,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(25),
-        supabase.from("sales_transactions").select("id,transaction_number,total,balance_due,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(15),
-      ]);
-      if (!active) return;
-      setPayments((pRes.data || []) as any);
-      setLoyalty((lRes.data || []) as any);
-      setSales((sRes.data || []) as any);
-      setLoading(false);
+
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+      const useOnline = !isTauriEnv || isOnline;
+
+      if (!useOnline) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+
+          // 1. Fetch local sales transactions for this customer
+          const localTxs = await db.select<any[]>(
+            "SELECT id, transaction_number, total, created_at FROM sales_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 15",
+            [customerId]
+          );
+          const mappedSales = localTxs.map(t => ({
+            id: t.id,
+            transaction_number: t.transaction_number,
+            total: Number(t.total),
+            balance_due: 0,
+            created_at: t.created_at
+          }));
+
+          // 2. Fetch pending customer payments from sync_queue
+          const queueJobs = await db.select<any[]>(
+            "SELECT * FROM sync_queue WHERE table_name = ? AND action = ? ORDER BY created_at DESC",
+            ["customer_payments", "INSERT"]
+          );
+          const mappedPayments: PaymentRow[] = [];
+          for (const job of queueJobs) {
+            try {
+              const payload = JSON.parse(job.payload);
+              if (payload.customer_id === customerId) {
+                mappedPayments.push({
+                  id: payload.id || crypto.randomUUID(),
+                  amount: Number(payload.amount),
+                  method: payload.method,
+                  reference: payload.reference || null,
+                  note: payload.note || null,
+                  created_at: job.created_at
+                });
+              }
+            } catch (e) {
+              console.error("[CustomerDetailDialog] Failed to parse sync queue payload:", e);
+            }
+          }
+
+          if (!active) return;
+          setSales(mappedSales);
+          setPayments(mappedPayments);
+          setLoyalty([]); // loyalty point activities are not cached offline
+          setLoading(false);
+        } catch (e) {
+          console.error("[CustomerDetailDialog] Offline query failed:", e);
+          if (active) setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const [pRes, lRes, sRes] = await Promise.all([
+          supabase.from("customer_payments").select("id,amount,method,reference,note,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(25),
+          supabase.from("loyalty_transactions").select("id,points,type,reference_type,note,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(25),
+          supabase.from("sales_transactions").select("id,transaction_number,total,balance_due,created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(15),
+        ]);
+        if (!active) return;
+        setPayments((pRes.data || []) as any);
+        setLoyalty((lRes.data || []) as any);
+        setSales((sRes.data || []) as any);
+      } catch (err) {
+        console.error("Customer detail dialog query error:", err);
+      } finally {
+        if (active) setLoading(false);
+      }
     })();
     return () => { active = false; };
   }, [customerId]);

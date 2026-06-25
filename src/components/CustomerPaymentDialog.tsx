@@ -43,6 +43,52 @@ export default function CustomerPaymentDialog({
     if (!Number.isFinite(value) || value <= 0) return toast.error("Enter a valid amount");
     if (method === "transfer" && !reference.trim()) return toast.error("Add a reference for the transfer");
     setSaving(true);
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        
+        const payload = {
+          id: crypto.randomUUID(),
+          customer_id: customerId,
+          amount: value,
+          method,
+          reference: reference.trim() || null,
+          note: note.trim() || null,
+          company_id: user?.companyId || null,
+          created_by: user?.id || null,
+        };
+        
+        await enqueueSync("customer_payments", "INSERT", payload);
+        
+        const existing = await db.select<any[]>("SELECT * FROM customers WHERE id = ?", [customerId]);
+        if (existing.length > 0) {
+          const current = existing[0];
+          const newOutstanding = Math.max(0, (Number(current.outstanding_balance) || 0) - value);
+          await db.execute(
+            "UPDATE customers SET outstanding_balance = ? WHERE id = ?",
+            [newOutstanding, customerId]
+          );
+        }
+        
+        toast.success(`Recorded ${formatCurrency(value)} payment (offline)`);
+        window.dispatchEvent(new CustomEvent("customer-stats-updated", { detail: { id: customerId } }));
+        setSaving(false);
+        onRecorded();
+        onClose();
+        return;
+      } catch (e) {
+        console.error("[CustomerPaymentDialog] Offline payment write failed:", e);
+        setSaving(false);
+        return;
+      }
+    }
+
     const { error } = await supabase.from("customer_payments").insert({
       customer_id: customerId,
       amount: value,

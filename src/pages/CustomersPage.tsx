@@ -359,6 +359,44 @@ function CustomerHistory({ customerId }: { customerId: string }) {
     async function loadHistory() {
       setLoading(true);
       try {
+        const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+        const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+        const useOnline = !isTauriEnv || isOnline;
+
+        if (!useOnline) {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const txs = await db.select<any[]>(
+            "SELECT id, transaction_number, created_at, total, payment_method FROM sales_transactions WHERE customer_id = ? ORDER BY created_at DESC",
+            [customerId]
+          );
+          
+          const mapped: CustomerTransaction[] = [];
+          for (const tx of txs) {
+            const items = await db.select<any[]>(
+              "SELECT name, qty, price FROM sales_items WHERE transaction_id = ?",
+              [tx.id]
+            );
+            mapped.push({
+              id: tx.id,
+              transaction_number: tx.transaction_number,
+              created_at: tx.created_at,
+              total: tx.total,
+              payment_method: tx.payment_method,
+              stores: { name: "Local Store" },
+              sales_transaction_items: items.map(i => ({
+                name: i.name || "Unknown Product",
+                qty: i.qty,
+                price: i.price,
+                unit_name: null
+              }))
+            });
+          }
+          setTransactions(mapped);
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from("sales_transactions")
           .select("id, transaction_number, created_at, total, payment_method, stores!sales_transactions_store_id_fkey(name), sales_transaction_items(name, qty, price, unit_name)")

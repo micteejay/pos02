@@ -98,6 +98,21 @@ export default function WorkflowsPage() {
   useEffect(() => {
     const fetchWorkflows = async () => {
       setLoading(true);
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+      if (isTauriEnv && !isOnline) {
+        // Read from localStorage cache
+        try {
+          const cached = window.localStorage.getItem("pos_workflows_cache");
+          if (cached) setWorkflows(JSON.parse(cached));
+        } catch (e) {
+          console.error("[WorkflowsPage] Offline workflow cache read failed:", e);
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("workflows")
         .select("*")
@@ -107,7 +122,7 @@ export default function WorkflowsPage() {
         const profilesRes = await supabase.from("profiles").select("id, name");
         const profileMap = new Map((profilesRes.data || []).map(p => [p.id, p.name || "Unknown"]));
 
-        setWorkflows(data.map((wf: any) => {
+        const mapped = data.map((wf: any) => {
           const steps: WorkflowStep[] = Array.isArray(wf.steps) ? (wf.steps as any[]).map(s => ({
             name: s.name || "Step",
             role: s.role || "manager",
@@ -132,7 +147,10 @@ export default function WorkflowsPage() {
             sourceType: wf.source_type || null,
             sourceId: wf.source_id || null,
           };
-        }));
+        });
+        setWorkflows(mapped);
+        // Cache for offline
+        try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(mapped)); } catch {}
       }
       setLoading(false);
     };
@@ -145,6 +163,8 @@ export default function WorkflowsPage() {
     const wf = workflows.find(w => w.id === expandedId);
     if (!wf || wf.sourceType !== "purchase_order" || !wf.sourceId) return;
     if (poItems[wf.sourceId]) return;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    if (!isOnline) return; // Skip PO detail fetch when offline
     (async () => {
       const [{ data: items }, { data: po }] = await Promise.all([
         supabase.from("purchase_order_items").select("name, qty, unit_price, total, unit_name, unit_factor").eq("purchase_order_id", wf.sourceId),
@@ -160,6 +180,8 @@ export default function WorkflowsPage() {
     if (!expandedId) return;
     const wf = workflows.find(w => w.id === expandedId);
     if (!wf || history[wf.dbId]) return;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    if (!isOnline) { setHistory(prev => ({ ...prev, [wf.dbId]: [] })); return; } // Show empty history when offline
     (async () => {
       const { data } = await supabase
         .from("workflow_step_history")
@@ -206,36 +228,61 @@ export default function WorkflowsPage() {
     newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "completed", assignee: user?.name || "Admin" };
     const nextStep = wf.currentStep + 1;
     const isComplete = nextStep >= newSteps.length;
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
 
-    await supabase.from("workflows").update({
-      steps: newSteps as any,
-      current_step: nextStep,
-      status: isComplete ? "completed" : "active",
-      completed_at: isComplete ? new Date().toISOString() : null,
-    }).eq("id", wf.dbId);
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        await enqueueSync("workflows", "UPDATE", {
+          id: wf.dbId, steps: newSteps, current_step: nextStep,
+          status: isComplete ? "completed" : "active",
+          completed_at: isComplete ? new Date().toISOString() : null,
+        });
+        await enqueueSync("workflow_step_history", "INSERT", {
+          workflow_id: wf.dbId, step_index: wf.currentStep,
+          step_name: wf.steps[wf.currentStep]?.name || "Step",
+          action: "approved", acted_by: user?.id || null,
+        });
+        if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
+          await enqueueSync("purchase_orders", "UPDATE", { id: wf.sourceId, status: "approved", approved_by: user?.id || null });
+        }
+      } catch (e) {
+        console.error("[WorkflowsPage] Offline approve failed:", e);
+      }
+    } else {
+      await supabase.from("workflows").update({
+        steps: newSteps as any,
+        current_step: nextStep,
+        status: isComplete ? "completed" : "active",
+        completed_at: isComplete ? new Date().toISOString() : null,
+      }).eq("id", wf.dbId);
 
-    // Log step history
-    await supabase.from("workflow_step_history").insert({
-      workflow_id: wf.dbId,
-      step_index: wf.currentStep,
-      step_name: wf.steps[wf.currentStep]?.name || "Step",
-      action: "approved",
-      acted_by: user?.id || null,
-    });
+      // Log step history
+      await supabase.from("workflow_step_history").insert({
+        workflow_id: wf.dbId,
+        step_index: wf.currentStep,
+        step_name: wf.steps[wf.currentStep]?.name || "Step",
+        action: "approved",
+        acted_by: user?.id || null,
+      });
 
-    // If the workflow is linked to a PO and now fully approved, sync PO status.
-    if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
-      await supabase.from("purchase_orders").update({ status: "approved", approved_by: user?.id || null }).eq("id", wf.sourceId);
-      window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "approved", workflowId: wf.id } }));
+      // If the workflow is linked to a PO and now fully approved, sync PO status.
+      if (isComplete && wf.sourceType === "purchase_order" && wf.sourceId) {
+        await supabase.from("purchase_orders").update({ status: "approved", approved_by: user?.id || null }).eq("id", wf.sourceId);
+        window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "approved", workflowId: wf.id } }));
+      }
     }
 
     // Refresh history cache for this workflow
     setHistory(prev => { const c = { ...prev }; delete c[wf.dbId]; return c; });
 
-    setWorkflows(prev => prev.map(w => {
+    const updated = workflows.map(w => {
       if (w.id !== id) return w;
       return { ...w, steps: newSteps, currentStep: nextStep, status: isComplete ? "completed" as WFStatus : "active" as WFStatus };
-    }));
+    });
+    setWorkflows(updated);
+    try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(updated)); } catch {}
 
     if (isComplete) {
       addNotification({ type: "workflow", title: `Workflow ${id} fully approved`, message: `${wf.title} completed all steps`, link: "/workflows" });
@@ -267,32 +314,53 @@ export default function WorkflowsPage() {
 
     const newSteps = [...wf.steps];
     newSteps[wf.currentStep] = { ...newSteps[wf.currentStep], status: "rejected" };
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
 
-    await supabase.from("workflows").update({
-      steps: newSteps as any,
-      status: "cancelled",
-    }).eq("id", wf.dbId);
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        await enqueueSync("workflows", "UPDATE", { id: wf.dbId, steps: newSteps, status: "cancelled" });
+        await enqueueSync("workflow_step_history", "INSERT", {
+          workflow_id: wf.dbId, step_index: wf.currentStep,
+          step_name: wf.steps[wf.currentStep]?.name || "Step",
+          action: "rejected", acted_by: user?.id || null,
+        });
+        if (wf.sourceType === "purchase_order" && wf.sourceId) {
+          await enqueueSync("purchase_orders", "UPDATE", { id: wf.sourceId, status: "cancelled" });
+        }
+      } catch (e) {
+        console.error("[WorkflowsPage] Offline reject failed:", e);
+      }
+    } else {
+      await supabase.from("workflows").update({
+        steps: newSteps as any,
+        status: "cancelled",
+      }).eq("id", wf.dbId);
 
-    await supabase.from("workflow_step_history").insert({
-      workflow_id: wf.dbId,
-      step_index: wf.currentStep,
-      step_name: wf.steps[wf.currentStep]?.name || "Step",
-      action: "rejected",
-      acted_by: user?.id || null,
-    });
+      await supabase.from("workflow_step_history").insert({
+        workflow_id: wf.dbId,
+        step_index: wf.currentStep,
+        step_name: wf.steps[wf.currentStep]?.name || "Step",
+        action: "rejected",
+        acted_by: user?.id || null,
+      });
 
-    // Mirror cancel onto linked PO
-    if (wf.sourceType === "purchase_order" && wf.sourceId) {
-      await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", wf.sourceId);
-      window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "cancelled", workflowId: wf.id } }));
+      // Mirror cancel onto linked PO
+      if (wf.sourceType === "purchase_order" && wf.sourceId) {
+        await supabase.from("purchase_orders").update({ status: "cancelled" }).eq("id", wf.sourceId);
+        window.dispatchEvent(new CustomEvent("po-status-synced", { detail: { poId: wf.sourceId, status: "cancelled", workflowId: wf.id } }));
+      }
     }
 
     setHistory(prev => { const c = { ...prev }; delete c[wf.dbId]; return c; });
 
-    setWorkflows(prev => prev.map(w => {
+    const updated = workflows.map(w => {
       if (w.id !== id) return w;
       return { ...w, steps: newSteps, status: "cancelled" as WFStatus };
-    }));
+    });
+    setWorkflows(updated);
+    try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(updated)); } catch {}
 
     addNotification({ type: "workflow", title: `Workflow ${id} rejected`, message: `${wf.title} was rejected at step: ${wf.steps[wf.currentStep].name}`, link: "/workflows" });
     toast.success("Workflow rejected");
@@ -301,9 +369,24 @@ export default function WorkflowsPage() {
   const deleteWorkflow = useCallback(async (id: string) => {
     const wf = workflows.find(w => w.id === id);
     if (!wf) return;
-    await supabase.from("workflow_step_history").delete().eq("workflow_id", wf.dbId);
-    await supabase.from("workflows").delete().eq("id", wf.dbId);
-    setWorkflows(prev => prev.filter(w => w.id !== id));
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        await enqueueSync("workflow_step_history", "DELETE", { workflow_id: wf.dbId });
+        await enqueueSync("workflows", "DELETE", { id: wf.dbId });
+      } catch (e) {
+        console.error("[WorkflowsPage] Offline delete failed:", e);
+      }
+    } else {
+      await supabase.from("workflow_step_history").delete().eq("workflow_id", wf.dbId);
+      await supabase.from("workflows").delete().eq("id", wf.dbId);
+    }
+    const updated = workflows.filter(w => w.id !== id);
+    setWorkflows(updated);
+    try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(updated)); } catch {}
     toast.success("Workflow deleted");
   }, [workflows]);
 
@@ -327,6 +410,38 @@ export default function WorkflowsPage() {
       assignee: "Auto-assigned",
     }));
 
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const dbId = crypto.randomUUID();
+        await enqueueSync("workflows", "INSERT", {
+          id: dbId, title: data.title, type: data.type, description: data.amount,
+          status: "active", current_step: 0, steps,
+          created_by: user?.id || null, company_id: user?.companyId || null,
+        });
+        const newWf: Workflow = {
+          id: `WF-${dbId.substring(0, 6).toUpperCase()}`, dbId,
+          title: data.title, type: data.type, status: "active",
+          currentStep: 0, steps, requester: user?.name || "You",
+          created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          amount: data.amount,
+        };
+        const updated = [newWf, ...workflows];
+        setWorkflows(updated);
+        try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(updated)); } catch {}
+        setShowNewWF(false);
+        addNotification({ type: "workflow", title: `Workflow created (offline)`, message: `${data.title} will sync when online`, link: "/workflows" });
+        toast.success("Workflow created offline");
+      } catch (e) {
+        console.error("[WorkflowsPage] Offline workflow create failed:", e);
+        toast.error("Failed to create workflow offline.");
+      }
+      return;
+    }
+
     const { data: newWf, error } = await supabase.from("workflows").insert({
       title: data.title,
       type: data.type,
@@ -339,7 +454,7 @@ export default function WorkflowsPage() {
     }).select().single();
 
     if (newWf && !error) {
-      setWorkflows(prev => [{
+      const mapped: Workflow = {
         id: `WF-${newWf.id.substring(0, 6).toUpperCase()}`,
         dbId: newWf.id,
         title: data.title,
@@ -350,7 +465,10 @@ export default function WorkflowsPage() {
         requester: user?.name || "You",
         created: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         amount: data.amount,
-      }, ...prev]);
+      };
+      const updated = [mapped, ...workflows];
+      setWorkflows(updated);
+      try { window.localStorage.setItem("pos_workflows_cache", JSON.stringify(updated)); } catch {}
 
       setShowNewWF(false);
       addApprovalItem({ title: data.title, type: typeKey as any, sourceId: newWf.id, requester: user?.name || "You", department: "Operations", amount: null, description: `${data.type}: ${data.amount}`, priority: "medium" });

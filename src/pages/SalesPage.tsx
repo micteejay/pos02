@@ -108,6 +108,51 @@ export default function SalesPage() {
   useEffect(() => {
     const fetchTransactions = async () => {
       setLoading(true);
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+      if (isTauriEnv && !isOnline) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const localTxns = await db.select<any[]>(
+            "SELECT * FROM sales_transactions ORDER BY created_at DESC LIMIT 500"
+          );
+          
+          const mapped: Transaction[] = [];
+          for (const s of localTxns) {
+            const items = await db.select<any[]>(
+              "SELECT * FROM sales_items WHERE transaction_id = ?",
+              [s.id]
+            );
+            mapped.push({
+              id: s.transaction_number,
+              dbId: s.id,
+              customer: s.customer_name || "Walk-in",
+              items: items.reduce((sum: number, i) => sum + i.qty, 0),
+              total: Number(s.total),
+              method: s.payment_method,
+              store: s.store_id || "",
+              storeName: "Local Store",
+              rep: "Local Cashier",
+              time: new Date(s.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+              status: s.status as Transaction["status"],
+              date: s.created_at,
+              lineItems: items.map((i) => ({
+                name: i.name || `Product (${i.product_id})`,
+                qty: i.qty,
+                price: Number(i.price)
+              })),
+            });
+          }
+          setTransactions(mapped);
+          setLoading(false);
+          return;
+        } catch (e) {
+          console.error("[SalesPage] Local SQLite fetch failed:", e);
+        }
+      }
+
       const { data, error } = await supabase
         .from("sales_transactions")
         .select("*, sales_transaction_items(*), stores!sales_transactions_store_id_fkey(name)")
@@ -174,6 +219,25 @@ export default function SalesPage() {
   const updateStatus = useCallback(async (id: string, status: Transaction["status"]) => {
     const txn = transactions.find(t => t.id === id);
     if (!txn) return;
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        await db.execute("UPDATE sales_transactions SET status = ?, updated_at = ? WHERE id = ?", [status, new Date().toISOString(), txn.dbId]);
+        await enqueueSync("sales_transactions", "UPDATE", { id: txn.dbId, status });
+        setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
+        toast.success(`Transaction ${id} marked as ${status} (offline)`);
+        return;
+      } catch (e) {
+        console.error("[SalesPage] Offline status update failed:", e);
+      }
+    }
+
     await supabase.from("sales_transactions").update({ status: status as Database["public"]["Enums"]["transaction_status"] }).eq("id", txn.dbId);
     setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status } : t));
     toast.success(`Transaction ${id} marked as ${status}`);
@@ -182,7 +246,27 @@ export default function SalesPage() {
   const deleteTransaction = useCallback(async (id: string) => {
     const txn = transactions.find(t => t.id === id);
     if (!txn) return;
-    // Delete items first, then transaction
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        await db.execute("DELETE FROM sales_items WHERE transaction_id = ?", [txn.dbId]);
+        await db.execute("DELETE FROM sales_transactions WHERE id = ?", [txn.dbId]);
+        await enqueueSync("sales_transaction_items", "DELETE", { id: txn.dbId });
+        await enqueueSync("sales_transactions", "DELETE", { id: txn.dbId });
+        setTransactions((prev) => prev.filter((t) => t.id !== id));
+        toast.success(`Transaction ${id} deleted (offline)`);
+        return;
+      } catch (e) {
+        console.error("[SalesPage] Offline delete failed:", e);
+      }
+    }
+
     await supabase.from("sales_transaction_items").delete().eq("transaction_id", txn.dbId);
     await supabase.from("sales_transactions").delete().eq("id", txn.dbId);
     setTransactions((prev) => prev.filter((t) => t.id !== id));
@@ -192,6 +276,45 @@ export default function SalesPage() {
   const reprintTransaction = useCallback(async (id: string) => {
     const txn = transactions.find(t => t.id === id);
     if (!txn) return;
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const db = await getDb();
+        const data = await db.select<any[]>("SELECT * FROM sales_transactions WHERE id = ?", [txn.dbId]);
+        if (data.length === 0) { toast.error("Could not find transaction locally"); return; }
+        const s = data[0];
+        const items = await db.select<any[]>("SELECT * FROM sales_items WHERE transaction_id = ?", [txn.dbId]);
+        
+        setReprintSaleId(s.id);
+        setReprintAttachments([]);
+        setReprintSale({
+          id: s.transaction_number,
+          total: Number(s.total),
+          subtotal: Number(s.subtotal || s.total),
+          tax: Number(s.tax || 0),
+          discount: Number(s.discount || 0),
+          customer: txn.customer,
+          method: s.payment_method,
+          cashier: txn.rep,
+          date: formatDateTime(s.created_at),
+          items: items.map((i) => ({
+            name: i.name || `Product (${i.product_id})`,
+            qty: i.qty,
+            price: Number(i.price),
+            unitName: undefined,
+            unitFactor: 1,
+          })),
+        });
+        return;
+      } catch (e) {
+        console.error("[SalesPage] Offline reprint failed:", e);
+      }
+    }
+
     const { data, error } = await supabase
       .from("sales_transactions")
       .select("*, sales_transaction_items(*)")
@@ -218,7 +341,7 @@ export default function SalesPage() {
         unitFactor: Number(i.unit_factor) || 1,
       })),
     });
-  }, [transactions]);
+  }, [transactions, formatDateTime]);
 
   const tabs = useMemo(() => allTabs.filter(t => hasPermission(tabPermMap[t.key])), [hasPermission]);
 

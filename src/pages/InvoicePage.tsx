@@ -64,10 +64,54 @@ export default function InvoicePage() {
   // Attachments on the in-progress (draft) form, keyed by editing id or "new"
   const [formAttachments, setFormAttachments] = useState<Attachment[]>([]);
 
-  // Fetch invoices from DB
+  // Fetch invoices from DB (online) or local cache (offline)
   useEffect(() => {
     const fetchInvoices = async () => {
       setLoading(true);
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+      const useOnline = !isTauriEnv || isOnline;
+
+      const mapInvoice = (inv: any, items: any[]): SavedInvoice => ({
+        id: inv.number,
+        dbId: inv.id,
+        type: inv.type as "quote" | "invoice",
+        number: inv.number,
+        date: inv.date ? new Date(inv.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "",
+        customerName: inv.customer_name,
+        customerAddress: inv.customer_address || "",
+        customerId: inv.customer_id || null,
+        items: items.map((item: any) => ({
+          description: item.description,
+          qty: Number(item.qty),
+          rate: Number(item.rate),
+          unitName: item.unit_name || undefined,
+          unitFactor: Number(item.unit_factor) || 1,
+        })),
+        serviceChargePercent: Number(inv.service_charge_percent) || 0,
+        notes: inv.notes || "",
+        status: inv.status as SavedInvoice["status"],
+        attachments: (() => { try { return Array.isArray(inv.attachments) ? inv.attachments : JSON.parse(inv.attachments || "[]"); } catch { return []; } })(),
+      });
+
+      if (!useOnline) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const localInvs = await db.select<any[]>("SELECT * FROM invoices ORDER BY created_at DESC LIMIT 100");
+          const mapped: SavedInvoice[] = [];
+          for (const inv of localInvs) {
+            const items = await db.select<any[]>("SELECT * FROM invoice_items WHERE invoice_id = ?", [inv.id]);
+            mapped.push(mapInvoice(inv, items));
+          }
+          setSavedInvoices(mapped);
+        } catch (e) {
+          console.error("[InvoicePage] Offline invoice fetch failed:", e);
+        }
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("invoices")
         .select("*, invoice_items(*)")
@@ -75,27 +119,30 @@ export default function InvoicePage() {
         .limit(100);
 
       if (data && !error) {
-        setSavedInvoices(data.map((inv: any) => ({
-          id: inv.number,
-          dbId: inv.id,
-          type: inv.type as "quote" | "invoice",
-          number: inv.number,
-          date: new Date(inv.date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-          customerName: inv.customer_name,
-          customerAddress: inv.customer_address || "",
-          customerId: inv.customer_id || null,
-          items: (inv.invoice_items || []).map((item: any) => ({
-            description: item.description,
-            qty: Number(item.qty),
-            rate: Number(item.rate),
-            unitName: item.unit_name || undefined,
-            unitFactor: Number(item.unit_factor) || 1,
-          })),
-          serviceChargePercent: Number(inv.service_charge_percent) || 0,
-          notes: inv.notes || "",
-          status: inv.status as SavedInvoice["status"],
-          attachments: Array.isArray(inv.attachments) ? (inv.attachments as Attachment[]) : [],
-        })));
+        // Cache to local DB
+        if (isTauriEnv) {
+          try {
+            const { getDb } = await import("@/lib/db");
+            const db = await getDb();
+            for (const inv of data) {
+              const now = inv.created_at || new Date().toISOString();
+              await db.execute(
+                `INSERT OR REPLACE INTO invoices (id, number, type, customer_name, customer_address, customer_id, date, notes, service_charge_percent, status, company_id, created_by, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [inv.id, inv.number, inv.type, inv.customer_name, inv.customer_address, inv.customer_id, inv.date, inv.notes, inv.service_charge_percent || 0, inv.status, inv.company_id, inv.created_by, JSON.stringify(inv.attachments || []), now]
+              );
+              await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [inv.id]);
+              for (const item of (inv.invoice_items || [])) {
+                await db.execute(
+                  `INSERT OR REPLACE INTO invoice_items (id, invoice_id, description, qty, rate, inventory_item_id, unit_name, unit_factor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                  [item.id || crypto.randomUUID(), inv.id, item.description, item.qty, item.rate, item.inventory_item_id, item.unit_name, item.unit_factor || 1]
+                );
+              }
+            }
+          } catch (e) {
+            console.error("[InvoicePage] SQLite invoice cache write failed:", e);
+          }
+        }
+        setSavedInvoices(data.map((inv: any) => mapInvoice(inv, inv.invoice_items || [])));
       }
       setLoading(false);
     };
@@ -162,38 +209,18 @@ export default function InvoicePage() {
       if (c) resolvedId = c.id;
     }
 
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    const useOnline = !isTauriEnv || isOnline;
+
     const isEdit = !!editingDbId;
-    const payload = {
-      number: form.number,
-      type: form.type as any,
-      customer_name: form.customerName,
-      customer_address: form.customerAddress || null,
-      customer_id: resolvedId,
-      date: new Date().toISOString().split("T")[0],
-      notes: form.notes || null,
-      service_charge_percent: form.serviceChargePercent || 0,
-      created_by: user?.id || null,
-      company_id: user?.companyId || null,
-      attachments: formAttachments as any,
-    };
+    const dateStr = new Date().toISOString().split("T")[0];
+    const now = new Date().toISOString();
 
-    let dbId = editingDbId;
-    if (isEdit) {
-      const { error } = await supabase.from("invoices").update(payload).eq("id", editingDbId!);
-      if (error) { toast.error("Failed to update invoice: " + error.message); return; }
-      // Replace line items
-      await supabase.from("invoice_items").delete().eq("invoice_id", editingDbId!);
-    } else {
-      const { data: newInv, error } = await supabase.from("invoices").insert({ ...payload, status: "draft" as any }).select().single();
-      if (!newInv || error) { toast.error("Failed to save invoice: " + (error?.message || "Unknown")); return; }
-      dbId = newInv.id;
-    }
-
-    // Insert line items (with units)
-    const lineItems = form.items.filter(i => i.description).map(i => {
+    const lineItemsData = form.items.filter(i => i.description).map(i => {
       const invItem = inventory.find(p => p.name.toLowerCase() === i.description.toLowerCase());
       return {
-        invoice_id: dbId!,
+        id: crypto.randomUUID(),
         description: i.description,
         qty: i.qty,
         rate: i.rate,
@@ -202,13 +229,98 @@ export default function InvoicePage() {
         unit_factor: i.unitFactor || 1,
       };
     });
-    if (lineItems.length > 0) await supabase.from("invoice_items").insert(lineItems);
 
-    const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone, attachments: formAttachments };
-    setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
-    toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
+    if (!useOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        let dbId = editingDbId || crypto.randomUUID();
+        const status = isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft";
+
+        await db.execute(
+          `INSERT OR REPLACE INTO invoices (id, number, type, customer_name, customer_address, customer_id, date, notes, service_charge_percent, status, company_id, created_by, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [dbId, form.number, form.type, form.customerName, form.customerAddress || null, resolvedId, dateStr, form.notes || null, form.serviceChargePercent || 0, status, user?.companyId || null, user?.id || null, JSON.stringify(formAttachments), now]
+        );
+        await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [dbId]);
+        for (const li of lineItemsData) {
+          await db.execute(
+            `INSERT OR REPLACE INTO invoice_items (id, invoice_id, description, qty, rate, inventory_item_id, unit_name, unit_factor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [li.id, dbId, li.description, li.qty, li.rate, li.inventory_item_id, li.unit_name, li.unit_factor]
+          );
+        }
+
+        const syncPayload = { id: dbId, number: form.number, type: form.type, customer_name: form.customerName, customer_address: form.customerAddress || null, customer_id: resolvedId, date: dateStr, notes: form.notes || null, service_charge_percent: form.serviceChargePercent || 0, status, created_by: user?.id || null, company_id: user?.companyId || null, attachments: formAttachments };
+        await enqueueSync("invoices", isEdit ? "UPDATE" : "INSERT", syncPayload);
+        for (const li of lineItemsData) {
+          await enqueueSync("invoice_items", "INSERT", { ...li, invoice_id: dbId });
+        }
+
+        const saved: SavedInvoice = { ...form, id: form.number, dbId, status, customerId: resolvedId, customerEmail, customerPhone, attachments: formAttachments };
+        setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
+        toast.success(`${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved offline.`);
+      } catch (e) {
+        console.error("[InvoicePage] Offline save failed:", e);
+        toast.error("Failed to save invoice offline.");
+        return;
+      }
+    } else {
+      const payload = {
+        number: form.number,
+        type: form.type as any,
+        customer_name: form.customerName,
+        customer_address: form.customerAddress || null,
+        customer_id: resolvedId,
+        date: dateStr,
+        notes: form.notes || null,
+        service_charge_percent: form.serviceChargePercent || 0,
+        created_by: user?.id || null,
+        company_id: user?.companyId || null,
+        attachments: formAttachments as any,
+      };
+
+      let dbId = editingDbId;
+      if (isEdit) {
+        const { error } = await supabase.from("invoices").update(payload).eq("id", editingDbId!);
+        if (error) { toast.error("Failed to update invoice: " + error.message); return; }
+        await supabase.from("invoice_items").delete().eq("invoice_id", editingDbId!);
+      } else {
+        const { data: newInv, error } = await supabase.from("invoices").insert({ ...payload, status: "draft" as any }).select().single();
+        if (!newInv || error) { toast.error("Failed to save invoice: " + (error?.message || "Unknown")); return; }
+        dbId = newInv.id;
+      }
+
+      const remoteLineItems = lineItemsData.map(i => ({ ...i, invoice_id: dbId! }));
+      if (remoteLineItems.length > 0) await supabase.from("invoice_items").insert(remoteLineItems);
+
+      // Cache to local DB
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const status = isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft";
+          await db.execute(
+            `INSERT OR REPLACE INTO invoices (id, number, type, customer_name, customer_address, customer_id, date, notes, service_charge_percent, status, company_id, created_by, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [dbId, form.number, form.type, form.customerName, form.customerAddress || null, resolvedId, dateStr, form.notes || null, form.serviceChargePercent || 0, status, user?.companyId || null, user?.id || null, JSON.stringify(formAttachments), now]
+          );
+          await db.execute("DELETE FROM invoice_items WHERE invoice_id = ?", [dbId]);
+          for (const li of lineItemsData) {
+            await db.execute(
+              `INSERT OR REPLACE INTO invoice_items (id, invoice_id, description, qty, rate, inventory_item_id, unit_name, unit_factor) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [li.id, dbId, li.description, li.qty, li.rate, li.inventory_item_id, li.unit_name, li.unit_factor]
+            );
+          }
+        } catch (e) {
+          console.error("[InvoicePage] SQLite cache write failed:", e);
+        }
+      }
+
+      const saved: SavedInvoice = { ...form, id: form.number, dbId: dbId!, status: isEdit ? (savedInvoices.find(s => s.dbId === dbId)?.status || "draft") : "draft", customerId: resolvedId, customerEmail, customerPhone, attachments: formAttachments };
+      setSavedInvoices(prev => isEdit ? prev.map(s => s.dbId === dbId ? saved : s) : [saved, ...prev]);
+      toast.success(isEdit ? `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} updated.` : `${form.type === "invoice" ? "Invoice" : "Quote"} ${form.number} saved as draft.`);
+    }
+
     setEditingDbId(null);
-
     // Reset form
     setForm({
       type: form.type,
@@ -224,7 +336,22 @@ export default function InvoicePage() {
 
   const convertQuoteToInvoice = async (inv: SavedInvoice) => {
     const newNum = `INV-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
-    await supabase.from("invoices").update({ type: "invoice" as any, number: newNum, status: "sent" as any }).eq("id", inv.dbId);
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        await db.execute("UPDATE invoices SET type = ?, number = ?, status = ? WHERE id = ?", ["invoice", newNum, "sent", inv.dbId]);
+        await enqueueSync("invoices", "UPDATE", { id: inv.dbId, type: "invoice", number: newNum, status: "sent" });
+      } catch (e) {
+        console.error("[InvoicePage] Offline convert failed:", e);
+      }
+    } else {
+      await supabase.from("invoices").update({ type: "invoice" as any, number: newNum, status: "sent" as any }).eq("id", inv.dbId);
+    }
     setSavedInvoices(prev => prev.map(item => item.dbId === inv.dbId ? { ...item, type: "invoice" as const, number: newNum, id: newNum, status: "sent" as const } : item));
     toast.success("Quote converted to invoice.");
   };
@@ -291,7 +418,22 @@ export default function InvoicePage() {
       if (invItem) adjustInventoryQty(invItem.sku, -(item.qty * (item.unitFactor || 1)));
     });
 
-    await supabase.from("invoices").update({ status: "paid" as any }).eq("id", inv.dbId);
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      try {
+        const { getDb } = await import("@/lib/db");
+        const { enqueueSync } = await import("@/lib/sync-engine");
+        const db = await getDb();
+        await db.execute("UPDATE invoices SET status = ? WHERE id = ?", ["paid", inv.dbId]);
+        await enqueueSync("invoices", "UPDATE", { id: inv.dbId, status: "paid" });
+      } catch (e) {
+        console.error("[InvoicePage] Offline payment status update failed:", e);
+      }
+    } else {
+      await supabase.from("invoices").update({ status: "paid" as any }).eq("id", inv.dbId);
+    }
     setSavedInvoices(prev => prev.map(s => s.dbId === inv.dbId ? { ...s, status: "paid", paymentMethod: method } : s));
     setPayingInvoice(null);
     toast.success(`Payment recorded — ${inv.number} is now paid and stock updated.`);
@@ -579,10 +721,24 @@ export default function InvoicePage() {
                   setSavedInvoices((prev) =>
                     prev.map((s) => (s.dbId === previewInvoice.dbId ? { ...s, attachments: next } : s))
                   );
-                  await supabase
-                    .from("invoices")
-                    .update({ attachments: next as any })
-                    .eq("id", previewInvoice.dbId);
+                  const isTauriEnv2 = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+                  const isOnline2 = typeof window !== "undefined" && window.navigator.onLine;
+                  if (isTauriEnv2 && !isOnline2) {
+                    try {
+                      const { getDb } = await import("@/lib/db");
+                      const { enqueueSync } = await import("@/lib/sync-engine");
+                      const db = await getDb();
+                      await db.execute("UPDATE invoices SET attachments = ? WHERE id = ?", [JSON.stringify(next), previewInvoice.dbId]);
+                      await enqueueSync("invoices", "UPDATE", { id: previewInvoice.dbId, attachments: next });
+                    } catch (e) {
+                      console.error("[InvoicePage] Offline attachment update failed:", e);
+                    }
+                  } else {
+                    await supabase
+                      .from("invoices")
+                      .update({ attachments: next as any })
+                      .eq("id", previewInvoice.dbId);
+                  }
                 }}
               />
             </div>

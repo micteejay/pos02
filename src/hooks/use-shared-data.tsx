@@ -5,6 +5,8 @@ import { useAppSettings } from "@/hooks/use-app-settings";
 import { useAppEvents } from "@/hooks/use-app-events";
 import { computeStockStatus, getStockThreshold } from "@/lib/stock-status";
 import { toast } from "@/hooks/use-toast";
+import { LocalInventoryRepository, LocalSalesRepository } from "@/lib/repositories";
+import { startSyncEngine } from "@/lib/sync-engine";
 
 export interface ItemUnit {
   /** Unit name e.g. "Box", "Carton", "Pack" */
@@ -133,6 +135,8 @@ interface SharedDataContextType {
 
 const SharedDataContext = createContext<SharedDataContextType>(null!);
 
+let inventoryHasPulledOnBoot = false;
+
 export function SharedDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { settings } = useAppSettings();
@@ -150,18 +154,122 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const fetchAll = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     try {
+      const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+      const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+      const useOnline = !isTauriEnv || isOnline;
+
+      if (useOnline) {
+        try {
+          const { triggerSync } = await import("@/lib/sync-engine");
+          await triggerSync();
+        } catch (e) {
+          console.error("[fetchAll] Failed to flush sync queue before fetchAll:", e);
+        }
+      }
+
       const [invRes, salesRes, expRes, catRes, docRes, storeRes, whRes, deptRes] = await Promise.all([
-        supabase.from("inventory_items").select("*").order("created_at", { ascending: false }),
-        supabase.from("sales_transactions").select("*, sales_transaction_items(*)").order("created_at", { ascending: false }).limit(200),
-        supabase.from("expenses").select("*").order("date", { ascending: false }),
-        supabase.from("categories").select("*").order("created_at", { ascending: false }),
-        supabase.from("documents").select("*").order("updated_at", { ascending: false }),
-        supabase.from("stores").select("*").order("name"),
-        supabase.from("warehouses").select("*").order("name"),
-        supabase.from("departments").select("*").order("name"),
+        useOnline ? supabase.from("inventory_items").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("sales_transactions").select("*, sales_transaction_items(*)").order("created_at", { ascending: false }).limit(200) : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("expenses").select("*").order("date", { ascending: false }) : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("categories").select("*").order("created_at", { ascending: false }) : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("documents").select("*").order("updated_at", { ascending: false }) : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("stores").select("*").order("name") : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("warehouses").select("*").order("name") : Promise.resolve({ data: null }),
+        useOnline ? supabase.from("departments").select("*").order("name") : Promise.resolve({ data: null }),
       ]);
 
-      if (invRes.data) {
+      if (isTauriEnv) {
+        if (isOnline) {
+          // Cache fetched inventory to SQLite
+          if (invRes.data) {
+            const { getDb } = await import("@/lib/db");
+            const db = await getDb();
+            for (const i of invRes.data) {
+              await db.execute(
+                `INSERT OR REPLACE INTO products (id, name, price, stock, reorder_level, sku, category_id, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [i.id, i.name, Number(i.price), i.qty, i.reorder_point || 10, i.sku, i.category || "Uncategorized", i.updated_at]
+              );
+            }
+          }
+          // Cache fetched sales transactions to SQLite
+          if (salesRes.data) {
+            const { getDb } = await import("@/lib/db");
+            const db = await getDb();
+            for (const s of salesRes.data) {
+              await db.execute(
+                `INSERT OR REPLACE INTO sales_transactions (id, transaction_number, customer_id, customer_name, total, tax, discount, payment_method, status, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [s.id, s.transaction_number, s.customer_id, s.customer_name || "Walk-in", Number(s.total), Number(s.tax), Number(s.discount), s.payment_method, s.status, s.created_at, s.updated_at]
+              );
+              for (const item of s.sales_transaction_items || []) {
+                await db.execute(
+                  `INSERT OR REPLACE INTO sales_items (id, transaction_id, product_id, name, qty, price, total) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                  [item.id, s.id, item.sku || item.product_id, item.name, item.qty, Number(item.price), Number(item.total)]
+                );
+              }
+            }
+          }
+        } else {
+          // Offline fallback: load from SQLite cache
+          const localInventory = await LocalInventoryRepository.getAll();
+          setInventory(localInventory);
+          
+          const localSales = await LocalSalesRepository.getAll();
+          setSales(localSales);
+        }
+      }
+
+      let expData = expRes.data;
+      let catData = catRes.data;
+      let docData = docRes.data;
+      let storeData = storeRes.data;
+      let whData = whRes.data;
+      let deptData = deptRes.data;
+      let profilesData = null;
+
+      if (useOnline) {
+        // Fetch profiles online
+        const profsRes = await supabase.from("profiles").select("id, name, store_id, department_id");
+        profilesData = profsRes.data;
+
+        // Cache to localStorage
+        if (typeof window !== "undefined") {
+          if (expData) window.localStorage.setItem("pos_cache_expenses", JSON.stringify(expData));
+          if (catData) window.localStorage.setItem("pos_cache_categories", JSON.stringify(catData));
+          if (docData) window.localStorage.setItem("pos_cache_documents", JSON.stringify(docData));
+          if (storeData) window.localStorage.setItem("pos_cache_stores", JSON.stringify(storeData));
+          if (whData) window.localStorage.setItem("pos_cache_warehouses", JSON.stringify(whData));
+          if (deptData) window.localStorage.setItem("pos_cache_departments", JSON.stringify(deptData));
+          if (profilesData) window.localStorage.setItem("pos_cache_profiles", JSON.stringify(profilesData));
+        }
+      } else {
+        // Load from localStorage
+        if (typeof window !== "undefined") {
+          try {
+            const expCached = window.localStorage.getItem("pos_cache_expenses");
+            const catCached = window.localStorage.getItem("pos_cache_categories");
+            const docCached = window.localStorage.getItem("pos_cache_documents");
+            const storeCached = window.localStorage.getItem("pos_cache_stores");
+            const whCached = window.localStorage.getItem("pos_cache_warehouses");
+            const deptCached = window.localStorage.getItem("pos_cache_departments");
+            const profilesCached = window.localStorage.getItem("pos_cache_profiles");
+            
+            if (expCached) expData = JSON.parse(expCached);
+            if (catCached) catData = JSON.parse(catCached);
+            if (docCached) docData = JSON.parse(docCached);
+            if (storeCached) storeData = JSON.parse(storeCached);
+            if (whCached) whData = JSON.parse(whCached);
+            if (deptCached) deptData = JSON.parse(deptCached);
+            if (profilesCached) profilesData = JSON.parse(profilesCached);
+          } catch (e) {
+            console.error("[useSharedData] Failed to parse offline localStorage caches", e);
+          }
+        }
+      }
+
+      if (useOnline && invRes.data) {
         const globalThreshold = settings.lowStockThreshold;
         setInventory(invRes.data.map(i => {
           const reorder = i.reorder_point ?? 0;
@@ -181,7 +289,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         }));
       }
 
-      if (salesRes.data) {
+      if (useOnline && salesRes.data) {
         setSales(salesRes.data.map(s => ({
           id: s.transaction_number,
           items: ((s as any).sales_transaction_items || []).map((si: any) => ({
@@ -199,8 +307,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      if (expRes.data) {
-        setExpenses(expRes.data.map(e => ({
+      if (expData) {
+        setExpenses(expData.map(e => ({
           id: e.id, category: e.category, description: e.description,
           amount: Number(e.amount), date: e.date, store: "",
           createdBy: "", createdByRole: "",
@@ -211,8 +319,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      if (catRes.data) {
-        setCategories(catRes.data.map(c => ({
+      if (catData) {
+        setCategories(catData.map(c => ({
           id: c.id, name: c.name, type: c.type as CategoryType,
           description: c.description || undefined,
           status: c.status as Category["status"],
@@ -221,8 +329,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      if (docRes.data) {
-        setDocuments(docRes.data.map(d => ({
+      if (docData) {
+        setDocuments(docData.map(d => ({
           id: d.id, name: d.name, type: d.type as SharedDocument["type"],
           size: d.size_display || "0 KB", modified: d.updated_at,
           author: d.author || "", folder: d.folder_path || "/",
@@ -230,12 +338,10 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      // Fetch profiles for manager/head resolution and employee counts
-      const { data: profilesData } = await supabase.from("profiles").select("id, name, store_id, department_id");
       const profileMap = new Map((profilesData || []).map(p => [p.id, p.name || "Unknown"]));
 
-      if (storeRes.data) {
-        setStores(storeRes.data.map(s => {
+      if (storeData) {
+        setStores(storeData.map(s => {
           const statusMap: Record<string, string> = { active: "Active", maintenance: "Maintenance", closed: "Closed" };
           const employeeCount = (profilesData || []).filter(p => p.store_id === s.id).length;
           return {
@@ -249,8 +355,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         }));
       }
 
-      if (whRes.data) {
-        setWarehouses(whRes.data.map(w => ({
+      if (whData) {
+        setWarehouses(whData.map(w => ({
           id: w.id, name: w.name, location: w.location || "",
           capacity: w.capacity || 0, sqft: w.sqft || "0",
           manager: w.manager_id ? profileMap.get(w.manager_id) || "Unassigned" : "Unassigned",
@@ -258,8 +364,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         })));
       }
 
-      if (deptRes.data) {
-        setDepartments(deptRes.data.map(d => {
+      if (deptData) {
+        setDepartments(deptData.map(d => {
           const headcount = (profilesData || []).filter(p => p.department_id === d.id).length;
           return {
             id: d.id, name: d.name,
@@ -272,8 +378,8 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       }
 
       // Resolve warehouse names for inventory
-      if (whRes.data && invRes.data) {
-        const whMap = new Map(whRes.data.map(w => [w.id, w.name]));
+      if (whData) {
+        const whMap = new Map(whData.map(w => [w.id, w.name]));
         setInventory(prev => prev.map(item => ({
           ...item,
           warehouse: item.warehouseId ? (whMap.get(item.warehouseId) || "") : "",
@@ -288,10 +394,28 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  useEffect(() => {
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (isTauriEnv) {
+      startSyncEngine();
+    }
+  }, []);
+
   // --- Inventory ---
   const addInventoryItem = useCallback(async (item: InventoryItem) => {
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      await LocalInventoryRepository.insert(item, user?.companyId || null);
+      setInventory(prev => [{ ...item, id: item.id || crypto.randomUUID() }, ...prev]);
+      return;
+    }
+
     const whId = warehouses.find(w => w.name === item.warehouse)?.id || null;
+    const id = item.id || crypto.randomUUID();
     const { data, error } = await supabase.from("inventory_items").insert({
+      id,
       sku: item.sku, name: item.name, category: item.category,
       warehouse_id: whId, qty: item.qty, reorder_point: item.reorder,
       cost_price: item.costPrice, price: item.price,
@@ -302,7 +426,22 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
       unit: item.baseUnit || "pcs",
       company_id: user?.companyId || null,
     }).select().single();
+    
     if (data && !error) {
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const now = new Date().toISOString();
+          await db.execute(
+            `INSERT OR REPLACE INTO products (id, name, price, stock, reorder_level, sku, category_id, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [id, item.name, item.price, item.qty, item.reorder, item.sku, item.category, now]
+          );
+        } catch (e) {
+          console.error("[addInventoryItem] SQLite cache write failed:", e);
+        }
+      }
       setInventory(prev => [{ ...item, id: data.id, warehouseId: whId || undefined }, ...prev]);
     }
   }, [warehouses, user]);
@@ -310,6 +449,22 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
   const updateInventoryItem = useCallback(async (sku: string, updates: Partial<InventoryItem>) => {
     const existing = inventory.find(i => i.sku === sku);
     if (!existing?.id) return;
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      await LocalInventoryRepository.update(sku, existing.id, updates);
+      setInventory(prev => prev.map(i => {
+        if (i.sku !== sku) return i;
+        const updated = { ...i, ...updates };
+        const threshold = getStockThreshold(updated.reorder, settings.lowStockThreshold);
+        updated.status = computeStockStatus(updated.qty, threshold);
+        return updated;
+      }));
+      return;
+    }
+
     const whId = updates.warehouse ? warehouses.find(w => w.name === updates.warehouse)?.id : undefined;
     const payload: any = {};
     if (updates.name !== undefined) payload.name = updates.name;
@@ -324,33 +479,104 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
     if (updates.units !== undefined) payload.units = updates.units as any;
     if (whId !== undefined) payload.warehouse_id = whId;
 
-    await supabase.from("inventory_items").update(payload).eq("id", existing.id);
-    setInventory(prev => prev.map(i => {
-      if (i.sku !== sku) return i;
-      const updated = { ...i, ...updates };
-      const threshold = getStockThreshold(updated.reorder, settings.lowStockThreshold);
-      updated.status = computeStockStatus(updated.qty, threshold);
-      return updated;
-    }));
+    const { error } = await supabase.from("inventory_items").update(payload).eq("id", existing.id);
+    if (!error) {
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const now = new Date().toISOString();
+          const stock = updates.qty !== undefined ? updates.qty : existing.qty;
+          const name = updates.name !== undefined ? updates.name : existing.name;
+          const price = updates.price !== undefined ? updates.price : existing.price;
+          const category = updates.category !== undefined ? updates.category : existing.category;
+          const reorder = updates.reorder !== undefined ? updates.reorder : existing.reorder;
+          await db.execute(
+            `UPDATE products SET name = ?, price = ?, stock = ?, category_id = ?, reorder_level = ?, updated_at = ? 
+             WHERE id = ?`,
+            [name, price, stock, category, reorder, now, existing.id]
+          );
+        } catch (e) {
+          console.error("[updateInventoryItem] SQLite cache update failed:", e);
+        }
+      }
+      setInventory(prev => prev.map(i => {
+        if (i.sku !== sku) return i;
+        const updated = { ...i, ...updates };
+        const threshold = getStockThreshold(updated.reorder, settings.lowStockThreshold);
+        updated.status = computeStockStatus(updated.qty, threshold);
+        return updated;
+      }));
+    }
   }, [inventory, warehouses, settings.lowStockThreshold]);
 
   const deleteInventoryItem = useCallback(async (sku: string) => {
     const existing = inventory.find(i => i.sku === sku);
-    if (existing?.id) {
-      await supabase.from("inventory_items").delete().eq("id", existing.id);
+    if (!existing?.id) return;
+
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      const { getDb } = await import("@/lib/db");
+      const { enqueueSync } = await import("@/lib/sync-engine");
+      const db = await getDb();
+      await db.execute("DELETE FROM products WHERE id = ?", [existing.id]);
+      await enqueueSync("inventory_items", "DELETE", { id: existing.id });
+      setInventory(prev => prev.filter(i => i.sku !== sku));
+      return;
     }
-    setInventory(prev => prev.filter(i => i.sku !== sku));
+
+    const { error } = await supabase.from("inventory_items").delete().eq("id", existing.id);
+    if (!error) {
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          await db.execute("DELETE FROM products WHERE id = ?", [existing.id]);
+        } catch (e) {
+          console.error("[deleteInventoryItem] SQLite cache delete failed:", e);
+        }
+      }
+      setInventory(prev => prev.filter(i => i.sku !== sku));
+    }
   }, [inventory]);
 
   const adjustInventoryQty = useCallback(async (sku: string, delta: number) => {
     const existing = inventory.find(i => i.sku === sku);
     if (!existing?.id) return;
-    const newQty = settings.allowNegativeStock
-      ? existing.qty + delta
-      : Math.max(0, existing.qty + delta);
+    
     const threshold = getStockThreshold(existing.reorder, settings.lowStockThreshold);
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+    
+    let newQty = 0;
+    if (isTauriEnv && !isOnline) {
+      newQty = await LocalInventoryRepository.adjustQty(
+        sku,
+        existing.id,
+        delta,
+        settings.allowNegativeStock,
+        threshold
+      );
+    } else {
+      newQty = settings.allowNegativeStock
+        ? existing.qty + delta
+        : Math.max(0, existing.qty + delta);
+      const { error } = await supabase.from("inventory_items").update({ qty: newQty }).eq("id", existing.id);
+      if (!error && isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const now = new Date().toISOString();
+          await db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?", [newQty, now, existing.id]);
+        } catch (e) {
+          console.error("[adjustInventoryQty] SQLite cache update failed:", e);
+        }
+      }
+    }
+
     const status = computeStockStatus(newQty, threshold);
-    await supabase.from("inventory_items").update({ qty: newQty }).eq("id", existing.id);
     setInventory(prev => prev.map(i => {
       if (i.sku !== sku) return i;
       return { ...i, qty: newQty, status };
@@ -377,6 +603,41 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
   // --- Sales ---
   const addSale = useCallback(async (sale: Omit<SaleRecord, "id" | "date">) => {
+    const isTauriEnv = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    const isOnline = typeof window !== "undefined" && window.navigator.onLine;
+
+    if (isTauriEnv && !isOnline) {
+      await LocalSalesRepository.insert(sale, user?.companyId || null, user?.id || null);
+      
+      const subtotal = sale.subtotal ?? sale.total;
+      const tax = sale.tax ?? 0;
+      const discount = sale.discount ?? 0;
+      const txnNumber = `TXN-OFF-${Date.now()}`;
+      
+      setSales(prev => [{
+        id: txnNumber,
+        items: sale.items,
+        total: sale.total,
+        customer: sale.customer,
+        method: sale.method,
+        date: new Date().toISOString(),
+        store: sale.store,
+        createdBy: sale.createdBy,
+        createdByRole: sale.createdByRole,
+        customerId: sale.customerId || null,
+        customerEmail: sale.customerEmail || null,
+        customerPhone: sale.customerPhone || null,
+        subtotal,
+        tax,
+        discount,
+        payments: sale.payments || [],
+        amountTendered: sale.amountTendered ?? 0,
+        change: sale.change ?? 0,
+        balanceDue: sale.balanceDue ?? 0,
+      }, ...prev]);
+      return;
+    }
+
     const storeId = stores.find(s => s.name === sale.store)?.id || null;
     const { data: txnNum } = await supabase.rpc("generate_txn_number");
     const txnNumber = txnNum || `TXN-${Date.now()}`;
@@ -427,6 +688,30 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
         base_qty: item.baseQty || item.qty * (item.unitFactor || 1),
       }));
       await supabase.from("sales_transaction_items").insert(lineItems);
+
+      // Cache transaction locally in SQLite if running under Tauri
+      if (isTauriEnv) {
+        try {
+          const { getDb } = await import("@/lib/db");
+          const db = await getDb();
+          const now = new Date().toISOString();
+          await db.execute(
+            `INSERT OR REPLACE INTO sales_transactions (id, transaction_number, customer_id, total, tax, discount, payment_method, status, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [data.id, txnNumber, sale.customerId || null, sale.total, tax, discount, methodLabel, "completed", now, now]
+          );
+          for (const item of sale.items) {
+            const lineId = crypto.randomUUID();
+            await db.execute(
+              `INSERT OR REPLACE INTO sales_items (id, transaction_id, product_id, qty, price, total) 
+               VALUES (?, ?, ?, ?, ?, ?)`,
+              [lineId, data.id, item.sku, item.qty, item.price, item.price * item.qty]
+            );
+          }
+        } catch (e) {
+          console.error("[addSale] SQLite cache write failed:", e);
+        }
+      }
 
       setSales(prev => [{
         id: txnNumber, items: sale.items, total: sale.total,
