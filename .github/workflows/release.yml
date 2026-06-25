@@ -52,10 +52,16 @@ jobs:
           projectPath: "."
           args: "--target x86_64-pc-windows-msvc"
 
-      - name: Show Built Files (Debug)
+      - name: Show Bundle Output (Debug)
+        if: always()
         shell: pwsh
         run: |
-          Get-ChildItem -Path src-tauri/target/release -Recurse -Include *.exe,*.msi -ErrorAction SilentlyContinue | Select-Object FullName
+          Write-Host "---- src-tauri/target/x86_64-pc-windows-msvc/release/bundle ----"
+          Get-ChildItem -Path src-tauri/target/x86_64-pc-windows-msvc/release/bundle -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length
+
+          Write-Host "---- Full release dir (fallback, in case bundle/ is missing) ----"
+          Get-ChildItem -Path src-tauri/target/x86_64-pc-windows-msvc/release -Recurse -Include *.exe,*.msi,*.sig -ErrorAction SilentlyContinue | Select-Object FullName, Length
+
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
         with:
