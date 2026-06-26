@@ -34,7 +34,8 @@
   "bundle": {
     "active": true,
     "targets": [
-      "deb"
+      "msi",
+      "nsis"
     ],
     "createUpdaterArtifacts": true,
     "icon": [
