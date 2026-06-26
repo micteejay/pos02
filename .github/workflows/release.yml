@@ -50,7 +50,7 @@ jobs:
           releaseDraft: false
           prerelease: false
           projectPath: "."
-          args: "--target x86_64-pc-windows-msvc"
+          args: ""
 
   build-android:
     needs: build-windows
