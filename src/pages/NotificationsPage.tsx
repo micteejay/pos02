@@ -113,7 +113,7 @@ export default function NotificationsPage() {
     { key: "chat", label: "Chat" },
     { key: "workflow", label: "Workflows" },
     { key: "sales", label: "Sales" },
-    { key: "supply", label: "Supply Chain" },
+    { key: "supply", label: "Supplier" },
   ];
 
   if (loading) {

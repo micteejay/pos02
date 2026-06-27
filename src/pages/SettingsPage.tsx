@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,11 +9,12 @@ import { useAudit } from "@/hooks/use-audit";
 import { toast } from "sonner";
 import {
   Settings, Palette, Shield, Plug, Receipt, Image, Sun, Moon, Globe, Bell, Lock, Key, Save, Upload, Check, Monitor, DollarSign, X, Building2, GitBranch, Plus, Trash2, ArrowUp, ArrowDown,
-  Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi, Printer, RefreshCw, CheckCircle2,
+  Database, Package, AlertTriangle, Calendar, Clock, FileText, Download, HardDrive, RotateCcw, CreditCard, ShieldAlert, Wifi, Printer, RefreshCw, CheckCircle2, FolderOpen, PackageOpen,
 } from "lucide-react";
 import { isTauri } from "@tauri-apps/api/core";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { exportCompanyBackup, previewBackupFile, type BackupManifest, type BackupProgress } from "@/utils/company-backup";
 
 type Tab = "general" | "business" | "receipt" | "integrations" | "security" | "data" | "workflows";
 
@@ -141,6 +142,300 @@ function SettingRow({ label, desc, children }: { label: string; desc: string; ch
     <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
       <div><p className="text-sm font-medium text-foreground">{label}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
       {children}
+    </div>
+  );
+}
+
+// ─── Data & Backup Tab Component ──────────────────────────────────────────
+function DataBackupTab({
+  companyProfile, authUser, settings, updateSettings, logAction,
+}: {
+  companyProfile: any;
+  authUser: any;
+  settings: any;
+  updateSettings: (u: any) => void;
+  logAction: (action: string, module: string, target: string, detail: string) => void;
+}) {
+  const importRef = useRef<HTMLInputElement>(null);
+  const [exportProgress, setExportProgress] = useState<BackupProgress | null>(null);
+  const [importProgress, setImportProgress] = useState<BackupProgress | null>(null);
+  const [previewManifest, setPreviewManifest] = useState<BackupManifest | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const isSuperAdmin = authUser?.role === "Super Admin";
+  const isAdmin = isSuperAdmin || authUser?.role === "Admin";
+
+  const totalRows = previewManifest
+    ? Object.values(previewManifest.row_counts).reduce((a, b) => a + b, 0)
+    : 0;
+
+  const handleExport = async () => {
+    if (!companyProfile?.id) {
+      toast.error("No company profile found.");
+      return;
+    }
+    setExportProgress({ stage: "exporting", message: "Starting export…", percent: 0 });
+    try {
+      await exportCompanyBackup(
+        companyProfile.id,
+        companyProfile.name,
+        (p) => setExportProgress(p)
+      );
+      logAction("backup.export", "Data & Backup", companyProfile.name, "Full company backup exported");
+      toast.success("Backup downloaded successfully!");
+    } catch (err: any) {
+      toast.error(`Export failed: ${err?.message}`);
+      setExportProgress({ stage: "error", message: err?.message, percent: 0 });
+    }
+    setTimeout(() => setExportProgress(null), 3000);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const { ok, manifest, message } = await previewBackupFile(file);
+    if (!ok) {
+      toast.error(message);
+      return;
+    }
+    setPendingFile(file);
+    setPreviewManifest(manifest!);
+    setShowConfirm(true);
+  };
+
+  const handleImport = async () => {
+    if (!pendingFile || !authUser?.id) return;
+    setShowConfirm(false);
+    setImportProgress({ stage: "importing", message: "Preparing import…", percent: 0 });
+    try {
+      const { importCompanyBackup } = await import("@/utils/company-backup");
+      const result = await importCompanyBackup(
+        pendingFile,
+        authUser.id,
+        (p) => setImportProgress(p)
+      );
+      if (result.ok) {
+        logAction("backup.import", "Data & Backup", previewManifest?.company_name ?? "unknown", "Backup restored successfully");
+        toast.success("Backup restored! Reloading…");
+        setTimeout(() => window.location.replace("/"), 1500);
+      } else {
+        toast.error(result.message);
+        setImportProgress({ stage: "error", message: result.message, percent: 0 });
+        setTimeout(() => setImportProgress(null), 4000);
+      }
+    } catch (err: any) {
+      toast.error(`Import failed: ${err?.message}`);
+      setImportProgress({ stage: "error", message: err?.message, percent: 0 });
+      setTimeout(() => setImportProgress(null), 4000);
+    }
+    setPendingFile(null);
+    setPreviewManifest(null);
+  };
+
+  return (
+    <div className="space-y-6">
+
+      {/* ── Full Company Backup ──────────────────────────────────── */}
+      {isAdmin && (
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <HardDrive className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Full Company Backup</h3>
+            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">Admin</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-5">
+            Export everything — inventory, sales, customers, suppliers, settings, roles, workflows, and more — as a single <code className="text-primary">.vitepbak</code> file. Use it to migrate to a new account or keep an offline backup.
+          </p>
+
+          {/* What's included */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+            {[
+              { label: "Inventory", icon: "📦" },
+              { label: "Sales & POS", icon: "🧾" },
+              { label: "Customers", icon: "👥" },
+              { label: "Suppliers & POs", icon: "🚚" },
+              { label: "Expenses", icon: "💸" },
+              { label: "Invoices", icon: "📄" },
+              { label: "Settings & Roles", icon: "⚙️" },
+              { label: "Workflows", icon: "🔀" },
+            ].map((item) => (
+              <div key={item.label} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-xs text-muted-foreground">
+                <span>{item.icon}</span> {item.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Progress bar */}
+          {exportProgress && (
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>{exportProgress.message}</span>
+                <span>{exportProgress.percent}%</span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${exportProgress.stage === "error" ? "bg-destructive" : exportProgress.stage === "done" ? "bg-success" : "bg-primary"}`}
+                  style={{ width: `${exportProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleExport}
+            disabled={!!exportProgress && exportProgress.stage !== "done" && exportProgress.stage !== "error"}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {exportProgress && exportProgress.stage !== "done" && exportProgress.stage !== "error"
+              ? <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+              : <Download className="w-4 h-4" />
+            }
+            {exportProgress && exportProgress.stage !== "done" && exportProgress.stage !== "error"
+              ? "Exporting…" : "Export Full Backup (.vitepbak)"}
+          </button>
+        </div>
+      )}
+
+      {/* ── Restore from Backup ──────────────────────────────────── */}
+      {isSuperAdmin && (
+        <div className="glass-card rounded-xl p-6 border border-warning/20">
+          <div className="flex items-center gap-2 mb-1">
+            <RotateCcw className="w-4 h-4 text-warning" />
+            <h3 className="text-sm font-semibold text-foreground">Restore from Backup</h3>
+            <span className="text-[10px] bg-warning/10 text-warning px-2 py-0.5 rounded-full font-medium">Super Admin</span>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Import a <code className="text-primary">.vitepbak</code> file to restore company data into this account. All existing data will be replaced. You will remain as the Super Admin.
+          </p>
+
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/5 border border-warning/20 mb-4">
+            <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+            <p className="text-xs text-warning">This will overwrite your current company data. Make sure to export a backup first.</p>
+          </div>
+
+          {/* Import progress */}
+          {importProgress && (
+            <div className="mb-4">
+              <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                <span>{importProgress.message}</span>
+                <span>{importProgress.percent}%</span>
+              </div>
+              <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${importProgress.stage === "error" ? "bg-destructive" : importProgress.stage === "done" ? "bg-success" : "bg-warning"}`}
+                  style={{ width: `${importProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <input ref={importRef} type="file" accept=".vitepbak" className="hidden" onChange={handleFileSelect} />
+          <button
+            onClick={() => importRef.current?.click()}
+            disabled={!!importProgress && importProgress.stage !== "done" && importProgress.stage !== "error"}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-warning/40 text-warning font-semibold text-sm hover:bg-warning/5 disabled:opacity-50 transition-colors"
+          >
+            <FolderOpen className="w-4 h-4" />
+            Choose Backup File
+          </button>
+        </div>
+      )}
+
+      {/* ── Settings (Audit Retention, Export Format, Schedule) ─── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Audit Log Retention</h3>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Retention Period (days)</label>
+              <input type="number" min={30} max={3650} value={settings.auditRetentionDays}
+                onChange={(e) => updateSettings({ auditRetentionDays: Number(e.target.value) })}
+                className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground" />
+              <p className="text-[10px] text-muted-foreground mt-1">Minimum 30 days.</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 space-y-1">
+              <p className="text-xs font-medium text-foreground">Current: <span className="text-primary">{settings.auditRetentionDays} days</span></p>
+              <p className="text-[10px] text-muted-foreground">≈ {Math.round(settings.auditRetentionDays / 30)} months · {(settings.auditRetentionDays / 365).toFixed(1)} years</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Database className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">Storage Overview</h3>
+          </div>
+          <div className="space-y-3">
+            {[
+              { label: "Documents", color: "bg-primary" },
+              { label: "Chat Attachments", color: "bg-accent" },
+              { label: "Avatars", color: "bg-success" },
+              { label: "Logos", color: "bg-warning" },
+            ].map(bucket => (
+              <div key={bucket.label} className="flex items-center justify-between p-2 rounded bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2.5 h-2.5 rounded-full ${bucket.color}`} />
+                  <span className="text-sm text-foreground">{bucket.label}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">—</span>
+              </div>
+            ))}
+            <p className="text-[10px] text-muted-foreground text-center mt-2">Storage managed by Supabase</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Confirm Import Modal ─────────────────────────────────── */}
+      {showConfirm && previewManifest && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-2xl p-6 w-full max-w-md border border-border animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+                <PackageOpen className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">Restore Backup?</h3>
+                <p className="text-xs text-muted-foreground">This will replace your current company data</p>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-xl bg-muted/30 space-y-2 mb-5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Company</span>
+                <span className="font-medium text-foreground">{previewManifest.company_name}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Exported</span>
+                <span className="font-medium text-foreground">{new Date(previewManifest.exported_at).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Total records</span>
+                <span className="font-medium text-foreground">{totalRows.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Tables</span>
+                <span className="font-medium text-foreground">{previewManifest.tables_exported.length}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => { setShowConfirm(false); setPendingFile(null); setPreviewManifest(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleImport}
+                className="flex-1 py-2.5 rounded-xl bg-warning text-warning-foreground text-sm font-semibold hover:bg-warning/90 transition-colors flex items-center justify-center gap-2">
+                <RotateCcw className="w-4 h-4" /> Restore Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1125,108 +1420,13 @@ export default function SettingsPage() {
 
         {/* ===================== DATA & BACKUP TAB ===================== */}
         {activeTab === "data" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Audit Log Retention */}
-            <div className="glass-card rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <FileText className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Audit Log Retention</h3>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Retention Period (days)</label>
-                  <Input type="number" min={30} max={3650} value={settings.auditRetentionDays} onChange={(e) => updateSettings({ auditRetentionDays: Number(e.target.value) })} className="mt-1" />
-                  <p className="text-[10px] text-muted-foreground mt-1">Audit records older than this will be archived. Minimum 30 days.</p>
-                </div>
-                <div className="p-3 rounded-lg bg-muted/30 space-y-1">
-                  <p className="text-xs font-medium text-foreground">Current retention: <span className="text-primary">{settings.auditRetentionDays} days</span></p>
-                  <p className="text-[10px] text-muted-foreground">≈ {Math.round(settings.auditRetentionDays / 30)} months · {(settings.auditRetentionDays / 365).toFixed(1)} years</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Backup Settings */}
-            <div className="glass-card rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <HardDrive className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Backup Settings</h3>
-              </div>
-              <div className="space-y-4">
-                <SettingRow label="Automatic Backups" desc="Schedule regular data backups">
-                  <ToggleSwitch enabled={settings.autoBackupEnabled} onToggle={() => updateSettings({ autoBackupEnabled: !settings.autoBackupEnabled })} />
-                </SettingRow>
-                {settings.autoBackupEnabled && (
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground">Backup Frequency</label>
-                    <select value={settings.backupFrequency} onChange={(e) => updateSettings({ backupFrequency: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                      <option value="hourly">Every Hour</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Data Export */}
-            <div className="glass-card rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Download className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Data Export</h3>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Default Export Format</label>
-                  <select value={settings.dataExportFormat} onChange={(e) => updateSettings({ dataExportFormat: e.target.value })} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground">
-                    <option value="csv">CSV (Comma Separated)</option>
-                    <option value="xlsx">Excel (XLSX)</option>
-                    <option value="json">JSON</option>
-                    <option value="pdf">PDF</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
-                    <Download className="w-3.5 h-3.5" /> Export Inventory
-                  </button>
-                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
-                    <Download className="w-3.5 h-3.5" /> Export Sales
-                  </button>
-                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
-                    <Download className="w-3.5 h-3.5" /> Export Users
-                  </button>
-                  <button className="py-2.5 rounded-lg bg-muted text-sm font-medium text-foreground hover:bg-muted/80 transition-colors flex items-center justify-center gap-2">
-                    <Download className="w-3.5 h-3.5" /> Export Audit Log
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Storage Info */}
-            <div className="glass-card rounded-xl p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Database className="w-4 h-4 text-primary" />
-                <h3 className="text-sm font-semibold text-foreground">Storage Overview</h3>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { label: "Documents", usage: "—", color: "bg-primary" },
-                  { label: "Chat Attachments", usage: "—", color: "bg-accent" },
-                  { label: "Avatars", usage: "—", color: "bg-success" },
-                  { label: "Logos", usage: "—", color: "bg-warning" },
-                ].map(bucket => (
-                  <div key={bucket.label} className="flex items-center justify-between p-2 rounded bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${bucket.color}`} />
-                      <span className="text-sm text-foreground">{bucket.label}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{bucket.usage}</span>
-                  </div>
-                ))}
-                <p className="text-[10px] text-muted-foreground text-center mt-2">Storage is managed by Lovable Cloud</p>
-              </div>
-            </div>
-          </div>
+          <DataBackupTab
+            companyProfile={companyProfile}
+            authUser={authUser}
+            settings={settings}
+            updateSettings={updateSettings}
+            logAction={logAction}
+          />
         )}
       </div>
     </AppLayout>

@@ -146,8 +146,12 @@ export default function AIChatAssistant() {
   const quickPrompts = [
     "What are my top selling products?",
     "How's my inventory health?",
-    "Summarize today's sales",
-    "Tips to improve revenue",
+    "Show me overdue invoices summary",
+    "Any pending approvals or workflows?",
+    "Who are my top customers by spend?",
+    "Summarize my supply chain status",
+    "What's my net profit vs expenses?",
+    "How many active users and roles?",
   ];
 
   return (

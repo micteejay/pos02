@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, Fragment } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useSharedData } from "@/hooks/use-shared-data";
@@ -572,7 +572,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                 const MethodIcon = methodIcons[txn.method] || DollarSign;
                 const isExpanded = expandedTxn === txn.id;
                 return (
-                  <>
+                  <Fragment key={txn.id}>
                     <tr key={txn.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpandedTxn(isExpanded ? null : txn.id)}>
                       <td className="px-4 py-3">
                         <p className="text-xs font-mono text-primary">{txn.id}</p>
@@ -645,7 +645,7 @@ function TransactionsTab({ transactions, onUpdateStatus, onDelete, onReprint, st
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 );
               })}
               {filtered.length === 0 && (

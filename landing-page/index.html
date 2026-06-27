@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VitePOS - Next-Gen Offline-First POS Platform</title>
+  <meta name="description" content="Manage retail checkouts, stock control, multi-warehouse shipping, manager approval pipelines, and backup migrations with VitePOS—the offline-first platform.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header class="header">
+    <div class="nav-container">
+      <div class="brand">
+        <img src="assets/logo.png" alt="VitePOS Logo" class="brand-logo">
+        <span class="brand-name">Vite<span class="text-primary">POS</span></span>
+      </div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#demo-console">Live Interactive App Demo</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#pricing">Pricing</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="#contact-form-section" class="btn btn-primary">Try For Free</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="glow glow-1"></div>
+    <div class="glow glow-2"></div>
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <div class="hero-tag">
+          <svg class="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Next-Gen Offline-First POS Platform
+        </div>
+        <h1 class="hero-title">
+          Smart POS Platform for <span class="gradient-text">Modern Retail</span>
+        </h1>
+        <p class="hero-description">
+          Run checkout instantly. Sync automatically. Manage multiple warehouses, suppliers, purchase orders, approval pipelines, and get AI-driven sales insights—even completely offline.
+        </p>
+        <div class="hero-actions">
+          <a href="#contact-form-section" class="btn btn-primary btn-large">Get Started for Free</a>
+          <a href="#demo-console" class="btn btn-secondary btn-large">Play Live Demo</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-num">99.9%</div>
+            <div class="stat-lbl">Local Uptime</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">&lt; 10ms</div>
+            <div class="stat-lbl">Checkout Latency</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">2-Way</div>
+            <div class="stat-lbl">Sync Engine</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="app-window">
+          <div class="window-header">
+            <div class="dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <span class="address-bar">app.vitepos.com/dashboard</span>
+            <div class="w-8"></div>
+          </div>
+          <img src="assets/pos_checkout_screenshot.png" alt="VitePOS Dashboard Mockup" class="hero-img">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Grid -->
+  <section id="features" class="section features-section">
+    <div class="container text-center max-w-2xl">
+      <h2 class="section-title">Powering All Business Operations</h2>
+      <p class="section-subtitle">A comprehensive system built on modern architecture, designed to simplify sales, inventory, and governance.</p>
+    </div>
+
+    <div class="container grid-3 mt-12">
+      <div class="card feature-card">
+        <div class="card-icon bg-primary-10 text-primary">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+        </div>
+        <h3 class="card-title">Ultra-Fast POS Terminal</h3>
+        <p class="card-desc">Check out clients instantly. Generates clean transaction numbers, prints receipts (A4 & thermal styles), and manages barcode inputs.</p>
+      </div>
+
+      <div class="card feature-card">
+        <div class="card-icon bg-accent-10 text-accent">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="15" x2="23" y2="15"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="15" x2="4" y2="15"></line></svg>
+        </div>
+        <h3 class="card-title">Offline Sync Engine</h3>
+        <p class="card-desc">Tauri-backed local SQLite synchronization queue. Cache products and checkout transactions locally, auto-syncing when internet restores.</p>
+      </div>
+
+      <div class="card feature-card">
+        <div class="card-icon bg-emerald-10 text-emerald">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
+        </div>
+        <h3 class="card-title">Multi-Tenant Backup / Restore</h3>
+        <p class="card-desc">Export full company logs to a `.vitepbak` file. Our import module handles global unique constraints safely, avoiding duplicate SKUs or conflicts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive POS Console Simulator -->
+  <section id="demo-console" class="section demo-console-section border-t border-border/30 bg-background/50">
+    <div class="container max-w-4xl text-center mb-12">
+      <span class="badge">Live App Experience</span>
+      <h2 class="section-title">Explore the Actual App Interface</h2>
+      <p class="section-subtitle">Click items in the sidebar sections below to switch screens and experience the checkout system, live inventory tables, PO approvals, and backups.</p>
+    </div>
+
+    <div class="container max-w-7xl">
+      <div class="mock-console shadow-2xl">
+        <!-- Sidebar Navigation (Matching exact App Sidebar Grouping) -->
+        <aside class="console-sidebar">
+          <div class="sidebar-header border-b pb-4 mb-4">
+            <div class="bg-white rounded-lg w-8 h-8 flex items-center justify-center shrink-0">
+              <img src="assets/logo.png" alt="Logo" class="w-6 h-6 object-contain">
+            </div>
+            <div class="sidebar-brand-text">
+              <span class="font-bold text-sm text-foreground block leading-none">VitePOS</span>
+              <span class="text-[9px] text-muted-foreground mt-1 block">Super Admin</span>
+            </div>
+          </div>
+
+          <div class="sidebar-nav-container">
+            <!-- Section: Overview -->
+            <div class="nav-section-group">
+              <p class="nav-section-title">Overview</p>
+              <button class="nav-btn active" data-tab="dashboard">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+                Dashboard
+              </button>
+            </div>
+
+            <!-- Section: Operations -->
+            <div class="nav-section-group">
+              <p class="nav-section-title">Operations</p>
+              <button class="nav-btn" data-tab="checkout">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                POS Checkout
+              </button>
+              <button class="nav-btn" data-tab="inventory">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                Inventory
+              </button>
+              <button class="nav-btn" data-tab="sales">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                Sales Ledger
+              </button>
+              <button class="nav-btn" data-tab="customers">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                Customers
+              </button>
+              <button class="nav-btn" data-tab="supply">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                Supply Chain
+              </button>
+              <button class="nav-btn flex justify-between items-center" data-tab="approvals">
+                <span class="flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                  Approvals
+                </span>
+                <span class="badge badge-accent approvals-badge">1</span>
+              </button>
+            </div>
+
+            <!-- Section: Analytics & Backup -->
+            <div class="nav-section-group">
+              <p class="nav-section-title">System Management</p>
+              <button class="nav-btn" data-tab="reports">
+                <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-3-3.1-5.2-6.1-5.4-3-.2-5.6 1.6-6.4 4.3C8.5 9.7 7 9 5.3 9.4c-2.2.5-3.6 2.5-3.3 4.7.3 2.2 2.2 3.9 4.4 3.9H19c.8 0 1.6-.3 2.2-.8z"></path></svg>
+                Sync & backups
+              </button>
+            </div>
+          </div>
+
+          <div class="sidebar-status mt-auto">
+            <div class="status-indicator online"></div>
+            <span class="status-text">Connected</span>
+          </div>
+        </aside>
+
+        <!-- Console View Area -->
+        <main class="console-body">
+          <header class="console-body-header">
+            <h3 id="current-tab-title">Sales Dashboard</h3>
+            <div class="flex items-center gap-3">
+              <div class="network-toggle">
+                <label class="switch-label">
+                  <input type="checkbox" id="network-switch">
+                  <span class="slider"></span>
+                </label>
+                <span class="text-[11px] text-muted-foreground font-semibold">Simulate Offline Mode</span>
+              </div>
+            </div>
+          </header>
+
+          <!-- Tab Contents -->
+          <div class="console-content">
+            <!-- Dashboard Tab (FULL SCREEN) -->
+            <div class="tab-pane active" id="tab-dashboard">
+              <div class="grid-3 gap-4">
+                <div class="metric-card border bg-card/60 p-4 rounded-xl">
+                  <p class="text-xs font-semibold text-muted-foreground">Daily Revenue</p>
+                  <p class="text-2xl font-bold text-foreground mt-1" id="dash-revenue">$1,240.50</p>
+                  <span class="text-[10px] text-success font-bold mt-1 flex items-center gap-0.5"><svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg> +12.3%</span>
+                </div>
+                <div class="metric-card border bg-card/60 p-4 rounded-xl">
+                  <p class="text-xs font-semibold text-muted-foreground">Sales Transactions</p>
+                  <p class="text-2xl font-bold text-foreground mt-1" id="dash-transactions">18</p>
+                  <span class="text-[10px] text-muted-foreground mt-1">Updates live</span>
+                </div>
+                <div class="metric-card border bg-card/60 p-4 rounded-xl">
+                  <p class="text-xs font-semibold text-muted-foreground">Outbox Queue (Offline)</p>
+                  <p class="text-2xl font-bold text-foreground mt-1" id="dash-outbox">0 pending</p>
+                  <span class="text-[10px] text-muted-foreground mt-1">Buffered locally</span>
+                </div>
+              </div>
+
+              <!-- Secondary Row: Chart and System Audit Logs -->
+              <div class="grid-1-2 gap-4 mt-5">
+                <div class="border bg-card/60 rounded-xl p-4 flex flex-col justify-between">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Live Sales Volumes</h4>
+                  <div class="h-28 flex items-end justify-between gap-2.5 pt-2">
+                    <div class="flex-1 bg-primary/20 hover:bg-primary/40 transition-all rounded-t-md h-[40%]" title="6am: 12 orders"></div>
+                    <div class="flex-1 bg-primary/20 hover:bg-primary/40 transition-all rounded-t-md h-[55%]" title="9am: 18 orders"></div>
+                    <div class="flex-1 bg-primary/30 hover:bg-primary/50 transition-all rounded-t-md h-[85%]" title="12pm: 29 orders"></div>
+                    <div class="flex-1 bg-primary/20 hover:bg-primary/40 transition-all rounded-t-md h-[45%]" title="3pm: 15 orders"></div>
+                    <div class="flex-1 bg-primary/40 hover:bg-primary/60 transition-all rounded-t-md h-[95%]" title="6pm: 34 orders"></div>
+                    <div class="flex-1 bg-primary/20 hover:bg-primary/40 transition-all rounded-t-md h-[25%]" title="9pm: 8 orders"></div>
+                  </div>
+                  <div class="flex justify-between text-[9px] text-muted-foreground mt-2 border-t pt-2 font-mono">
+                    <span>6am</span><span>9am</span><span>12pm</span><span>3pm</span><span>6pm</span><span>9pm</span>
+                  </div>
+                </div>
+
+                <div class="border bg-card/60 rounded-xl p-4">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center justify-between">
+                    <span>System Audit Logs</span>
+                    <span class="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold font-mono">Real-time</span>
+                  </h4>
+                  <div class="space-y-2 max-h-[120px] overflow-y-auto pr-1" id="dash-audit-logs">
+                    <!-- Loaded dynamically via JS -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Simulated Transaction History -->
+              <div class="border bg-card/60 rounded-xl p-4 mt-5">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                  Simulated Transaction History
+                </h4>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="border-b border-border/60 text-muted-foreground">
+                        <th class="text-left py-2 font-medium">Txn Number</th>
+                        <th class="text-left py-2 font-medium">Client</th>
+                        <th class="text-left py-2 font-medium">Payment</th>
+                        <th class="text-right py-2 font-medium">Total</th>
+                        <th class="text-center py-2 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="txn-history-body">
+                      <!-- Filled via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- POS Checkout Tab -->
+            <div class="tab-pane" id="tab-checkout">
+              <div class="grid-1-2 gap-4 h-full items-stretch">
+                <!-- Catalog Grid -->
+                <div class="catalog-panel border bg-card/40 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between mb-3 border-b pb-2">
+                      <span class="font-bold text-xs uppercase text-muted-foreground">Product Catalog</span>
+                      <div class="flex gap-2">
+                        <input type="text" id="pos-search-input" placeholder="Search catalog..." class="bg-muted/60 border rounded text-[10px] px-2 py-0.5 text-foreground max-w-[120px]">
+                      </div>
+                    </div>
+                    <div class="grid-3 gap-2 max-h-[300px] overflow-y-auto pr-1" id="catalog-items-grid">
+                      <!-- Loaded dynamically via JS -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Checkout Panel -->
+                <div class="checkout-panel border bg-card/60 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <div class="flex items-center justify-between border-b pb-2 mb-3">
+                      <span class="font-bold text-xs uppercase text-muted-foreground flex items-center gap-1">
+                        <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                        Checkout Cart
+                      </span>
+                      <button class="text-[10px] text-destructive hover:underline hidden" id="clear-cart-btn">Clear</button>
+                    </div>
+
+                    <div class="cart-items space-y-2 max-h-[200px] overflow-y-auto" id="cart-items-list">
+                      <!-- Loaded via JS -->
+                    </div>
+                  </div>
+
+                  <div class="border-t border-border/60 pt-3 mt-3 space-y-3">
+                    <div class="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                      <span>Payment Type:</span>
+                      <div class="flex gap-1.5">
+                        <button class="px-2 py-0.5 rounded border bg-card border-primary text-primary text-[10px]" id="btn-pay-cash">Cash</button>
+                        <button class="px-2 py-0.5 rounded border bg-card text-[10px]" id="btn-pay-card">Card</button>
+                      </div>
+                    </div>
+                    <div class="flex justify-between text-xs font-bold text-foreground">
+                      <span>Grand Total:</span>
+                      <span id="cart-total">$0.00</span>
+                    </div>
+                    <button class="w-full btn btn-primary py-2.5 text-xs rounded-lg font-bold" id="btn-complete-sale" disabled>
+                      Checkout Transaction
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Inventory Page Tab -->
+            <div class="tab-pane" id="tab-inventory">
+              <div class="border bg-card/60 p-4 rounded-xl">
+                <div class="flex items-center justify-between mb-4 border-b pb-2">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Live Catalog Stocks</h4>
+                  <div class="flex gap-2">
+                    <input type="text" id="inv-search-input" placeholder="Search inventory..." class="bg-muted border rounded text-[10px] px-2 py-0.5 text-foreground max-w-[150px]">
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="border-b border-border/60 text-muted-foreground">
+                        <th class="py-2">Item Name</th>
+                        <th class="py-2">SKU Code</th>
+                        <th class="py-2 text-right">Price</th>
+                        <th class="py-2 text-center">Stock Level</th>
+                        <th class="py-2 text-center">Warehouse</th>
+                        <th class="py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="inventory-table-body">
+                      <!-- Filled via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sales Ledger Tab -->
+            <div class="tab-pane" id="tab-sales">
+              <div class="grid-1-2 gap-4 h-full items-stretch">
+                <!-- Historic list of transactions -->
+                <div class="border bg-card/60 p-4 rounded-xl">
+                  <span class="font-bold text-xs uppercase text-muted-foreground mb-4 block border-b pb-2">Completed Ledger Rows</span>
+                  <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1" id="sales-ledger-list">
+                    <!-- Dynamically filled via JS -->
+                  </div>
+                </div>
+
+                <!-- Sales breakdown statistics -->
+                <div class="border bg-card/60 p-4 rounded-xl flex flex-col justify-between">
+                  <div>
+                    <span class="font-bold text-xs uppercase text-muted-foreground mb-4 block border-b pb-2">Sales Breakdown</span>
+                    <div class="space-y-4">
+                      <div>
+                        <div class="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>Cash Payments</span>
+                          <span id="stat-cash-percent" class="font-bold">60%</span>
+                        </div>
+                        <div class="progress-bar-container"><div class="progress-bar bg-primary" id="progress-cash" style="width:60%"></div></div>
+                      </div>
+                      <div>
+                        <div class="flex justify-between text-xs text-muted-foreground mb-1">
+                          <span>Credit Card Payments</span>
+                          <span id="stat-card-percent" class="font-bold">40%</span>
+                        </div>
+                        <div class="progress-bar-container"><div class="progress-bar bg-accent" id="progress-card" style="width:40%"></div></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="border-t border-border/20 pt-4 mt-6 text-xs space-y-2">
+                    <div class="flex justify-between">
+                      <span class="text-muted-foreground">Highest Rep Daily Sales:</span>
+                      <span class="font-bold text-foreground">Sarah Campbell ($350)</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-muted-foreground">Total Retail Margins:</span>
+                      <span class="font-bold text-success flex items-center gap-0.5">38.4%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Customers Tab -->
+            <div class="tab-pane" id="tab-customers">
+              <div class="border bg-card/60 p-4 rounded-xl">
+                <div class="flex items-center justify-between mb-4 border-b pb-2">
+                  <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Customers Registry</h4>
+                  <span class="text-[10px] text-muted-foreground">LTV Stats & Credit Accounts</span>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-xs">
+                    <thead>
+                      <tr class="border-b border-border/60 text-muted-foreground">
+                        <th class="py-2">Name</th>
+                        <th class="py-2">Email</th>
+                        <th class="py-2 text-right">Lifetime Spend</th>
+                        <th class="py-2 text-center">Loyalty Points</th>
+                        <th class="py-2 text-right">Outstanding Bal.</th>
+                        <th class="py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="customers-table-body">
+                      <!-- Filled via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Supply Chain Tab -->
+            <div class="tab-pane" id="tab-supply">
+              <div class="grid-1-2 gap-4 h-full items-stretch">
+                <!-- Submit Form Panel -->
+                <div class="border bg-card/60 p-4 rounded-xl flex flex-col justify-between h-full">
+                  <div>
+                    <span class="font-bold text-xs uppercase text-muted-foreground mb-4 block">New Purchase Order</span>
+                    <div class="space-y-3">
+                      <div class="field">
+                        <label class="text-[10px] text-muted-foreground font-semibold">Vendor Supplier</label>
+                        <select class="w-full rounded border bg-card border-border/60 text-xs px-2 py-1.5 mt-1 text-foreground" id="po-supplier">
+                          <option>A1 Logistics & Hardware</option>
+                          <option>Zenith Global Corp</option>
+                          <option>Apex Retail Wholesalers</option>
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label class="text-[10px] text-muted-foreground font-semibold">Order Total ($)</label>
+                        <input type="number" class="w-full rounded border bg-card border-border/60 text-xs px-2 py-1.5 mt-1 text-foreground" id="po-amount" value="1200" placeholder="PO Value">
+                        <span class="text-[9px] text-muted-foreground mt-1 block">Value &ge; $5,000 triggers **Four-Eyes Manager Review**.</span>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary w-full py-2.5 mt-6 text-xs rounded-lg font-bold" id="btn-submit-po">
+                    Generate Purchase Order
+                  </button>
+                </div>
+
+                <!-- PO List Panel -->
+                <div class="border bg-card/60 p-4 rounded-xl">
+                  <span class="font-bold text-xs uppercase text-muted-foreground mb-4 block border-b pb-2">Purchase Orders Registry</span>
+                  <div class="space-y-2 max-h-[300px] overflow-y-auto pr-1" id="supply-po-list">
+                    <!-- Loaded dynamically via JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Approvals Tab -->
+            <div class="tab-pane" id="tab-approvals">
+              <div class="border bg-card/60 p-5 rounded-xl flex flex-col justify-between h-full">
+                <div>
+                  <div class="flex items-center justify-between border-b pb-2 mb-4">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-muted-foreground">Governance Approvals Queue</h4>
+                    <div class="flex items-center gap-1.5 text-xs">
+                      <span class="text-muted-foreground font-semibold">Switch Role:</span>
+                      <select class="bg-muted border rounded text-[11px] px-2 py-0.5 font-semibold text-foreground" id="approver-role-select">
+                        <option value="rep">Sales Rep</option>
+                        <option value="manager">Manager</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="po-list space-y-3 max-h-[320px] overflow-y-auto pr-1" id="po-list-container">
+                    <!-- Dynamically filled via JS -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sync & Backups Tab -->
+            <div class="tab-pane" id="tab-reports">
+              <div class="grid-1-2 gap-4 h-full items-stretch">
+                <!-- Sync Engine -->
+                <div class="border bg-card/60 p-4 rounded-xl flex flex-col items-center justify-center text-center">
+                  <div class="sync-icon-container mb-3">
+                    <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="text-primary" id="sync-icon"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-3-3.1-5.2-6.1-5.4-3-.2-5.6 1.6-6.4 4.3C8.5 9.7 7 9 5.3 9.4c-2.2.5-3.6 2.5-3.3 4.7.3 2.2 2.2 3.9 4.4 3.9H19c.8 0 1.6-.3 2.2-.8z"></path></svg>
+                  </div>
+                  <h4 class="text-xs font-bold text-foreground mb-1" id="sync-status-title">Sync Status: Connected</h4>
+                  <p class="text-[10px] text-muted-foreground leading-snug" id="sync-status-desc">Local SQLite outbox matches cloud storage database.</p>
+
+                  <div class="w-full bg-muted/40 border border-border/40 p-3 rounded-lg mt-4 text-left" id="sync-queue-panel">
+                    <div class="flex items-center justify-between border-b pb-1.5 mb-2">
+                      <span class="text-[10px] font-bold text-foreground uppercase">SQLite Outbox</span>
+                      <span class="text-[9px] text-muted-foreground" id="sync-queue-count">0 pending</span>
+                    </div>
+                    <div class="space-y-1 max-h-[100px] overflow-y-auto text-[10px]" id="sync-queue-list">
+                      <p class="text-muted-foreground italic text-center py-2">Queue is empty.</p>
+                    </div>
+                  </div>
+                  <button class="btn btn-primary w-full py-2.5 text-xs rounded-lg font-bold mt-4 hidden" id="btn-sync-now">
+                    Commit SQLite Outbox Queue
+                  </button>
+                </div>
+
+                <!-- Backups & Suffix Migration -->
+                <div class="border bg-card/60 p-4 rounded-xl flex flex-col justify-between h-full">
+                  <div class="space-y-3">
+                    <span class="font-bold text-xs uppercase text-muted-foreground block border-b pb-2">Export & Import Migrator</span>
+                    <button class="btn btn-secondary w-full py-2 text-xs rounded-lg font-bold" id="btn-export-backup">
+                      Export company_backup.vitepbak
+                    </button>
+                    <div class="h-px bg-border my-2" />
+                    <div class="file-drop-area border border-dashed border-border/80 rounded-xl p-4 text-center cursor-pointer hover:border-primary/60 transition-colors" id="file-drop-area">
+                      <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" class="text-muted-foreground mx-auto mb-1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                      <p class="text-[10px] font-semibold text-foreground leading-none">Click to load backup file</p>
+                      <p class="text-[9px] text-muted-foreground mt-1">company_backup.vitepbak</p>
+                    </div>
+                  </div>
+                  <button class="btn btn-secondary w-full py-2 text-xs rounded-lg font-bold mt-2" id="btn-trigger-restore" disabled>
+                    Initiate Database Migration
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Visualizer Section -->
+  <section id="architecture" class="section architecture-section border-t border-border/30 bg-muted/20">
+    <div class="container max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div class="lg:col-span-6 space-y-6">
+        <span class="badge badge-primary">Sync Topology</span>
+        <h2 class="section-title">2-Way SQLite-Supabase Sync Architecture</h2>
+        <p class="section-subtitle">A hybrid local-cloud architecture designed to never let connectivity issues halt your store sales.</p>
+        
+        <div class="space-y-4 mt-8">
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-primary-10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">1</div>
+            <div>
+              <h4 class="text-base font-bold text-foreground mb-1">Local SQLite Database Cache</h4>
+              <p class="text-sm text-muted-foreground">Inside the Tauri desktop bundle, a local SQLite repository stores store logs, catalog inventory, and completed transactions.</p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-primary-10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">2</div>
+            <div>
+              <h4 class="text-base font-bold text-foreground mb-1">Sync Outbox Queue</h4>
+              <p class="text-sm text-muted-foreground">Every create, update, or delete transaction performed offline is stacked in an internal sync outbox repository inside the Tauri instance.</p>
+            </div>
+          </div>
+          <div class="flex gap-4">
+            <div class="w-8 h-8 rounded-full bg-primary-10 flex items-center justify-center shrink-0 text-primary font-bold text-sm">3</div>
+            <div>
+              <h4 class="text-base font-bold text-foreground mb-1">Automatic Cloud Reconnection</h4>
+              <p class="text-sm text-muted-foreground">When the network status flags connected, the sync engine fires an autocommit loop, uploading all queued outbox records to Supabase in correct table order.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lg:col-span-6 flex justify-center">
+        <div class="architecture-diagram shadow-xl">
+          <div class="diagram-node">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" class="text-primary"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+            <span class="node-title">Tauri / SQLite</span>
+            <span class="node-sub">Local Device Client</span>
+          </div>
+          <div class="diagram-arrow">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" class="text-accent animate-pulse"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+          </div>
+          <div class="diagram-node node-pulse">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" class="text-accent"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            <span class="node-title">Sync Queue</span>
+            <span class="node-sub">Outbox Commits</span>
+          </div>
+          <div class="diagram-arrow">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" class="text-accent animate-pulse"><polyline points="13 17 18 12 13 7"></polyline><polyline points="6 17 11 12 6 7"></polyline></svg>
+          </div>
+          <div class="diagram-node">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" class="text-primary"><path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-3-3.1-5.2-6.1-5.4-3-.2-5.6 1.6-6.4 4.3C8.5 9.7 7 9 5.3 9.4c-2.2.5-3.6 2.5-3.3 4.7.3 2.2 2.2 3.9 4.4 3.9H19c.8 0 1.6-.3 2.2-.8z"></path></svg>
+            <span class="node-title">Supabase Cloud</span>
+            <span class="node-sub">Shared Remote Storage</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="section pricing-section">
+    <div class="container text-center max-w-2xl mb-16">
+      <span class="badge">Pricing Plans</span>
+      <h2 class="section-title">Transparent, Scale-Based Pricing</h2>
+      <p class="section-subtitle">No contract setup fees, choose the tier that fits your store operations.</p>
+    </div>
+
+    <div class="container grid-3 max-w-6xl">
+      <!-- Plan 1 -->
+      <div class="card pricing-card border">
+        <span class="text-xs uppercase font-bold text-muted-foreground tracking-widest">Single Store</span>
+        <div class="price-container mt-4">
+          <span class="price-unit">$</span><span class="price-num">49</span><span class="price-cycle">/mo</span>
+        </div>
+        <ul class="plan-features mt-6 space-y-3 text-xs text-muted-foreground">
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> 1 Active Store Terminal</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> SQLite Local Caching</li>
+        <a href="#contact-form-section" class="btn btn-secondary w-full py-2.5 mt-8 text-xs rounded-lg font-bold select-plan-btn" data-plan="Starter">Select Starter Tier</a>
+      </div>
+
+      <!-- Plan 2 (Popular) -->
+      <div class="card pricing-card border border-primary relative bg-primary-5">
+        <span class="popular-tag">MOST POPULAR</span>
+        <span class="text-xs uppercase font-bold text-primary tracking-widest">Multi-Store Growth</span>
+        <div class="price-container mt-4">
+          <span class="price-unit">$</span><span class="price-num">99</span><span class="price-cycle">/mo</span>
+        </div>
+        <ul class="plan-features mt-6 space-y-3 text-xs text-muted-foreground">
+          <li class="flex items-center gap-2 text-foreground font-semibold"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> Up to 5 Terminals & Warehouses</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> SQLite Local Caching</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> A4 & Thermal Receipt Printers</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> Four-Eyes Manager Review</li>
+        </ul>
+        <a href="#contact-form-section" class="btn btn-primary w-full py-2.5 mt-8 text-xs rounded-lg font-bold select-plan-btn" data-plan="Growth">Select Growth Tier</a>
+      </div>
+
+      <!-- Plan 3 -->
+      <div class="card pricing-card border">
+        <span class="text-xs uppercase font-bold text-muted-foreground tracking-widest">Enterprise Group</span>
+        <div class="price-container mt-4">
+          <span class="price-unit">$</span><span class="price-num">249</span><span class="price-cycle">/mo</span>
+        </div>
+        <ul class="plan-features mt-6 space-y-3 text-xs text-muted-foreground">
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> Unlimited Terminals & Warehouses</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> Global Database Suffix Migration</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> A4 & Thermal Receipt Printers</li>
+          <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2.5" fill="none" class="text-success"><polyline points="20 6 9 17 4 12"></polyline></svg> Automated PDF Invoices Emailing</li>
+        </ul>
+        <a href="#contact-form-section" class="btn btn-secondary w-full py-2.5 mt-8 text-xs rounded-lg font-bold select-plan-btn" data-plan="Enterprise">Select Enterprise Tier</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact / Account Request Form Section -->
+  <section id="contact-form-section" class="section cta-section">
+    <div class="container max-w-xl">
+      <div class="text-center mb-8 space-y-3">
+        <h2 class="section-title">Request a VitePOS Account</h2>
+        <p class="section-subtitle">Fill in details below. Clicking submit will automatically generate and open an email message or WhatsApp chat directly with our developer team.</p>
+      </div>
+
+      <div class="card bg-card/60 border p-6 rounded-2xl shadow-xl">
+        <form id="account-request-form" class="space-y-4">
+          <div class="field">
+            <label for="req-name" class="block text-xs font-semibold text-muted-foreground mb-1">Full Name</label>
+            <input type="text" id="req-name" required placeholder="John Doe" class="w-full rounded border bg-card border-border/60 text-xs px-3 py-2 text-foreground focus:border-primary focus:outline-none">
+          </div>
+          <div class="field">
+            <label for="req-company" class="block text-xs font-semibold text-muted-foreground mb-1">Company / Store Name</label>
+            <input type="text" id="req-company" required placeholder="Retail Solutions Ltd" class="w-full rounded border bg-card border-border/60 text-xs px-3 py-2 text-foreground focus:border-primary focus:outline-none">
+          </div>
+          <div class="field">
+            <label for="req-phone" class="block text-xs font-semibold text-muted-foreground mb-1">Phone Number</label>
+            <input type="tel" id="req-phone" required placeholder="+234 800 000 0000" class="w-full rounded border bg-card border-border/60 text-xs px-3 py-2 text-foreground focus:border-primary focus:outline-none">
+          </div>
+          <div class="field">
+            <label for="req-tier" class="block text-xs font-semibold text-muted-foreground mb-1">Interested Pricing Plan</label>
+            <select id="req-tier" class="w-full rounded border bg-card border-border/60 text-xs px-3 py-2 text-foreground focus:border-primary focus:outline-none">
+              <option value="Starter">Starter Tier ($49/mo) - Single Store</option>
+              <option value="Growth" selected>Growth Tier ($99/mo) - Multi-Store (Recommended)</option>
+              <option value="Enterprise">Enterprise Group ($249/mo) - Unlimited Terminals</option>
+              <option value="Demo">Custom Demo Request</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="req-message" class="block text-xs font-semibold text-muted-foreground mb-1">Message / Requirements (Optional)</label>
+            <textarea id="req-message" rows="3" placeholder="Tell us about your terminals, warehouses, or hardware integration needs..." class="w-full rounded border bg-card border-border/60 text-xs px-3 py-2 text-foreground focus:border-primary focus:outline-none resize-none"></textarea>
+          </div>
+          <div class="flex gap-3 mt-2">
+            <button type="submit" id="btn-submit-email" class="flex-1 btn btn-secondary py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 justify-center">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              Send via Email
+            </button>
+            <button type="submit" id="btn-submit-whatsapp" class="flex-1 btn btn-primary py-2.5 text-xs font-bold rounded-xl flex items-center gap-2 justify-center">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none" class="fill-current"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              Send via WhatsApp
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container flex justify-between items-center flex-wrap gap-6">
+      <div class="brand">
+        <img src="assets/logo.png" alt="Logo" class="brand-logo">
+        <span class="brand-name text-sm">VitePOS</span>
+      </div>
+      <p class="text-[11px] text-muted-foreground">&copy; 2026 VitePOS Retail Systems. All rights reserved.</p>
+      <div class="flex gap-4 text-xs text-muted-foreground">
+        <a href="#features">Features</a>
+        <a href="#demo-console">Demo Simulator</a>
+        <a href="#architecture">Architecture</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

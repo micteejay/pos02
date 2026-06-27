@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, Fragment } from "react";
 import AppLayout from "@/components/AppLayout";
 import { Input } from "@/components/ui/input";
 import { useCustomers, type Customer } from "@/hooks/use-customers";
@@ -52,7 +52,7 @@ export default function CustomersPage() {
           </div>
           <div className="flex items-center gap-2">
           <button
-            onClick={async () => {
+             onClick={async () => {
               setRecomputing(true);
               await recomputeStats();
               setRecomputing(false);
@@ -124,7 +124,7 @@ export default function CustomersPage() {
                     const outstanding = Number((c as any).outstanding_balance || (c as any).outstandingBalance || 0);
                     const loyaltyPoints = Number((c as any).loyalty_points || (c as any).loyaltyPoints || 0);
                     return (
-                      <>
+                      <Fragment key={c.id}>
                         <tr
                           key={c.id}
                           className="border-b border-border/50 hover:bg-muted/30 transition-colors cursor-pointer"
@@ -206,7 +206,7 @@ export default function CustomersPage() {
                             </td>
                           </tr>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })}
                 </tbody>

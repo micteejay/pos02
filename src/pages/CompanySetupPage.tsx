@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth, CompanyProfile } from "@/hooks/use-auth";
 import { useAppSettings } from "@/hooks/use-app-settings";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase } from "lucide-react";
+import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase, PackageOpen, FolderOpen, AlertTriangle, RotateCcw } from "lucide-react";
+import { previewBackupFile, importCompanyBackup, type BackupManifest, type BackupProgress } from "@/utils/company-backup";
 
 const currencyMap: Record<string, string> = {
   NGN: "₦", USD: "$", EUR: "€", GBP: "£", JPY: "¥", CAD: "C$", AUD: "A$", INR: "₹", BRL: "R$", ZAR: "R",
@@ -15,6 +16,16 @@ export default function CompanySetupPage() {
   const { saveCompanyProfile, user } = useAuth();
   const { updateSettings } = useAppSettings();
   const navigate = useNavigate();
+
+  // ── Mode: null = choose, "fresh" = setup form, "restore" = import flow
+  const [mode, setMode] = useState<null | "fresh" | "restore">(null);
+
+  // ── Restore state
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [previewManifest, setPreviewManifest] = useState<BackupManifest | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [restoreProgress, setRestoreProgress] = useState<BackupProgress | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Staff users created under an existing company should never see the
   // onboarding form. If we can find their company via any assignment,
@@ -92,8 +103,6 @@ export default function CompanySetupPage() {
 
   const handleComplete = async () => {
     await saveCompanyProfile(form);
-
-    // Sync company setup data into app settings (branding, currency, tax)
     updateSettings({
       appName: form.name,
       currency: form.currency,
@@ -102,12 +111,38 @@ export default function CompanySetupPage() {
       logoUrl: form.logoUrl,
       receiptHeader: form.name,
     });
-
     navigate("/");
+  };
+
+  // ── Restore handlers
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    const { ok, manifest, message } = await previewBackupFile(file);
+    if (!ok) { toast.error(message); return; }
+    setPendingFile(file);
+    setPreviewManifest(manifest!);
+    setShowConfirm(true);
+  };
+
+  const handleRestore = async () => {
+    if (!pendingFile || !user?.id) return;
+    setShowConfirm(false);
+    setRestoreProgress({ stage: "importing", message: "Starting restore…", percent: 0 });
+    const result = await importCompanyBackup(pendingFile, user.id, (p) => setRestoreProgress(p));
+    if (result.ok) {
+      toast.success("Company restored! Taking you to your dashboard…");
+      setTimeout(() => window.location.replace("/"), 1500);
+    } else {
+      toast.error(result.message);
+      setRestoreProgress({ stage: "error", message: result.message, percent: 0 });
+    }
   };
 
   const canProceedStep1 = form.name && form.country && form.phone && form.email;
   const canProceedStep2 = form.industry && form.currency;
+  const totalRows = previewManifest ? Object.values(previewManifest.row_counts).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
@@ -116,25 +151,130 @@ export default function CompanySetupPage() {
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">
             <Building2 className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Set Up Your Company</h1>
-          <p className="text-sm text-muted-foreground mt-1">Complete your company profile to get started</p>
+          <h1 className="text-2xl font-bold text-foreground">
+            {mode === null ? "Get Started" : mode === "restore" ? "Restore Company" : "Set Up Your Company"}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {mode === null ? "Choose how you'd like to set up your account" :
+             mode === "restore" ? "Import your backup file to restore everything" :
+             "Complete your company profile to get started"}
+          </p>
         </div>
 
-        {/* Progress */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                {step > s ? <Check className="w-4 h-4" /> : s}
+        {/* ════════════════════════════════════════════════════════
+            MODE SELECT
+        ════════════════════════════════════════════════════════ */}
+        {mode === null && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+            {/* Start Fresh */}
+            <button
+              onClick={() => setMode("fresh")}
+              className="glass-card rounded-2xl p-6 text-left hover:border-primary/40 hover:shadow-lg transition-all group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                <Building2 className="w-6 h-6 text-primary" />
               </div>
-              {s < 3 && <div className={`w-12 h-0.5 rounded-full ${step > s ? "bg-primary" : "bg-muted"}`} />}
-            </div>
-          ))}
-        </div>
+              <h3 className="font-bold text-foreground mb-1">Start Fresh</h3>
+              <p className="text-xs text-muted-foreground">Set up a brand-new company from scratch. Fill in your company details and get started in minutes.</p>
+              <div className="flex items-center gap-1 text-primary text-xs font-medium mt-4">
+                Continue <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </button>
 
-        <div className="glass-card rounded-2xl p-8 animate-fade-in">
-          {/* Step 1: Basic Info */}
-          {step === 1 && (
+            {/* Restore Backup */}
+            <button
+              onClick={() => setMode("restore")}
+              className="glass-card rounded-2xl p-6 text-left hover:border-warning/40 hover:shadow-lg transition-all group"
+            >
+              <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center mb-4 group-hover:bg-warning/20 transition-colors">
+                <PackageOpen className="w-6 h-6 text-warning" />
+              </div>
+              <h3 className="font-bold text-foreground mb-1">Restore Backup</h3>
+              <p className="text-xs text-muted-foreground">Have a <code className="text-primary">.vitepbak</code> file? Import your previous company — inventory, sales, customers, and settings all restored.</p>
+              <div className="flex items-center gap-1 text-warning text-xs font-medium mt-4">
+                Import file <ArrowRight className="w-3.5 h-3.5" />
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            RESTORE MODE
+        ════════════════════════════════════════════════════════ */}
+        {mode === "restore" && (
+          <div className="glass-card rounded-2xl p-8 animate-fade-in">
+            {!restoreProgress ? (
+              <div className="space-y-5">
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/5 border border-warning/20">
+                  <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+                  <p className="text-xs text-warning">Make sure you have your <code className="bg-warning/10 px-1 rounded">.vitepbak</code> file ready. This will set up your company using data from your previous account.</p>
+                </div>
+
+                <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary/40 transition-colors">
+                  <PackageOpen className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground mb-1">Select your backup file</p>
+                  <p className="text-xs text-muted-foreground mb-4">Supports <code>.vitepbak</code> files exported from VITE POS</p>
+                  <input ref={fileRef} type="file" accept=".vitepbak" className="hidden" onChange={handleFileSelect} />
+                  <button onClick={() => fileRef.current?.click()}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors mx-auto">
+                    <FolderOpen className="w-4 h-4" /> Browse File
+                  </button>
+                </div>
+
+                <button onClick={() => setMode(null)} className="w-full py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                  ← Back
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5 text-center">
+                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto ${restoreProgress.stage === "error" ? "bg-destructive/10" : restoreProgress.stage === "done" ? "bg-success/10" : "bg-warning/10"}`}>
+                  {restoreProgress.stage === "done"
+                    ? <Check className="w-8 h-8 text-success" />
+                    : restoreProgress.stage === "error"
+                    ? <AlertTriangle className="w-8 h-8 text-destructive" />
+                    : <RotateCcw className="w-8 h-8 text-warning animate-spin" />
+                  }
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">{restoreProgress.stage === "done" ? "Restore Complete!" : restoreProgress.stage === "error" ? "Restore Failed" : "Restoring…"}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{restoreProgress.message}</p>
+                </div>
+                <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${restoreProgress.stage === "error" ? "bg-destructive" : restoreProgress.stage === "done" ? "bg-success" : "bg-warning"}`}
+                    style={{ width: `${restoreProgress.percent}%` }} />
+                </div>
+                {restoreProgress.stage === "error" && (
+                  <button onClick={() => { setRestoreProgress(null); setPendingFile(null); setPreviewManifest(null); }}
+                    className="px-5 py-2 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-colors">
+                    Try Again
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            FRESH SETUP (existing 3-step form)
+        ════════════════════════════════════════════════════════ */}
+        {mode === "fresh" && (
+          <>
+            {/* Progress */}
+            <div className="flex items-center justify-center gap-2 mb-8">
+              {[1, 2, 3].map((s) => (
+                <div key={s} className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${step >= s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    {step > s ? <Check className="w-4 h-4" /> : s}
+                  </div>
+                  {s < 3 && <div className={`w-12 h-0.5 rounded-full ${step > s ? "bg-primary" : "bg-muted"}`} />}
+                </div>
+              ))}
+            </div>
+
+            <div className="glass-card rounded-2xl p-8 animate-fade-in">
+              {/* Step 1: Basic Info */}
+              {step === 1 && (
+
             <div className="space-y-4">
               <h2 className="text-lg font-semibold text-foreground mb-4">Company Information</h2>
               <div className="flex items-center gap-6 mb-6">
@@ -294,7 +434,57 @@ export default function CompanySetupPage() {
             </div>
           )}
         </div>
+        </>
+      )}
+
+      {/* ── Confirm Restore Modal ── */}
+      {showConfirm && previewManifest && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-2xl shadow-2xl p-6 w-full max-w-md border border-border animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+                <PackageOpen className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground">Restore This Backup?</h3>
+                <p className="text-xs text-muted-foreground">Your account will be set up using this backup</p>
+              </div>
+            </div>
+            <div className="p-4 rounded-xl bg-muted/30 space-y-2 mb-5">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Company</span>
+                <span className="font-semibold text-foreground">{previewManifest.company_name}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Exported</span>
+                <span className="font-medium text-foreground">{new Date(previewManifest.exported_at).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Total records</span>
+                <span className="font-medium text-foreground">{totalRows.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Tables</span>
+                <span className="font-medium text-foreground">{previewManifest.tables_exported.length}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-5">You will be the Super Admin of the restored company. All inventory, sales, customers, and settings will be imported.</p>
+            <div className="flex gap-3">
+              <button onClick={() => { setShowConfirm(false); setPendingFile(null); setPreviewManifest(null); }}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-foreground hover:bg-muted transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleRestore}
+                className="flex-1 py-2.5 rounded-xl bg-warning text-warning-foreground text-sm font-semibold hover:bg-warning/90 transition-colors flex items-center justify-center gap-2">
+                <RotateCcw className="w-4 h-4" /> Restore Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </div>
     </div>
   );
 }
+

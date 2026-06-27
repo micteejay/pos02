@@ -254,7 +254,7 @@ export default function SupplyPage() {
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Supply Chain</h1>
+            <h1 className="text-2xl font-bold text-foreground">Supplier</h1>
             <p className="text-sm text-muted-foreground mt-1">Manage purchase orders, suppliers, and procurement.</p>
           </div>
           <div className="flex gap-2">

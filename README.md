@@ -71,3 +71,21 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+supabase login          # authenticate with your Supabase account
+supabase link           # link to your pos02 project
+supabase db dump        # dump your full database
+
+# 1. Login to your Supabase account
+supabase login
+
+# 2. Link to your pos02 project (run from project root)
+cd ~/pos02
+supabase link --project-ref <your-project-ref>
+#   (find project-ref in: Supabase Dashboard → Settings → General)
+
+# 3. Dump your full database (schema + data)
+supabase db dump -f full_backup.sql
+
+# 4. Dump data only
+supabase db dump --data-only -f data_only.sql

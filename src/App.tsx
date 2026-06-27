@@ -45,6 +45,7 @@ const CompanySetupPage = lazy(() => import("./pages/CompanySetupPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -94,6 +95,8 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/setup-company" element={<SetupRoute><CompanySetupPage /></SetupRoute>} />
         <Route path="/install" element={<InstallPage />} />
+        <Route path="/landing" element={<LandingPage />} />
+        <Route path="/about" element={<LandingPage />} />
         <Route path="/" element={<Guarded permission="pages.dashboard"><Index /></Guarded>} />
         <Route path="/chat" element={<Guarded permission="pages.chat"><ChatPage /></Guarded>} />
         <Route path="/documents" element={<Guarded permission="pages.documents"><DocumentsPage /></Guarded>} />
