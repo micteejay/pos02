@@ -108,7 +108,9 @@ export function generateReceiptText(
 
   // Items — paginated into sections of PAGE_SIZE so long receipts repeat
   // the column header and stay readable when many items are printed.
-  const PAGE_SIZE = Number(settings?.receiptPageSize) || 25;
+  // For roll printers (80mm/58mm), we do not want page breaks (which trigger printer cutting).
+  const isRollPrinter = paperWidthStr !== "A4";
+  const PAGE_SIZE = isRollPrinter ? 999999 : (Number(settings?.receiptPageSize) || 25);
   const chunks: typeof sale.items[] = [];
   for (let i = 0; i < sale.items.length; i += PAGE_SIZE) {
     chunks.push(sale.items.slice(i, i + PAGE_SIZE));

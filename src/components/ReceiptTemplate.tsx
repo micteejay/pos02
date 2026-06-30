@@ -92,7 +92,9 @@ const ReceiptTemplate = forwardRef<HTMLDivElement, Props>(function ReceiptTempla
   // Page size — how many items per "section" before we repeat the column
   // header and insert a print page-break. Keeps long receipts (20+ items)
   // readable both on screen and when printed on Letter / A4.
-  const PAGE_SIZE = Number(settings?.receiptPageSize) || 25;
+  // For roll printers (80mm/58mm), we do not want page breaks (which trigger printer cutting).
+  const isRollPrinter = paperWidth !== "A4";
+  const PAGE_SIZE = isRollPrinter ? 999999 : (Number(settings?.receiptPageSize) || 25);
   const itemChunks: typeof sale.items[] = [];
   for (let i = 0; i < sale.items.length; i += PAGE_SIZE) {
     itemChunks.push(sale.items.slice(i, i + PAGE_SIZE));

@@ -208,7 +208,19 @@ export async function printNode(
 
       if (isThermal && widthNum) {
         printOptions.page_width = widthNum;
-        printOptions.page_height = 200; // safe thermal height estimate (mm)
+        
+        // Calculate dynamic height based on scrollHeight
+        // At 96 DPI, 1px = 0.264583 mm. We add a padding (e.g. 15mm) to prevent cutoff
+        let heightMm = 200;
+        if (node.scrollHeight > 0) {
+          heightMm = Math.ceil(node.scrollHeight * 0.264583) + 15;
+        } else {
+          // Fallback to estimation based on child count
+          const childCount = node.getElementsByTagName("*").length;
+          heightMm = 100 + Math.ceil(childCount * 1.5); // conservative estimate
+        }
+        
+        printOptions.page_height = Math.max(150, Math.min(2000, heightMm));
         printOptions.margin = {
           top: 0,
           bottom: 0,
@@ -320,7 +332,19 @@ export async function printHtmlString(
 
       if (isThermal && widthNum) {
         printOptions.page_width = widthNum;
-        printOptions.page_height = 200; // safe thermal height estimate (mm)
+        
+        // Parse HTML and estimate height based on DOM nodes
+        let heightMm = 200;
+        try {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+          const childCount = doc.getElementsByTagName("*").length;
+          heightMm = 100 + Math.ceil(childCount * 1.5);
+        } catch (e) {
+          console.warn("Failed to parse HTML for height estimation", e);
+        }
+        
+        printOptions.page_height = Math.max(150, Math.min(2000, heightMm));
         printOptions.margin = {
           top: 0,
           bottom: 0,

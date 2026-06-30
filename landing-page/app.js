@@ -3,7 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isOffline = false;
   let cart = [];
   let outboxQueue = [];
-  
+
   let products = [
     { id: "1", name: "Premium Widget Alpha", price: 29.99, sku: "W-ALPHA-90", stock: 45, warehouse: "A" },
     { id: "2", name: "Wireless Smart Sensor", price: 89.99, sku: "S-SMART-88", stock: 12, warehouse: "B" },
@@ -48,7 +48,7 @@ document.addEventListener("DOMContentLoaded", () => {
   tabButtons.forEach(btn => {
     btn.addEventListener("click", () => {
       const tabId = btn.getAttribute("data-tab");
-      
+
       tabButtons.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -119,7 +119,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateAuditLogsUI() {
     const logsContainer = document.getElementById("dash-audit-logs");
     if (!logsContainer) return;
-    
+
     logsContainer.innerHTML = "";
     auditLogs.slice(0, 5).forEach(log => {
       const item = document.createElement("div");
@@ -141,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("dash-revenue").textContent = `$${totalRev.toFixed(2)}`;
     document.getElementById("dash-transactions").textContent = transactionsHistory.length;
-    
+
     const outboxCount = outboxQueue.length;
     document.getElementById("dash-outbox").textContent = `${outboxCount} pending`;
 
@@ -156,9 +156,9 @@ document.addEventListener("DOMContentLoaded", () => {
     transactionsHistory.slice(0, 5).forEach(tx => {
       const tr = document.createElement("tr");
       tr.className = "border-b border-border/40 hover:bg-muted/30";
-      
+
       const badgeClass = tx.status === "completed" ? "badge bg-emerald-10 text-emerald" : "badge bg-warning-10 text-warning";
-      
+
       tr.innerHTML = `
         <td class="py-2 font-mono text-primary">${tx.id}</td>
         <td class="py-2 font-medium">${tx.client}</td>
@@ -311,7 +311,7 @@ document.addEventListener("DOMContentLoaded", () => {
   btnCompleteSale.addEventListener("click", () => {
     const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
     const txnNum = "TXN-" + Math.floor(Math.random() * 9000 + 1000);
-    
+
     // Subtract stock levels
     cart.forEach(cartItem => {
       products = products.map(p => {
@@ -349,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Inventory Management Logic ---
   const invSearchInput = document.getElementById("inv-search-input");
-  
+
   function renderInventoryTable(filterText = "") {
     const tableBody = document.getElementById("inventory-table-body");
     tableBody.innerHTML = "";
@@ -365,7 +365,7 @@ document.addEventListener("DOMContentLoaded", () => {
     filtered.forEach(p => {
       const tr = document.createElement("tr");
       tr.className = "hover:bg-muted/20 border-b border-border/40 transition-colors";
-      
+
       let stockColorClass = "text-foreground";
       if (p.stock === 0) stockColorClass = "text-destructive font-bold";
       else if (p.stock < 15) stockColorClass = "text-warning font-bold";
@@ -456,9 +456,9 @@ document.addEventListener("DOMContentLoaded", () => {
     customers.forEach((c, idx) => {
       const tr = document.createElement("tr");
       tr.className = "hover:bg-muted/20 border-b border-border/40 transition-colors";
-      
+
       const balClass = c.balance > 0 ? "text-warning font-bold" : "text-muted-foreground";
-      const actionHtml = c.balance > 0 
+      const actionHtml = c.balance > 0
         ? `<button class="px-2 py-0.5 rounded border bg-card border-primary text-primary text-[10px] btn-pay-balance" data-index="${idx}">Record Payment</button>`
         : `<span class="text-[9px] text-muted-foreground italic">Cleared</span>`;
 
@@ -485,7 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const c = customers[index];
     logSystemAudit("Client Account Payment", `Cleared outstanding account balance of $${c.balance.toFixed(2)} for ${c.name}`);
     showToast(`Recorded balance payment of $${c.balance.toFixed(2)} for ${c.name}! Account balance is now $0.00.`, "success");
-    
+
     customers[index].spend += c.balance;
     customers[index].balance = 0;
     renderCustomersTable();
@@ -493,7 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Supply Chain Tab ---
   const btnSubmitPo = document.getElementById("btn-submit-po");
-  
+
   function renderSupplyPOs() {
     const list = document.getElementById("supply-po-list");
     list.innerHTML = "";
@@ -501,7 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
     purchaseOrders.forEach(po => {
       const card = document.createElement("div");
       card.className = "p-3 rounded-lg border bg-card/60 flex items-center justify-between";
-      
+
       let badgeClass = "badge bg-emerald-10 text-emerald";
       let lbl = "Approved";
 
@@ -531,7 +531,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const amountInput = document.getElementById("po-amount");
     const supplierInput = document.getElementById("po-supplier");
     const amount = Number(amountInput.value) || 0;
-    
+
     if (amount <= 0) {
       showToast("Please enter a valid purchase order amount.", "warning");
       return;
@@ -549,7 +549,7 @@ document.addEventListener("DOMContentLoaded", () => {
     purchaseOrders.unshift(newPO);
     logSystemAudit("Purchase Order Created", `Generated PO ${poId} value $${amount} for ${supplierInput.value}`);
     showToast(`Purchase Order created: ${poId}`, "success");
-    
+
     amountInput.value = "1200";
     renderSupplyPOs();
     updateOutboxBadges();
@@ -573,7 +573,7 @@ document.addEventListener("DOMContentLoaded", () => {
     pendingPOs.forEach(po => {
       const card = document.createElement("div");
       card.className = "p-3 rounded-xl border bg-card/60 flex flex-col justify-between gap-3 animate-fade-in";
-      
+
       let actionsHtml = "";
       if (activeRole === "manager") {
         actionsHtml = `
@@ -691,13 +691,13 @@ document.addEventListener("DOMContentLoaded", () => {
         txn.status = "completed";
         transactionsHistory.unshift(txn);
       });
-      
+
       const count = outboxQueue.length;
       outboxQueue = [];
-      
+
       btnSyncNow.disabled = false;
       btnSyncNow.textContent = "Commit SQLite Outbox Queue";
-      
+
       logSystemAudit("SQLite Outbox Synced", `Uploaded ${count} offline checkout sales rows to Cloud database`);
       showToast("Tauri Sync Engine committed outbox rows successfully!", "success");
       updateDashboard();
@@ -724,7 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
         sales_transactions: transactionsHistory.length
       }
     };
-    
+
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest, null, 2));
     const downloadAnchor = document.createElement("a");
     downloadAnchor.setAttribute("href", dataStr);
@@ -768,7 +768,7 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       // Simulate mapping and suffixing categories / SKUs
       const suffix = Math.floor(Math.random() * 9000 + 1000).toString(36).toUpperCase();
-      
+
       // Inject some mock sales items suffixing them
       const importedTxns = [
         { id: `TXN-5011-${suffix}`, client: `Sarah Campbell-${suffix}`, method: "Cash", total: 45.00, status: "completed", date: new Date().toLocaleTimeString() }
@@ -777,7 +777,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       btnTriggerRestore.disabled = false;
       btnTriggerRestore.textContent = "Initiate Database Migration";
-      
+
       // Reset drop area
       fileDropArea.classList.remove("active");
       fileDropArea.innerHTML = `
@@ -785,12 +785,12 @@ document.addEventListener("DOMContentLoaded", () => {
         <p class="text-[10px] font-semibold text-foreground leading-none">Click to upload backup file</p>
         <p class="text-[9px] text-muted-foreground mt-1">company_backup.vitepbak</p>
       `;
-      
+
       logSystemAudit("Backup Restored Successfully", `Migrated tables cleanly. Suffix -${suffix} applied to keys.`);
       showToast(`Data restored successfully under session suffix -${suffix}!`, "success");
-      
+
       updateDashboard();
-      
+
       // Navigate back to dashboard tab
       document.querySelector('[data-tab="dashboard"]').click();
     }, 1500);
@@ -803,11 +803,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const toast = document.createElement("div");
     toast.className = `toast-notification animate-slide-down ${type}`;
-    
+
     let color = "var(--primary)";
     if (type === "warning") color = "var(--warning)";
     else if (type === "error") color = "var(--destructive)";
-    
+
     toast.style.cssText = `
       position: fixed;
       top: 1.5rem;
@@ -864,13 +864,13 @@ document.addEventListener("DOMContentLoaded", () => {
   if (requestForm) {
     requestForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      
+
       const name = document.getElementById("req-name").value;
       const company = document.getElementById("req-company").value;
       const phone = document.getElementById("req-phone").value;
       const tier = document.getElementById("req-tier").value;
       const message = document.getElementById("req-message").value || "No additional comments";
-      
+
       if (submissionTarget === "email") {
         const emailRecipient = "vitaposdev@gmail.com";
         const subject = encodeURIComponent(`VitePOS Registration Inquiry - ${company}`);
@@ -887,7 +887,7 @@ document.addEventListener("DOMContentLoaded", () => {
           `Best regards,\n` +
           `${name}`
         );
-        
+
         window.location.href = `mailto:${emailRecipient}?subject=${subject}&body=${body}`;
         showToast("Email client opened! Send inquiry to complete request.", "success");
       } else {
@@ -899,8 +899,8 @@ document.addEventListener("DOMContentLoaded", () => {
           `*Plan/Tier:* ${tier}\n` +
           `*Message:* ${message}`
         );
-        
-        window.open(`https://wa.me/2349057991975?text=${waText}`, "_blank");
+
+        window.open(`https://wa.me/2349122984661?text=${waText}`, "_blank");
         showToast("WhatsApp app opened! Message drafted successfully.", "success");
       }
     });
