@@ -161,10 +161,14 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       PushNotifications.requestPermissions().then(result => {
         if (result.receive === 'granted') {
           // Register with Apple / Google to receive push via APNS/FCM
-          PushNotifications.register();
+          PushNotifications.register().catch(err => {
+            console.error("[Notifications] Push registration failed:", err);
+          });
         } else {
           console.log("[Notifications] Push permission denied");
         }
+      }).catch(err => {
+        console.error("[Notifications] Push permission request failed:", err);
       });
 
       // On success, we should be able to receive notifications
