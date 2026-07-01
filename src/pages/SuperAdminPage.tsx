@@ -1,0 +1,330 @@
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "@/hooks/use-toast";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut } from "lucide-react";
+
+const SUPER_ADMIN_EMAIL = "babajuwon0@gmail.com";
+const GATE_PASSWORD = "admin12345";
+
+type SuperUser = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  company_id: string | null;
+  company_name: string | null;
+  created_at: string | null;
+  last_sign_in_at: string | null;
+};
+
+export default function SuperAdminPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const isAllowed = (user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
+
+  const [unlocked, setUnlocked] = useState(false);
+  const [gate, setGate] = useState("");
+  const [users, setUsers] = useState<SuperUser[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<SuperUser | null>(null);
+  const [deleting, setDeleting] = useState<SuperUser | null>(null);
+  const [pwUser, setPwUser] = useState<SuperUser | null>(null);
+
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [newPassword, setNewPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const call = useCallback(async (action: string, body: Record<string, unknown> = {}) => {
+    const { data, error } = await supabase.functions.invoke("super-admin", { body: { action, ...body } });
+    if (error) throw new Error(error.message);
+    if ((data as any)?.error) throw new Error((data as any).error);
+    return data as any;
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await call("list");
+      setUsers(data.users || []);
+    } catch (e) {
+      toast({ title: "Failed to load users", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  }, [call]);
+
+  useEffect(() => { if (unlocked && isAllowed) load(); }, [unlocked, isAllowed, load]);
+
+  if (!isAllowed) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="p-8 max-w-md text-center space-y-4">
+          <Shield className="mx-auto h-10 w-10 text-destructive" />
+          <h1 className="text-xl font-semibold">Access Denied</h1>
+          <p className="text-sm text-muted-foreground">
+            This area is restricted to the platform owner.
+          </p>
+          <Button onClick={() => navigate("/")} variant="outline" className="w-full">Back to app</Button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!unlocked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="p-8 max-w-md w-full space-y-4">
+          <div className="text-center space-y-2">
+            <Shield className="mx-auto h-10 w-10 text-primary" />
+            <h1 className="text-xl font-semibold">Super Admin Console</h1>
+            <p className="text-sm text-muted-foreground">Enter your admin passcode to continue.</p>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (gate === GATE_PASSWORD) setUnlocked(true);
+              else toast({ title: "Incorrect passcode", variant: "destructive" });
+            }}
+            className="space-y-3"
+          >
+            <Input
+              type="password"
+              placeholder="Passcode"
+              value={gate}
+              onChange={(e) => setGate(e.target.value)}
+              autoFocus
+            />
+            <Button type="submit" className="w-full">Unlock</Button>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
+  const filtered = users.filter((u) => {
+    if (!q.trim()) return true;
+    const s = q.toLowerCase();
+    return [u.name, u.email, u.company_name].some((v) => (v || "").toLowerCase().includes(s));
+  });
+
+  return (
+    <div className="min-h-screen bg-background p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Shield className="h-6 w-6 text-primary" />
+            <div>
+              <h1 className="text-2xl font-semibold">Super Admin</h1>
+              <p className="text-xs text-muted-foreground">Global oversight — all users across every company</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button size="sm" onClick={() => { setForm({ name: "", email: "", password: "" }); setCreateOpen(true); }}>
+              <UserPlus className="h-4 w-4 mr-2" /> Add User
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setUnlocked(false)}>
+              <LogOut className="h-4 w-4 mr-2" /> Lock
+            </Button>
+          </div>
+        </div>
+
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users by name, email, or company..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="max-w-md"
+            />
+            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {users.length}</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Last sign in</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+                )}
+                {!loading && filtered.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No users found</TableCell></TableRow>
+                )}
+                {!loading && filtered.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">{u.name || "—"}</TableCell>
+                    <TableCell className="text-sm">{u.email || "—"}</TableCell>
+                    <TableCell className="text-sm">{u.company_name || <span className="text-muted-foreground">None</span>}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}
+                    </TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditing(u); setForm({ name: u.name || "", email: u.email || "", password: "" }); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Reset password" onClick={() => { setPwUser(u); setNewPassword(""); }}>
+                        <KeyRound className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleting(u)} className="text-destructive hover:text-destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      </div>
+
+      {/* Create dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create User</DialogTitle>
+            <DialogDescription>Creates a new authenticated user. Email is auto-confirmed.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div><Label>Password</Label><Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button
+              disabled={busy || !form.email || !form.password || !form.name}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await call("create", form);
+                  toast({ title: "User created" });
+                  setCreateOpen(false);
+                  load();
+                } catch (e) {
+                  toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setBusy(false); }
+              }}
+            >Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog */}
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>Leave password blank to keep the existing one.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+            <div><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+            <div><Label>New Password (optional)</Label><Input type="text" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                if (!editing) return;
+                setBusy(true);
+                try {
+                  await call("update", { userId: editing.id, name: form.name, email: form.email, password: form.password || undefined });
+                  toast({ title: "User updated" });
+                  setEditing(null);
+                  load();
+                } catch (e) {
+                  toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setBusy(false); }
+              }}
+            >Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password-only dialog */}
+      <Dialog open={!!pwUser} onOpenChange={(o) => !o && setPwUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>Set a new password for {pwUser?.email || pwUser?.name}.</DialogDescription>
+          </DialogHeader>
+          <Input type="text" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwUser(null)}>Cancel</Button>
+            <Button
+              disabled={busy || newPassword.length < 6}
+              onClick={async () => {
+                if (!pwUser) return;
+                setBusy(true);
+                try {
+                  await call("update", { userId: pwUser.id, password: newPassword });
+                  toast({ title: "Password updated" });
+                  setPwUser(null);
+                } catch (e) {
+                  toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setBusy(false); }
+              }}
+            >Update Password</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes <strong>{deleting?.email || deleting?.name}</strong> and their auth record. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleting) return;
+                try {
+                  await call("delete", { userId: deleting.id });
+                  toast({ title: "User deleted" });
+                  setDeleting(null);
+                  load();
+                } catch (e) {
+                  toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+                }
+              }}
+            >Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
