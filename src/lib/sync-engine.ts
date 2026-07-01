@@ -6,7 +6,7 @@ let isProcessingQueue = false;
 /**
  * Enqueues a write operation into the local sync_queue for background processing.
  */
-export async function enqueueSync(tableName: string, action: "INSERT" | "UPDATE" | "DELETE", payload: any): Promise<void> {
+export async function enqueueSync(tableName: string, action: "INSERT" | "UPDATE" | "DELETE" | "RPC", payload: any): Promise<void> {
   try {
     const db = await getDb();
     const payloadStr = JSON.stringify(payload);
