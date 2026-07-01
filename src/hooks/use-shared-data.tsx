@@ -379,7 +379,7 @@ export function SharedDataProvider({ children }: { children: ReactNode }) {
 
       // Resolve warehouse names for inventory
       if (whData) {
-        const whMap = new Map(whData.map(w => [w.id, w.name]));
+        const whMap = new Map<string, string>(whData.map(w => [w.id as string, w.name as string]));
         setInventory(prev => prev.map(item => ({
           ...item,
           warehouse: item.warehouseId ? (whMap.get(item.warehouseId) || "") : "",
