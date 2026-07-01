@@ -66,7 +66,7 @@ export default function CustomerPaymentDialog({
         
         await enqueueSync("customer_payments", "INSERT", payload);
         
-        const existing = await db.select<any[]>("SELECT * FROM customers WHERE id = ?", [customerId]);
+        const existing = await db.select("SELECT * FROM customers WHERE id = ?", [customerId]);
         if (existing.length > 0) {
           const current = existing[0];
           const newOutstanding = Math.max(0, (Number(current.outstanding_balance) || 0) - value);

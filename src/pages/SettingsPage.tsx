@@ -905,7 +905,7 @@ export default function SettingsPage() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Version {settings.version || "0.1.0"}</p>
+                  <p className="text-sm font-medium text-foreground">Version {(settings as any).version || "0.1.0"}</p>
                   <p className="text-xs text-muted-foreground">Check for and install the latest updates.</p>
                 </div>
                 <button onClick={handleManualUpdateCheck} className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors rounded-lg text-sm font-medium">

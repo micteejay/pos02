@@ -9,7 +9,7 @@ import { type Customer } from "@/hooks/use-customers";
 export const LocalInventoryRepository = {
   async getAll(): Promise<InventoryItem[]> {
     const db = await getDb();
-    const rows = await db.select<any[]>("SELECT * FROM products ORDER BY name ASC");
+    const rows = await db.select("SELECT * FROM products ORDER BY name ASC");
     return rows.map((r) => ({
       id: r.id,
       sku: r.sku,
@@ -56,7 +56,7 @@ export const LocalInventoryRepository = {
     const now = new Date().toISOString();
 
     // Fetch existing
-    const existing = await db.select<any[]>("SELECT * FROM products WHERE id = ?", [id]);
+    const existing = await db.select("SELECT * FROM products WHERE id = ?", [id]);
     if (existing.length === 0) return;
     const current = existing[0];
 
@@ -89,7 +89,7 @@ export const LocalInventoryRepository = {
     const db = await getDb();
     const now = new Date().toISOString();
 
-    const existing = await db.select<any[]>("SELECT * FROM products WHERE id = ?", [id]);
+    const existing = await db.select("SELECT * FROM products WHERE id = ?", [id]);
     if (existing.length === 0) return 0;
     const current = existing[0];
 
@@ -116,11 +116,11 @@ export const LocalInventoryRepository = {
 export const LocalSalesRepository = {
   async getAll(): Promise<SaleRecord[]> {
     const db = await getDb();
-    const txns = await db.select<any[]>("SELECT * FROM sales_transactions ORDER BY created_at DESC LIMIT 100");
+    const txns = await db.select("SELECT * FROM sales_transactions ORDER BY created_at DESC LIMIT 100");
     const sales: SaleRecord[] = [];
 
     for (const txn of txns) {
-      const items = await db.select<any[]>("SELECT * FROM sales_items WHERE transaction_id = ?", [txn.id]);
+      const items = await db.select("SELECT * FROM sales_items WHERE transaction_id = ?", [txn.id]);
       sales.push({
         id: txn.transaction_number,
         total: txn.total,
@@ -218,7 +218,7 @@ export const LocalSalesRepository = {
 export const LocalCustomerRepository = {
   async getAll(): Promise<Customer[]> {
     const db = await getDb();
-    const rows = await db.select<any[]>("SELECT * FROM customers ORDER BY name ASC");
+    const rows = await db.select("SELECT * FROM customers ORDER BY name ASC");
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -283,7 +283,7 @@ export const LocalCustomerRepository = {
     const db = await getDb();
     
     // Fetch existing
-    const existing = await db.select<any[]>("SELECT * FROM customers WHERE id = ?", [id]);
+    const existing = await db.select("SELECT * FROM customers WHERE id = ?", [id]);
     if (existing.length === 0) return;
     const current = existing[0];
 

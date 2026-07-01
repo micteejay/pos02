@@ -6,7 +6,7 @@ let isProcessingQueue = false;
 /**
  * Enqueues a write operation into the local sync_queue for background processing.
  */
-export async function enqueueSync(tableName: string, action: "INSERT" | "UPDATE" | "DELETE", payload: any): Promise<void> {
+export async function enqueueSync(tableName: string, action: "INSERT" | "UPDATE" | "DELETE" | "RPC", payload: any): Promise<void> {
   try {
     const db = await getDb();
     const payloadStr = JSON.stringify(payload);
@@ -43,7 +43,7 @@ export async function triggerSync(): Promise<void> {
   try {
     const db = await getDb();
     // Retrieve jobs in chronological order
-    const jobs = await db.select<any[]>(
+    const jobs = await db.select(
       "SELECT id, table_name, action, payload FROM sync_queue ORDER BY id ASC"
     );
 
@@ -112,7 +112,7 @@ export async function pullProductsFromCloud(): Promise<void> {
     const db = await getDb();
     
     // Find the latest update time from our local DB
-    const localResult = await db.select<any[]>(
+    const localResult = await db.select(
       "SELECT MAX(updated_at) as last_updated FROM products"
     );
     
@@ -164,7 +164,7 @@ export async function pullCustomersFromCloud(): Promise<void> {
     const db = await getDb();
     
     // Find the latest update time from our local DB using created_at
-    const localResult = await db.select<any[]>(
+    const localResult = await db.select(
       "SELECT MAX(created_at) as last_created FROM customers"
     );
     

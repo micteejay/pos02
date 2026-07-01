@@ -115,13 +115,13 @@ export default function SalesPage() {
         try {
           const { getDb } = await import("@/lib/db");
           const db = await getDb();
-          const localTxns = await db.select<any[]>(
+          const localTxns = await db.select(
             "SELECT * FROM sales_transactions ORDER BY created_at DESC LIMIT 500"
           );
           
           const mapped: Transaction[] = [];
           for (const s of localTxns) {
-            const items = await db.select<any[]>(
+            const items = await db.select(
               "SELECT * FROM sales_items WHERE transaction_id = ?",
               [s.id]
             );
@@ -284,10 +284,10 @@ export default function SalesPage() {
       try {
         const { getDb } = await import("@/lib/db");
         const db = await getDb();
-        const data = await db.select<any[]>("SELECT * FROM sales_transactions WHERE id = ?", [txn.dbId]);
+        const data = await db.select("SELECT * FROM sales_transactions WHERE id = ?", [txn.dbId]);
         if (data.length === 0) { toast.error("Could not find transaction locally"); return; }
         const s = data[0];
-        const items = await db.select<any[]>("SELECT * FROM sales_items WHERE transaction_id = ?", [txn.dbId]);
+        const items = await db.select("SELECT * FROM sales_items WHERE transaction_id = ?", [txn.dbId]);
         
         setReprintSaleId(s.id);
         setReprintAttachments([]);
