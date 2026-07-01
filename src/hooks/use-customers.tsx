@@ -190,7 +190,7 @@ export function useCustomers() {
         try {
           const { getDb } = await import("@/lib/db");
           const db = await getDb();
-          const existing = await db.select<any[]>("SELECT * FROM customers WHERE id = ?", [id]);
+          const existing = await db.select("SELECT * FROM customers WHERE id = ?", [id]);
           if (existing.length > 0) {
             const current = existing[0];
             const name = updates.name !== undefined ? updates.name : current.name;
@@ -254,7 +254,7 @@ export function useCustomers() {
       try {
         const { getDb } = await import("@/lib/db");
         const db = await getDb();
-        const txs = await db.select<any[]>(
+        const txs = await db.select(
           "SELECT customer_id, total, created_at FROM sales_transactions WHERE customer_id IS NOT NULL"
         );
         const agg = new Map<string, { spend: number; orders: number; last: string }>();

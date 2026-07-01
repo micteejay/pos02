@@ -44,7 +44,7 @@ export default function CustomerDetailDialog({ customerId, formatCurrency, onClo
           const db = await getDb();
 
           // 1. Fetch local sales transactions for this customer
-          const localTxs = await db.select<any[]>(
+          const localTxs = await db.select(
             "SELECT id, transaction_number, total, created_at FROM sales_transactions WHERE customer_id = ? ORDER BY created_at DESC LIMIT 15",
             [customerId]
           );
@@ -57,7 +57,7 @@ export default function CustomerDetailDialog({ customerId, formatCurrency, onClo
           }));
 
           // 2. Fetch pending customer payments from sync_queue
-          const queueJobs = await db.select<any[]>(
+          const queueJobs = await db.select(
             "SELECT * FROM sync_queue WHERE table_name = ? AND action = ? ORDER BY created_at DESC",
             ["customer_payments", "INSERT"]
           );

@@ -366,14 +366,14 @@ function CustomerHistory({ customerId }: { customerId: string }) {
         if (!useOnline) {
           const { getDb } = await import("@/lib/db");
           const db = await getDb();
-          const txs = await db.select<any[]>(
+          const txs = await db.select(
             "SELECT id, transaction_number, created_at, total, payment_method FROM sales_transactions WHERE customer_id = ? ORDER BY created_at DESC",
             [customerId]
           );
           
           const mapped: CustomerTransaction[] = [];
           for (const tx of txs) {
-            const items = await db.select<any[]>(
+            const items = await db.select(
               "SELECT name, qty, price FROM sales_items WHERE transaction_id = ?",
               [tx.id]
             );

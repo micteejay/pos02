@@ -122,7 +122,7 @@ export default function InventoryPage() {
         try {
           const { getDb } = await import("@/lib/db");
           const db = await getDb();
-          const rows = await db.select<any[]>("SELECT * FROM stock_transfers ORDER BY created_at DESC");
+          const rows = await db.select("SELECT * FROM stock_transfers ORDER BY created_at DESC");
           setTransfers(rows.map((t: any) => ({
             id: t.transfer_number,
             dbId: t.id,

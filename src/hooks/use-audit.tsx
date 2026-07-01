@@ -73,7 +73,7 @@ export function useAudit() {
       try {
         const { getDb } = await import("@/lib/db");
         const db = await getDb();
-        const rows = await db.select<any[]>("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500");
+        const rows = await db.select("SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 500");
         return rows.map((e: any) => ({
           id: e.id, timestamp: e.created_at, user: e.user_name || "System",
           userId: "", role: "",

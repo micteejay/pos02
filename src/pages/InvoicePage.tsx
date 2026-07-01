@@ -98,10 +98,10 @@ export default function InvoicePage() {
         try {
           const { getDb } = await import("@/lib/db");
           const db = await getDb();
-          const localInvs = await db.select<any[]>("SELECT * FROM invoices ORDER BY created_at DESC LIMIT 100");
+          const localInvs = await db.select("SELECT * FROM invoices ORDER BY created_at DESC LIMIT 100");
           const mapped: SavedInvoice[] = [];
           for (const inv of localInvs) {
-            const items = await db.select<any[]>("SELECT * FROM invoice_items WHERE invoice_id = ?", [inv.id]);
+            const items = await db.select("SELECT * FROM invoice_items WHERE invoice_id = ?", [inv.id]);
             mapped.push(mapInvoice(inv, items));
           }
           setSavedInvoices(mapped);
