@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { toast as sonnerToast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./hooks/use-theme";
 import { AppSettingsProvider } from "./hooks/use-app-settings";
 import { AppEventsProvider } from "./hooks/use-app-events";
@@ -60,14 +60,20 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompanyProfile } = useAuth();
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  const location = useLocation();
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
   if (!hasCompanyProfile) return <Navigate to="/setup-company" replace />;
   return <>{children}</>;
 }
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompanyProfile } = useAuth();
-  if (isAuthenticated) return <Navigate to={hasCompanyProfile ? "/" : "/setup-company"} replace />;
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  if (isAuthenticated) {
+    if (from && from.startsWith("/super-admin")) return <Navigate to={from} replace />;
+    return <Navigate to={hasCompanyProfile ? (from || "/") : "/setup-company"} replace />;
+  }
   return <>{children}</>;
 }
 
@@ -80,8 +86,9 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <LoadingFallback />;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <>{children}</>;
 }
 
