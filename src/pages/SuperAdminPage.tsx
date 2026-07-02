@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
@@ -15,10 +19,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 const SUPER_ADMIN_EMAIL = "babajuwon0@gmail.com";
 const GATE_PASSWORD = "admin12345";
+const PAGE_SIZE = 20;
 
 type SuperUser = {
   id: string;
@@ -28,7 +33,13 @@ type SuperUser = {
   company_name: string | null;
   created_at: string | null;
   last_sign_in_at: string | null;
+  roles?: { id: string; name: string }[];
 };
+
+type RoleRow = { id: string; name: string; description?: string | null };
+
+type SortKey = "name" | "email" | "company_name" | "last_sign_in_at" | "created_at";
+type SortDir = "asc" | "desc";
 
 export default function SuperAdminPage() {
   const { user, logout } = useAuth();
@@ -38,13 +49,19 @@ export default function SuperAdminPage() {
   const [unlocked, setUnlocked] = useState(false);
   const [gate, setGate] = useState("");
   const [users, setUsers] = useState<SuperUser[]>([]);
+  const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<SuperUser | null>(null);
   const [deleting, setDeleting] = useState<SuperUser | null>(null);
   const [pwUser, setPwUser] = useState<SuperUser | null>(null);
+  const [roleUser, setRoleUser] = useState<SuperUser | null>(null);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>("");
 
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [newPassword, setNewPassword] = useState("");
@@ -60,8 +77,9 @@ export default function SuperAdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await call("list");
-      setUsers(data.users || []);
+      const [u, r] = await Promise.all([call("list"), call("list_roles").catch(() => ({ roles: [] }))]);
+      setUsers(u.users || []);
+      setRoles(r.roles || []);
     } catch (e) {
       toast({ title: "Failed to load users", description: (e as Error).message, variant: "destructive" });
     } finally {
@@ -70,6 +88,34 @@ export default function SuperAdminPage() {
   }, [call]);
 
   useEffect(() => { if (unlocked && isAllowed) load(); }, [unlocked, isAllowed, load]);
+  useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
+
+  const toggleSort = (k: SortKey) => {
+    if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(k); setSortDir("asc"); }
+  };
+
+  const filteredSorted = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    const filtered = users.filter((u) =>
+      !s || [u.name, u.email, u.company_name].some((v) => (v || "").toLowerCase().includes(s))
+    );
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = (a[sortKey] as string | null) || "";
+      const bv = (b[sortKey] as string | null) || "";
+      return av.localeCompare(bv) * dir;
+    });
+  }, [users, q, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSorted.length / PAGE_SIZE));
+  const pageRows = filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const SortHeader = ({ k, label }: { k: SortKey; label: string }) => (
+    <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(k)}>
+      {label}
+      {sortKey === k && (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+    </button>
+  );
 
   if (!isAllowed) {
     return (
@@ -117,12 +163,6 @@ export default function SuperAdminPage() {
     );
   }
 
-  const filtered = users.filter((u) => {
-    if (!q.trim()) return true;
-    const s = q.toLowerCase();
-    return [u.name, u.email, u.company_name].some((v) => (v || "").toLowerCase().includes(s));
-  });
-
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -156,38 +196,47 @@ export default function SuperAdminPage() {
               onChange={(e) => setQ(e.target.value)}
               className="max-w-md"
             />
-            <span className="text-xs text-muted-foreground ml-auto">{filtered.length} of {users.length}</span>
+            <span className="text-xs text-muted-foreground ml-auto">{filteredSorted.length} of {users.length}</span>
           </div>
 
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Last sign in</TableHead>
+                  <TableHead><SortHeader k="name" label="Name" /></TableHead>
+                  <TableHead><SortHeader k="email" label="Email" /></TableHead>
+                  <TableHead><SortHeader k="company_name" label="Company" /></TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead><SortHeader k="last_sign_in_at" label="Last sign in" /></TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
                 )}
-                {!loading && filtered.length === 0 && (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No users found</TableCell></TableRow>
+                {!loading && pageRows.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No users found</TableCell></TableRow>
                 )}
-                {!loading && filtered.map((u) => (
+                {!loading && pageRows.map((u) => (
                   <TableRow key={u.id}>
                     <TableCell className="font-medium">{u.name || "—"}</TableCell>
                     <TableCell className="text-sm">{u.email || "—"}</TableCell>
                     <TableCell className="text-sm">{u.company_name || <span className="text-muted-foreground">None</span>}</TableCell>
+                    <TableCell className="text-xs">
+                      {(u.roles && u.roles.length)
+                        ? <div className="flex flex-wrap gap-1">{u.roles.map((r) => <Badge key={r.id} variant="secondary">{r.name}</Badge>)}</div>
+                        : <span className="text-muted-foreground">None</span>}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditing(u); setForm({ name: u.name || "", email: u.email || "", password: "" }); }}>
                         <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" title="Assign role" onClick={() => { setRoleUser(u); setSelectedRoleId(u.roles?.[0]?.id || ""); }}>
+                        <ShieldCheck className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" title="Reset password" onClick={() => { setPwUser(u); setNewPassword(""); }}>
                         <KeyRound className="h-4 w-4" />
@@ -201,6 +250,20 @@ export default function SuperAdminPage() {
               </TableBody>
             </Table>
           </div>
+
+          {!loading && filteredSorted.length > 0 && (
+            <div className="flex items-center justify-between mt-4 text-sm">
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages}</span>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </Button>
+                <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -325,6 +388,50 @@ export default function SuperAdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Role assignment */}
+      <Dialog open={!!roleUser} onOpenChange={(o) => !o && setRoleUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Role</DialogTitle>
+            <DialogDescription>
+              Assign an RBAC role to {roleUser?.name || roleUser?.email}. Scoped to their company.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
+              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+              <SelectContent>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {roleUser?.company_name && (
+              <p className="text-xs text-muted-foreground">Company: {roleUser.company_name}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRoleUser(null)}>Cancel</Button>
+            <Button
+              disabled={busy || !selectedRoleId}
+              onClick={async () => {
+                if (!roleUser) return;
+                setBusy(true);
+                try {
+                  await call("assign_role", { userId: roleUser.id, roleId: selectedRoleId });
+                  toast({ title: "Role updated" });
+                  setRoleUser(null);
+                  load();
+                } catch (e) {
+                  toast({ title: "Failed", description: (e as Error).message, variant: "destructive" });
+                } finally { setBusy(false); }
+              }}
+            >Assign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
