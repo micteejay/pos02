@@ -78,6 +78,12 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function SuperAdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
 function Guarded({ permission, children }: { permission: Permission; children: React.ReactNode }) {
   return (
     <ProtectedRoute>
@@ -93,7 +99,7 @@ function AppRoutes() {
         <Route path="/login" element={<AuthRoute><LoginPage /></AuthRoute>} />
         <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/super-admin" element={<ProtectedRoute><SuperAdminPage /></ProtectedRoute>} />
+        <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminPage /></SuperAdminRoute>} />
         <Route path="/setup-company" element={<SetupRoute><CompanySetupPage /></SetupRoute>} />
         <Route path="/install" element={<InstallPage />} />
         <Route path="/" element={<Guarded permission="pages.dashboard"><Index /></Guarded>} />

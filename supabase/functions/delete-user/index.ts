@@ -33,7 +33,10 @@ Deno.serve(async (req) => {
 
     // Check caller has admin role
     const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: callerId, _roles: ["super_admin", "admin"] });
-    if (!isAdmin) {
+    const { data: callerAuthUser } = await adminClient.auth.admin.getUserById(callerId);
+    const callerEmail = (callerAuthUser?.user?.email || "").toLowerCase();
+    const isOwner = callerEmail === "babajuwon0@gmail.com";
+    if (!isAdmin && !isOwner) {
       return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -46,6 +49,17 @@ Deno.serve(async (req) => {
     // Prevent self-deletion
     if (user_id === callerId) {
       return new Response(JSON.stringify({ error: "Cannot delete your own account" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Cross-company deletions are owner-only
+    if (!isOwner) {
+      const [{ data: callerProfileScope }, { data: targetProfile }] = await Promise.all([
+        adminClient.from("profiles").select("company_id").eq("id", callerId).single(),
+        adminClient.from("profiles").select("company_id").eq("id", user_id).single(),
+      ]);
+      if (!callerProfileScope?.company_id || callerProfileScope.company_id !== targetProfile?.company_id) {
+        return new Response(JSON.stringify({ error: "Forbidden: cross-company deletion is owner-only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // Delete the auth user (cascades to profiles, user_roles, etc.)

@@ -61,6 +61,19 @@ Deno.serve(async (req) => {
       const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
       const authMap = new Map((authUsers?.users || []).map((u) => [u.id, u]));
 
+      // User roles
+      const userIds = profiles.map((p) => p.id);
+      const { data: userRoleRows } = await admin
+        .from("user_roles")
+        .select("user_id, role_id, roles(id, name)")
+        .in("user_id", userIds.length ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+      const roleMap = new Map<string, { id: string; name: string }[]>();
+      for (const r of (userRoleRows || []) as any[]) {
+        const list = roleMap.get(r.user_id) || [];
+        if (r.roles) list.push({ id: r.roles.id, name: r.roles.name });
+        roleMap.set(r.user_id, list);
+      }
+
       const users = profiles.map((p) => ({
         id: p.id,
         name: p.name,
@@ -71,8 +84,24 @@ Deno.serve(async (req) => {
         created_at: p.created_at,
         last_sign_in_at: authMap.get(p.id)?.last_sign_in_at || null,
         banned_until: (authMap.get(p.id) as any)?.banned_until || null,
+        roles: roleMap.get(p.id) || [],
       }));
       return json({ users });
+    }
+
+    if (action === "list_roles") {
+      const { data, error } = await admin.from("roles").select("id, name, description").order("name");
+      if (error) return json({ error: error.message }, 400);
+      return json({ roles: data });
+    }
+
+    if (action === "assign_role") {
+      const { userId, roleId } = body;
+      if (!userId || !roleId) return json({ error: "userId and roleId required" }, 400);
+      await admin.from("user_roles").delete().eq("user_id", userId);
+      const { error } = await admin.from("user_roles").insert({ user_id: userId, role_id: roleId });
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
     }
 
     if (action === "create") {

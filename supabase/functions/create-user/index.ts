@@ -34,11 +34,22 @@ Deno.serve(async (req) => {
 
     // Check caller has admin role
     const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: callerId, _roles: ["super_admin", "admin"] });
-    if (!isAdmin) {
+    const { data: callerAuthUser } = await adminClient.auth.admin.getUserById(callerId);
+    const callerEmail = (callerAuthUser?.user?.email || "").toLowerCase();
+    const isOwner = callerEmail === "babajuwon0@gmail.com";
+    if (!isAdmin && !isOwner) {
       return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const { username, password, name, role, department, store, companyId: bodyCompanyId } = await req.json();
+
+    // Cross-company creations are owner-only
+    if (bodyCompanyId) {
+      const { data: callerProfileScope } = await adminClient.from("profiles").select("company_id").eq("id", callerId).single();
+      if (callerProfileScope?.company_id && callerProfileScope.company_id !== bodyCompanyId && !isOwner) {
+        return new Response(JSON.stringify({ error: "Forbidden: cross-company user creation is owner-only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
 
     if (!username || !password || !name) {
       return new Response(JSON.stringify({ error: "username, password, and name are required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
