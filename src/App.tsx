@@ -79,7 +79,8 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
 }
 
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <LoadingFallback />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
