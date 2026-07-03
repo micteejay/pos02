@@ -42,12 +42,16 @@ type SortKey = "name" | "email" | "company_name" | "last_sign_in_at" | "created_
 type SortDir = "asc" | "desc";
 
 export default function SuperAdminPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const isAllowed = SUPER_ADMIN_EMAILS.includes((user?.email || "").toLowerCase()) || user?.role === "Super Admin";
 
   const [serverCheck, setServerCheck] = useState<"pending" | "ok" | "forbidden">("pending");
   const [serverError, setServerError] = useState<string>("");
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
   const [unlocked, setUnlocked] = useState(false);
   const [gate, setGate] = useState("");
   const [users, setUsers] = useState<SuperUser[]>([]);
@@ -95,26 +99,28 @@ export default function SuperAdminPage() {
   // Server-side authorization: verify with the edge function that the
   // caller's authenticated email is the platform owner. Client-side checks
   // can be spoofed; this is the source of truth.
+  const runAuthorize = useCallback(async () => {
+    setServerCheck("pending");
+    try {
+      const { data, error } = await supabase.functions.invoke("super-admin", { body: { action: "authorize" } });
+      if (error) {
+        const status = (error as any)?.context?.status;
+        if (status === 401 || !isAuthenticated) { setNeedsAuth(true); setServerCheck("forbidden"); setServerError(""); return; }
+        if (status === 403) { setNeedsAuth(false); setServerCheck("forbidden"); setServerError("403 Forbidden — this console is restricted to the platform owner."); return; }
+        setNeedsAuth(false); setServerCheck("forbidden"); setServerError(error.message || "Authorization check failed."); return;
+      }
+      if ((data as any)?.error) { setNeedsAuth(false); setServerCheck("forbidden"); setServerError((data as any).error); return; }
+      setNeedsAuth(false); setServerCheck("ok");
+    } catch (e) {
+      setNeedsAuth(false); setServerCheck("forbidden"); setServerError((e as Error).message);
+    }
+  }, [isAuthenticated]);
+
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("super-admin", { body: { action: "authorize" } });
-        if (cancelled) return;
-        if (error) {
-          const status = (error as any)?.context?.status;
-          if (status === 403) { setServerCheck("forbidden"); setServerError("403 Forbidden — this console is restricted to the platform owner."); return; }
-          if (status === 401) { setServerCheck("forbidden"); setServerError("401 Unauthorized — please sign in first."); return; }
-          setServerCheck("forbidden"); setServerError(error.message || "Authorization check failed."); return;
-        }
-        if ((data as any)?.error) { setServerCheck("forbidden"); setServerError((data as any).error); return; }
-        setServerCheck("ok");
-      } catch (e) {
-        if (!cancelled) { setServerCheck("forbidden"); setServerError((e as Error).message); }
-      }
-    })();
+    if (!cancelled) runAuthorize();
     return () => { cancelled = true; };
-  }, []);
+  }, [runAuthorize]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -154,6 +160,38 @@ export default function SuperAdminPage() {
     );
   }
 
+  if (needsAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="p-8 max-w-md w-full space-y-4">
+          <div className="text-center space-y-2">
+            <Shield className="mx-auto h-10 w-10 text-primary" />
+            <h1 className="text-xl font-semibold">Super Admin sign-in</h1>
+            <p className="text-sm text-muted-foreground">Sign in with the platform owner account to continue.</p>
+          </div>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setSigningIn(true);
+              const res = await login(signInEmail, signInPassword);
+              setSigningIn(false);
+              if (!res.ok) { toast({ title: "Sign-in failed", description: res.message || "Check your credentials.", variant: "destructive" }); return; }
+              await runAuthorize();
+            }}
+          >
+            <div><Label>Email</Label><Input type="email" autoFocus value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} /></div>
+            <div><Label>Password</Label><Input type="password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} /></div>
+            <Button type="submit" className="w-full" disabled={signingIn || !signInEmail || !signInPassword}>
+              {signingIn ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => navigate("/")}>Back to app</Button>
+        </Card>
+      </div>
+    );
+  }
+
   if (serverCheck === "forbidden" || !isAllowed) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-background">
@@ -166,7 +204,10 @@ export default function SuperAdminPage() {
           <p className="text-[11px] font-mono text-muted-foreground/70">
             Signed in as: {user?.email || "unknown"}
           </p>
-          <Button onClick={() => navigate("/")} variant="outline" className="w-full">Back to app</Button>
+          <div className="flex gap-2">
+            <Button onClick={() => navigate("/")} variant="outline" className="flex-1">Back to app</Button>
+            <Button onClick={async () => { await logout(); setNeedsAuth(true); }} variant="secondary" className="flex-1">Switch account</Button>
+          </div>
         </Card>
       </div>
     );
