@@ -103,18 +103,16 @@ export default function SuperAdminPage() {
     setServerCheck("pending");
     try {
       const { data, error } = await supabase.functions.invoke("super-admin", { body: { action: "authorize" } });
-      if (error) {
-        const status = (error as any)?.context?.status;
-        if (status === 401 || !isAuthenticated) { setNeedsAuth(true); setServerCheck("forbidden"); setServerError(""); return; }
-        if (status === 403) { setNeedsAuth(false); setServerCheck("forbidden"); setServerError("403 Forbidden — this console is restricted to the platform owner."); return; }
-        setNeedsAuth(false); setServerCheck("forbidden"); setServerError(error.message || "Authorization check failed."); return;
-      }
-      if ((data as any)?.error) { setNeedsAuth(false); setServerCheck("forbidden"); setServerError((data as any).error); return; }
-      setNeedsAuth(false); setServerCheck("ok");
+      if (error) { setNeedsAuth(false); setServerCheck("forbidden"); setServerError(error.message || "Authorization check failed."); return; }
+      const d = (data as any) || {};
+      if (d.authorized) { setNeedsAuth(false); setServerCheck("ok"); return; }
+      if (d.reason === "unauthenticated" || !d.authenticated) { setNeedsAuth(true); setServerCheck("forbidden"); setServerError(""); return; }
+      setNeedsAuth(false); setServerCheck("forbidden");
+      setServerError("403 Forbidden — this console is restricted to the platform owner.");
     } catch (e) {
       setNeedsAuth(false); setServerCheck("forbidden"); setServerError((e as Error).message);
     }
-  }, [isAuthenticated]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
