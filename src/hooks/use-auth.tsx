@@ -216,9 +216,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Get initial session. If the browser has a stale refresh token, clear the
+    // local auth cache so protected screens can show a normal sign-in state.
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (active) {
+        if (error) {
+          await supabase.auth.signOut({ scope: "local" });
+          setUser(null);
+          setCompanyProfile(null);
+          setLoading(false);
+          return;
+        }
         handleSessionChange(session);
       }
     });
