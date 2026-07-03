@@ -225,8 +225,8 @@ export default function SuperAdminPage() {
             <Button size="sm" onClick={() => { setForm({ name: "", email: "", password: "" }); setCreateOpen(true); }}>
               <UserPlus className="h-4 w-4 mr-2" /> Add User
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setUnlocked(false)}>
-              <LogOut className="h-4 w-4 mr-2" /> Lock
+            <Button variant="ghost" size="sm" onClick={async () => { await logout(); setNeedsAuth(true); setServerCheck("forbidden"); }}>
+              <LogOut className="h-4 w-4 mr-2" /> Sign out
             </Button>
           </div>
         </div>
