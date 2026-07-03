@@ -84,11 +84,11 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// /super-admin is intentionally public at the route level.
+// The page itself performs a server-side authorization check via the
+// super-admin edge function and shows an inline sign-in for anonymous
+// visitors, so no auth redirect is needed here.
 function SuperAdminRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
-  const location = useLocation();
-  if (loading) return <LoadingFallback />;
-  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return <>{children}</>;
 }
 
