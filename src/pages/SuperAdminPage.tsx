@@ -21,7 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast";
 import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 
-const SUPER_ADMIN_EMAIL = "babajuwon0@gmail.com";
+const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 const GATE_PASSWORD = "admin12345";
 const PAGE_SIZE = 20;
 
@@ -44,7 +44,7 @@ type SortDir = "asc" | "desc";
 export default function SuperAdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isAllowed = (user?.email || "").toLowerCase() === SUPER_ADMIN_EMAIL;
+  const isAllowed = SUPER_ADMIN_EMAILS.includes((user?.email || "").toLowerCase()) || user?.role === "Super Admin";
 
   const [unlocked, setUnlocked] = useState(false);
   const [gate, setGate] = useState("");

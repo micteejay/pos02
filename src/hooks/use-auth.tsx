@@ -49,12 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = useCallback(async (supaUser: User) => {
+    console.log("[fetchUserProfile] Start for user:", supaUser.email);
     // Get profile (including company_id, store_id, and department_id)
-    const { data: profile } = await supabase
+    const { data: profile, error: profileErr } = await supabase
       .from("profiles")
       .select("name, email, avatar, company_id, store_id, department_id")
       .eq("id", supaUser.id)
       .single();
+
+    if (profileErr) {
+      console.log("[fetchUserProfile] Profile fetch error:", profileErr);
+    } else {
+      console.log("[fetchUserProfile] Profile fetch success:", profile);
+    }
 
     // Resolve role via secure role checks (works even when direct user_roles reads are restricted)
     const rolePriority = [
@@ -68,12 +75,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const roleChecks = await Promise.all(
       rolePriority.map(async ({ key, label }) => {
-        const { data } = await supabase.rpc("has_role", { _user_id: supaUser.id, _role: key });
+        const { data, error } = await supabase.rpc("has_role", { _user_id: supaUser.id, _role: key });
+        if (error) console.log(`[fetchUserProfile] rpc has_role error for ${key}:`, error);
         return data ? label : null;
       })
     );
 
     const roleName = (roleChecks.find((role) => role !== null) ?? "Viewer") as string;
+    console.log("[fetchUserProfile] Derived role name:", roleName);
 
     let profileCompanyId = profile?.company_id || null;
 
@@ -87,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
         if (storeRow?.company_id) {
           profileCompanyId = storeRow.company_id;
+          console.log("[fetchUserProfile] Self-healed profileCompanyId from store_id:", profileCompanyId);
           // Background update to self-heal profile row
           supabase
             .from("profiles")
@@ -105,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
         if (deptRow?.company_id) {
           profileCompanyId = deptRow.company_id;
+          console.log("[fetchUserProfile] Self-healed profileCompanyId from department_id:", profileCompanyId);
           // Background update to self-heal profile row
           supabase
             .from("profiles")
@@ -124,27 +135,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: roleName,
       companyId: profileCompanyId,
     };
+    console.log("[fetchUserProfile] Setting user state:", authUser);
     setUser(authUser);
 
     // Fetch company profile: by company_id on profile (works for both owners and staff)
     let company: any = null;
     if (profileCompanyId) {
-      const { data: companyRow } = await supabase
+      const { data: companyRow, error: compErr } = await supabase
         .from("company_profiles")
         .select("*")
         .eq("id", profileCompanyId)
         .single();
+      if (compErr) console.log("[fetchUserProfile] Company fetch error:", compErr);
       company = companyRow;
     } else {
       // Fallback: check if user owns a company (pre-migration scenario)
-      const { data: companyRows } = await supabase
+      const { data: companyRows, error: compRowsErr } = await supabase
         .from("company_profiles")
         .select("*")
         .eq("owner_id", supaUser.id)
         .order("updated_at", { ascending: false })
         .limit(1);
+      if (compRowsErr) console.log("[fetchUserProfile] Fallback company fetch error:", compRowsErr);
       company = companyRows?.[0] ?? null;
     }
+
+    console.log("[fetchUserProfile] Loaded company profile:", company);
 
     if (company) {
       setCompanyProfile({
@@ -171,37 +187,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    let initialLoad = true;
+    let active = true;
+    let lastUserId: string | null = null;
 
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    const handleSessionChange = async (session: Session | null) => {
+      if (!active) return;
+
+      const currentUserId = session?.user?.id || null;
+      if (currentUserId === lastUserId && lastUserId !== null) {
+        setLoading(false);
+        return;
+      }
+      lastUserId = currentUserId;
+
+      try {
         if (session?.user) {
-          // Use setTimeout to avoid potential deadlock with Supabase client
-          // but only set loading=false AFTER profile is fetched
-          setTimeout(async () => {
-            await fetchUserProfile(session.user);
-            if (!initialLoad) return; // getSession already handled it
-            setLoading(false);
-          }, 0);
+          await fetchUserProfile(session.user);
         } else {
           setUser(null);
           setCompanyProfile(null);
+        }
+      } catch (err) {
+        console.error("Error in auth state change:", err);
+      } finally {
+        if (active) {
           setLoading(false);
+        }
+      }
+    };
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (active) {
+        handleSessionChange(session);
+      }
+    });
+
+    // Listen to changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (active) {
+          if (event === "SIGNED_OUT" || !session) {
+            lastUserId = null;
+            setUser(null);
+            setCompanyProfile(null);
+            setLoading(false);
+          } else {
+            await handleSessionChange(session);
+          }
         }
       }
     );
 
-    // THEN check existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        await fetchUserProfile(session.user);
-      }
-      initialLoad = false;
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, [fetchUserProfile]);
 
   const login = useCallback(async (identifier: string, password: string): Promise<{ ok: boolean; message?: string }> => {

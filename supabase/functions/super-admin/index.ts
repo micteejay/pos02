@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPER_ADMIN_EMAIL = "babajuwon0@gmail.com";
+const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
     // Fetch caller email from auth
     const { data: callerAuth } = await admin.auth.admin.getUserById(claims.claims.sub);
     const callerEmail = callerAuth?.user?.email?.toLowerCase();
-    if (callerEmail !== SUPER_ADMIN_EMAIL) return json({ error: "Forbidden" }, 403);
+    if (!callerEmail || !SUPER_ADMIN_EMAILS.includes(callerEmail)) return json({ error: "Forbidden" }, 403);
 
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
     const action = body.action || new URL(req.url).searchParams.get("action") || "list";

@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     const { data: isAdmin } = await adminClient.rpc("has_any_role", { _user_id: callerId, _roles: ["super_admin", "admin"] });
     const { data: callerAuthUser } = await adminClient.auth.admin.getUserById(callerId);
     const callerEmail = (callerAuthUser?.user?.email || "").toLowerCase();
-    const isOwner = callerEmail === "babajuwon0@gmail.com";
+    const isOwner = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"].includes(callerEmail);
     if (!isAdmin && !isOwner) {
       return new Response(JSON.stringify({ error: "Forbidden: Admin role required" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
