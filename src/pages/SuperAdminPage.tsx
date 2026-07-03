@@ -22,7 +22,6 @@ import { toast } from "@/hooks/use-toast";
 import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
-const GATE_PASSWORD = "admin12345";
 const PAGE_SIZE = 20;
 
 type SuperUser = {
@@ -44,7 +43,6 @@ type SortDir = "asc" | "desc";
 export default function SuperAdminPage() {
   const { user, logout, login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const isAllowed = SUPER_ADMIN_EMAILS.includes((user?.email || "").toLowerCase()) || user?.role === "Super Admin";
 
   const [serverCheck, setServerCheck] = useState<"pending" | "ok" | "forbidden">("pending");
   const [serverError, setServerError] = useState<string>("");
@@ -52,8 +50,6 @@ export default function SuperAdminPage() {
   const [signInEmail, setSignInEmail] = useState("");
   const [signInPassword, setSignInPassword] = useState("");
   const [signingIn, setSigningIn] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
-  const [gate, setGate] = useState("");
   const [users, setUsers] = useState<SuperUser[]>([]);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,7 +89,7 @@ export default function SuperAdminPage() {
     }
   }, [call]);
 
-  useEffect(() => { if (unlocked && isAllowed) load(); }, [unlocked, isAllowed, load]);
+  useEffect(() => { if (serverCheck === "ok") load(); }, [serverCheck, load]);
   useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
 
   // Server-side authorization: verify with the edge function that the
@@ -190,7 +186,7 @@ export default function SuperAdminPage() {
     );
   }
 
-  if (serverCheck === "forbidden" || !isAllowed) {
+  if (serverCheck === "forbidden") {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-background">
         <Card className="p-8 max-w-md text-center space-y-4">
@@ -206,37 +202,6 @@ export default function SuperAdminPage() {
             <Button onClick={() => navigate("/")} variant="outline" className="flex-1">Back to app</Button>
             <Button onClick={async () => { await logout(); setNeedsAuth(true); }} variant="secondary" className="flex-1">Switch account</Button>
           </div>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <Card className="p-8 max-w-md w-full space-y-4">
-          <div className="text-center space-y-2">
-            <Shield className="mx-auto h-10 w-10 text-primary" />
-            <h1 className="text-xl font-semibold">Super Admin Console</h1>
-            <p className="text-sm text-muted-foreground">Enter your admin passcode to continue.</p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (gate === GATE_PASSWORD) setUnlocked(true);
-              else toast({ title: "Incorrect passcode", variant: "destructive" });
-            }}
-            className="space-y-3"
-          >
-            <Input
-              type="password"
-              placeholder="Passcode"
-              value={gate}
-              onChange={(e) => setGate(e.target.value)}
-              autoFocus
-            />
-            <Button type="submit" className="w-full">Unlock</Button>
-          </form>
         </Card>
       </div>
     );
