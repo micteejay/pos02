@@ -136,8 +136,12 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
 
   // Fetch workflow config from app_settings
   useEffect(() => {
+    if (!user) return;
+
     const fetchWorkflowConfig = async () => {
-      const { data } = await supabase.from("app_settings").select("*").eq("key", "workflow_stages").maybeSingle();
+      let query = supabase.from("app_settings").select("*").eq("key", "workflow_stages");
+      if (user.companyId) query = query.eq("company_id", user.companyId);
+      const { data } = await query.maybeSingle();
       if (data?.value) {
         try {
           const val = typeof data.value === "string" ? JSON.parse(data.value) : data.value;
@@ -146,7 +150,7 @@ export function AppEventsProvider({ children }: { children: ReactNode }) {
       }
     };
     fetchWorkflowConfig();
-  }, []);
+  }, [user]);
 
   // Request native local notifications permissions on setup
   useEffect(() => {
