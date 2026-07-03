@@ -22,29 +22,44 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await callerClient.auth.getClaims(token);
-    if (claimsErr || !claims?.claims?.sub) return json({ error: "Unauthorized" }, 401);
-
-    const admin = createClient(supabaseUrl, serviceRoleKey);
-
-    // Fetch caller email from auth
-    const { data: callerAuth } = await admin.auth.admin.getUserById(claims.claims.sub);
-    const callerEmail = callerAuth?.user?.email?.toLowerCase();
-    if (!callerEmail || !SUPER_ADMIN_EMAILS.includes(callerEmail)) return json({ error: "Forbidden" }, 403);
-
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
     const action = body.action || new URL(req.url).searchParams.get("action") || "list";
 
-    if (action === "authorize") {
-      return json({ ok: true, email: callerEmail });
+    // Resolve caller (may be anonymous)
+    const authHeader = req.headers.get("Authorization");
+    let callerEmail: string | null = null;
+    let callerId: string | null = null;
+    if (authHeader) {
+      const callerClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claims } = await callerClient.auth.getClaims(token);
+      if (claims?.claims?.sub) {
+        callerId = claims.claims.sub;
+        const admin0 = createClient(supabaseUrl, serviceRoleKey);
+        const { data: callerAuth } = await admin0.auth.admin.getUserById(callerId);
+        callerEmail = callerAuth?.user?.email?.toLowerCase() ?? null;
+      }
     }
+    const isOwner = !!callerEmail && SUPER_ADMIN_EMAILS.includes(callerEmail);
+
+    // Authorize probe: always 200; the client reads `authorized`.
+    if (action === "authorize") {
+      return json({
+        authorized: isOwner,
+        authenticated: !!callerId,
+        email: callerEmail,
+        reason: !callerId ? "unauthenticated" : (!isOwner ? "forbidden" : null),
+      });
+    }
+
+    // All other actions require the platform owner
+    if (!callerId) return json({ error: "Unauthorized" }, 401);
+    if (!isOwner) return json({ error: "Forbidden" }, 403);
+
+    const admin = createClient(supabaseUrl, serviceRoleKey);
+    const claims = { claims: { sub: callerId } } as { claims: { sub: string } };
 
     if (action === "list") {
       const { data: profiles, error } = await admin
