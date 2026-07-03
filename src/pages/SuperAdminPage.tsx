@@ -46,6 +46,8 @@ export default function SuperAdminPage() {
   const navigate = useNavigate();
   const isAllowed = SUPER_ADMIN_EMAILS.includes((user?.email || "").toLowerCase()) || user?.role === "Super Admin";
 
+  const [serverCheck, setServerCheck] = useState<"pending" | "ok" | "forbidden">("pending");
+  const [serverError, setServerError] = useState<string>("");
   const [unlocked, setUnlocked] = useState(false);
   const [gate, setGate] = useState("");
   const [users, setUsers] = useState<SuperUser[]>([]);
@@ -90,6 +92,30 @@ export default function SuperAdminPage() {
   useEffect(() => { if (unlocked && isAllowed) load(); }, [unlocked, isAllowed, load]);
   useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
 
+  // Server-side authorization: verify with the edge function that the
+  // caller's authenticated email is the platform owner. Client-side checks
+  // can be spoofed; this is the source of truth.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke("super-admin", { body: { action: "authorize" } });
+        if (cancelled) return;
+        if (error) {
+          const status = (error as any)?.context?.status;
+          if (status === 403) { setServerCheck("forbidden"); setServerError("403 Forbidden — this console is restricted to the platform owner."); return; }
+          if (status === 401) { setServerCheck("forbidden"); setServerError("401 Unauthorized — please sign in first."); return; }
+          setServerCheck("forbidden"); setServerError(error.message || "Authorization check failed."); return;
+        }
+        if ((data as any)?.error) { setServerCheck("forbidden"); setServerError((data as any).error); return; }
+        setServerCheck("ok");
+      } catch (e) {
+        if (!cancelled) { setServerCheck("forbidden"); setServerError((e as Error).message); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else { setSortKey(k); setSortDir("asc"); }
@@ -117,14 +143,28 @@ export default function SuperAdminPage() {
     </button>
   );
 
-  if (!isAllowed) {
+  if (serverCheck === "pending") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
+        <Card className="p-8 max-w-md text-center space-y-3">
+          <Shield className="mx-auto h-10 w-10 text-muted-foreground animate-pulse" />
+          <p className="text-sm text-muted-foreground">Verifying access…</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (serverCheck === "forbidden" || !isAllowed) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-background">
         <Card className="p-8 max-w-md text-center space-y-4">
           <Shield className="mx-auto h-10 w-10 text-destructive" />
-          <h1 className="text-xl font-semibold">Access Denied</h1>
+          <h1 className="text-xl font-semibold">403 — Access Denied</h1>
           <p className="text-sm text-muted-foreground">
-            This area is restricted to the platform owner.
+            {serverError || "This area is restricted to the platform owner."}
+          </p>
+          <p className="text-[11px] font-mono text-muted-foreground/70">
+            Signed in as: {user?.email || "unknown"}
           </p>
           <Button onClick={() => navigate("/")} variant="outline" className="w-full">Back to app</Button>
         </Card>

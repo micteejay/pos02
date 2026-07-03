@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetSending, setResetSending] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [superMode, setSuperMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +29,12 @@ export default function LoginPage() {
     const result = await login(email, password);
     setLoading(false);
     if (result.ok) {
-      // Surface organization context as soon as we land on the app.
-      // The actual company name is loaded by the auth provider; show a
-      // generic toast here and the AppLayout chip will reflect the company.
-      toast.success("Signed in. Loading your organization…");
+      if (superMode) {
+        toast.success("Signed in. Opening Super Admin…");
+        navigate("/super-admin", { replace: true });
+      } else {
+        toast.success("Signed in. Loading your organization…");
+      }
       return;
     }
     const msg = result.message || "";
@@ -83,7 +86,9 @@ export default function LoginPage() {
           </div>
 
           <h2 className="text-2xl font-bold text-foreground mb-1">Welcome back</h2>
-          <p className="text-sm text-muted-foreground mb-8">Sign in to your account to continue</p>
+          <p className="text-sm text-muted-foreground mb-8">
+            {superMode ? "Super Admin sign-in — you'll be routed to /super-admin" : "Sign in to your account to continue"}
+          </p>
 
           {error && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm mb-4">
@@ -153,6 +158,21 @@ export default function LoginPage() {
               Create account
             </Link>
           </p>
+
+          <div className="mt-4 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setSuperMode((v) => !v)}
+              className={`text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border transition-colors ${
+                superMode
+                  ? "bg-primary/10 text-primary border-primary/40"
+                  : "text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+              {superMode ? "Super Admin mode enabled — will open /super-admin" : "Sign in as Super Admin"}
+            </button>
+          </div>
          <div className="mt-8 p-3 rounded-lg bg-muted/50 border border-border">
            <p className="text-[10px] text-muted-foreground text-center">
             MICTEEJAY GLOBALTECH:  <code className="text-primary font-mono"></code>  <code className="text-primary font-mono"></code>

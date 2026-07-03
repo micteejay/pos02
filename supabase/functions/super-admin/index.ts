@@ -42,6 +42,10 @@ Deno.serve(async (req) => {
     const body = req.method === "GET" ? {} : await req.json().catch(() => ({}));
     const action = body.action || new URL(req.url).searchParams.get("action") || "list";
 
+    if (action === "authorize") {
+      return json({ ok: true, email: callerEmail });
+    }
+
     if (action === "list") {
       const { data: profiles, error } = await admin
         .from("profiles")
