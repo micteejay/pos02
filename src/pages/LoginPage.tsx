@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetSending, setResetSending] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [superMode, setSuperMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +29,12 @@ export default function LoginPage() {
     const result = await login(email, password);
     setLoading(false);
     if (result.ok) {
-      // Surface organization context as soon as we land on the app.
-      // The actual company name is loaded by the auth provider; show a
-      // generic toast here and the AppLayout chip will reflect the company.
-      toast.success("Signed in. Loading your organization…");
+      if (superMode) {
+        toast.success("Signed in. Opening Super Admin…");
+        navigate("/super-admin", { replace: true });
+      } else {
+        toast.success("Signed in. Loading your organization…");
+      }
       return;
     }
     const msg = result.message || "";
