@@ -7,6 +7,7 @@ import {
   LayoutDashboard, MessageSquare, FileText, GitBranch, Bell, Users, Shield, Settings,
   ChevronLeft, ChevronRight, Search, Building2, Package, BarChart3, ClipboardCheck,
   ShoppingCart, PieChart, Truck, Receipt, LogOut, UserCircle, Contact,
+  Bot,
 } from "lucide-react";
 
 interface NavItem {
@@ -44,6 +45,7 @@ const navSections: { title: string; items: NavItem[] }[] = [
     { label: "Organization", icon: Building2, path: "/organization", permission: "pages.organization" },
     { label: "Audit Log", icon: Shield, path: "/audit", permission: "pages.audit" },
     { label: "Settings", icon: Settings, path: "/settings", permission: "pages.settings" },
+    { label: "Connect AI", icon: Bot, path: "/connect", permission: "dashboard.view" },
     { label: "My Profile", icon: UserCircle, path: "/profile", permission: "dashboard.view" },
   ]},
 ];
