@@ -46,6 +46,7 @@ const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const InstallPage = lazy(() => import("./pages/InstallPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SuperAdminPage = lazy(() => import("./pages/SuperAdminPage"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -70,7 +71,12 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, hasCompanyProfile } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
+  // Honor ?next=<same-origin path> so OAuth consent (and similar deep links)
+  // send the user back to where they came from after sign-in.
+  const nextParam = new URLSearchParams(location.search).get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   if (isAuthenticated) {
+    if (safeNext) return <Navigate to={safeNext} replace />;
     if (from && from.startsWith("/super-admin")) return <Navigate to={from} replace />;
     return <Navigate to={hasCompanyProfile ? (from || "/") : "/setup-company"} replace />;
   }
@@ -108,6 +114,7 @@ function AppRoutes() {
         <Route path="/signup" element={<AuthRoute><SignupPage /></AuthRoute>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminPage /></SuperAdminRoute>} />
+        <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
         <Route path="/setup-company" element={<SetupRoute><CompanySetupPage /></SetupRoute>} />
         <Route path="/install" element={<InstallPage />} />
         <Route path="/" element={<Guarded permission="pages.dashboard"><Index /></Guarded>} />
