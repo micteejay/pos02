@@ -47,6 +47,7 @@ const InstallPage = lazy(() => import("./pages/InstallPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const SuperAdminPage = lazy(() => import("./pages/SuperAdminPage"));
 const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
+const ConnectPage = lazy(() => import("./pages/ConnectPage"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -135,6 +136,7 @@ function AppRoutes() {
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/invoices" element={<Guarded permission="pages.documents"><InvoicePage /></Guarded>} />
         <Route path="/customers" element={<Guarded permission="pages.sales"><CustomersPage /></Guarded>} />
+        <Route path="/connect" element={<ProtectedRoute><ConnectPage /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
