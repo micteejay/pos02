@@ -113,6 +113,54 @@ export default function SuperAdminPage() {
   useEffect(() => { if (serverCheck === "ok") load(); }, [serverCheck, load]);
   useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
 
+  // Loaders for new tabs
+  const loadStats = useCallback(async () => {
+    try {
+      const d = await call("platform_stats");
+      setStats(d.stats);
+    } catch (e) {
+      toast({ title: "Failed to load stats", description: (e as Error).message, variant: "destructive" });
+    }
+  }, [call]);
+
+  const loadCompanies = useCallback(async () => {
+    setCompaniesLoading(true);
+    try {
+      const d = await call("list_companies");
+      setCompanies(d.companies || []);
+    } catch (e) {
+      toast({ title: "Failed to load companies", description: (e as Error).message, variant: "destructive" });
+    } finally { setCompaniesLoading(false); }
+  }, [call]);
+
+  const openCompanyDetail = useCallback(async (companyId: string) => {
+    setCompanyDetailOpen(true);
+    setCompanyDetail({ loading: true });
+    try {
+      const d = await call("company_detail", { companyId });
+      setCompanyDetail(d);
+    } catch (e) {
+      setCompanyDetail({ error: (e as Error).message });
+    }
+  }, [call]);
+
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const d = await call("list_audit", { ...auditFilters, limit: 200 });
+      setAudit(d.audit || []);
+    } catch (e) {
+      toast({ title: "Failed to load audit log", description: (e as Error).message, variant: "destructive" });
+    } finally { setAuditLoading(false); }
+  }, [call, auditFilters]);
+
+  useEffect(() => {
+    if (serverCheck !== "ok") return;
+    if (tab === "overview") loadStats();
+    if (tab === "companies") loadCompanies();
+    if (tab === "audit") loadAudit();
+  }, [serverCheck, tab, loadStats, loadCompanies, loadAudit]);
+
   // Server-side authorization: verify with the edge function that the
   // caller's authenticated email is the platform owner. Client-side checks
   // can be spoofed; this is the source of truth.
