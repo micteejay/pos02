@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     if (action === "list") {
       const { data: profiles, error } = await admin
         .from("profiles")
-        .select("id, name, email, company_id, avatar_url, created_at")
+        .select("id, name, email, company_id, avatar, created_at")
         .order("created_at", { ascending: false });
       if (error) return json({ error: error.message }, 400);
 
@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
         email: p.email || authMap.get(p.id)?.email || null,
         company_id: p.company_id,
         company_name: p.company_id ? companyMap.get(p.company_id) || null : null,
-        avatar_url: p.avatar_url,
+        avatar_url: p.avatar,
         created_at: p.created_at,
         last_sign_in_at: authMap.get(p.id)?.last_sign_in_at || null,
         banned_until: (authMap.get(p.id) as any)?.banned_until || null,
