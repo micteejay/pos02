@@ -70,6 +70,26 @@ export default function SuperAdminPage() {
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // ---------- NEW: tabs, companies, stats, audit ----------
+  const [tab, setTab] = useState<"overview" | "companies" | "users" | "audit">("overview");
+  const [stats, setStats] = useState<any>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companyQ, setCompanyQ] = useState("");
+  const [companyDetail, setCompanyDetail] = useState<any | null>(null);
+  const [companyDetailOpen, setCompanyDetailOpen] = useState(false);
+  const [editCompany, setEditCompany] = useState<any | null>(null);
+  const [suspendCompany, setSuspendCompany] = useState<any | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [companyPatch, setCompanyPatch] = useState<Record<string, string>>({});
+  const [moveUser, setMoveUser] = useState<SuperUser | null>(null);
+  const [moveCompanyId, setMoveCompanyId] = useState<string>("");
+  const [banUser, setBanUser] = useState<SuperUser | null>(null);
+
+  const [audit, setAudit] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditFilters, setAuditFilters] = useState<{ companyId?: string; action?: string; severity?: string }>({});
+
   const call = useCallback(async (action: string, body: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("super-admin", { body: { action, ...body } });
     if (error) throw new Error(error.message);
