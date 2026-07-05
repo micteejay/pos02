@@ -33,6 +33,7 @@ type SuperUser = {
   company_name: string | null;
   created_at: string | null;
   last_sign_in_at: string | null;
+  banned_until?: string | null;
   roles?: { id: string; name: string }[];
 };
 
