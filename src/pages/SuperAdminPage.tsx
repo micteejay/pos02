@@ -18,8 +18,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye } from "lucide-react";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 const PAGE_SIZE = 20;
@@ -32,6 +33,7 @@ type SuperUser = {
   company_name: string | null;
   created_at: string | null;
   last_sign_in_at: string | null;
+  banned_until?: string | null;
   roles?: { id: string; name: string }[];
 };
 
@@ -69,6 +71,26 @@ export default function SuperAdminPage() {
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // ---------- NEW: tabs, companies, stats, audit ----------
+  const [tab, setTab] = useState<"overview" | "companies" | "users" | "audit">("overview");
+  const [stats, setStats] = useState<any>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companyQ, setCompanyQ] = useState("");
+  const [companyDetail, setCompanyDetail] = useState<any | null>(null);
+  const [companyDetailOpen, setCompanyDetailOpen] = useState(false);
+  const [editCompany, setEditCompany] = useState<any | null>(null);
+  const [suspendCompany, setSuspendCompany] = useState<any | null>(null);
+  const [suspendReason, setSuspendReason] = useState("");
+  const [companyPatch, setCompanyPatch] = useState<Record<string, string>>({});
+  const [moveUser, setMoveUser] = useState<SuperUser | null>(null);
+  const [moveCompanyId, setMoveCompanyId] = useState<string>("");
+  const [banUser, setBanUser] = useState<SuperUser | null>(null);
+
+  const [audit, setAudit] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditFilters, setAuditFilters] = useState<{ companyId?: string; action?: string; severity?: string }>({});
+
   const call = useCallback(async (action: string, body: Record<string, unknown> = {}) => {
     const { data, error } = await supabase.functions.invoke("super-admin", { body: { action, ...body } });
     if (error) throw new Error(error.message);
@@ -91,6 +113,54 @@ export default function SuperAdminPage() {
 
   useEffect(() => { if (serverCheck === "ok") load(); }, [serverCheck, load]);
   useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
+
+  // Loaders for new tabs
+  const loadStats = useCallback(async () => {
+    try {
+      const d = await call("platform_stats");
+      setStats(d.stats);
+    } catch (e) {
+      toast({ title: "Failed to load stats", description: (e as Error).message, variant: "destructive" });
+    }
+  }, [call]);
+
+  const loadCompanies = useCallback(async () => {
+    setCompaniesLoading(true);
+    try {
+      const d = await call("list_companies");
+      setCompanies(d.companies || []);
+    } catch (e) {
+      toast({ title: "Failed to load companies", description: (e as Error).message, variant: "destructive" });
+    } finally { setCompaniesLoading(false); }
+  }, [call]);
+
+  const openCompanyDetail = useCallback(async (companyId: string) => {
+    setCompanyDetailOpen(true);
+    setCompanyDetail({ loading: true });
+    try {
+      const d = await call("company_detail", { companyId });
+      setCompanyDetail(d);
+    } catch (e) {
+      setCompanyDetail({ error: (e as Error).message });
+    }
+  }, [call]);
+
+  const loadAudit = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const d = await call("list_audit", { ...auditFilters, limit: 200 });
+      setAudit(d.audit || []);
+    } catch (e) {
+      toast({ title: "Failed to load audit log", description: (e as Error).message, variant: "destructive" });
+    } finally { setAuditLoading(false); }
+  }, [call, auditFilters]);
+
+  useEffect(() => {
+    if (serverCheck !== "ok") return;
+    if (tab === "overview") loadStats();
+    if (tab === "companies") loadCompanies();
+    if (tab === "audit") loadAudit();
+  }, [serverCheck, tab, loadStats, loadCompanies, loadAudit]);
 
   // Server-side authorization: verify with the edge function that the
   // caller's authenticated email is the platform owner. Client-side checks
@@ -231,6 +301,89 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
+        <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="overview"><Shield className="h-4 w-4 mr-1" /> Overview</TabsTrigger>
+            <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-1" /> Companies</TabsTrigger>
+            <TabsTrigger value="users"><UsersIcon className="h-4 w-4 mr-1" /> Users</TabsTrigger>
+            <TabsTrigger value="audit"><ScrollText className="h-4 w-4 mr-1" /> Audit Log</TabsTrigger>
+          </TabsList>
+
+          {/* -------- Overview -------- */}
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Companies", value: stats?.companies, sub: stats ? `${stats.active_companies} active` : "", icon: <Building2 className="h-5 w-5 text-primary" /> },
+                { label: "Users", value: stats?.users, sub: "across all companies", icon: <UsersIcon className="h-5 w-5 text-primary" /> },
+                { label: "Stores", value: stats?.stores, sub: `${stats?.warehouses ?? 0} warehouses`, icon: <Store className="h-5 w-5 text-primary" /> },
+                { label: "Sales (completed)", value: stats?.sales_completed_count, sub: stats ? `Total: ${Number(stats.sales_completed_total).toLocaleString()}` : "", icon: <DollarSign className="h-5 w-5 text-primary" /> },
+              ].map((k) => (
+                <Card key={k.label} className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{k.label}</span>
+                    {k.icon}
+                  </div>
+                  <div className="text-2xl font-semibold mt-2">{k.value ?? "—"}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">{k.sub}</div>
+                </Card>
+              ))}
+            </div>
+            <Button variant="outline" size="sm" onClick={loadStats}><RefreshCw className="h-4 w-4 mr-2" /> Refresh stats</Button>
+          </TabsContent>
+
+          {/* -------- Companies -------- */}
+          <TabsContent value="companies" className="space-y-3">
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search companies…" value={companyQ} onChange={(e) => setCompanyQ(e.target.value)} className="max-w-md" />
+                <Button variant="outline" size="sm" onClick={loadCompanies} className="ml-auto" disabled={companiesLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${companiesLoading ? "animate-spin" : ""}`} /> Refresh
+                </Button>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Industry</TableHead>
+                      <TableHead className="text-right">Users</TableHead>
+                      <TableHead className="text-right">Stores</TableHead>
+                      <TableHead className="text-right">Warehouses</TableHead>
+                      <TableHead className="text-right">Sales total</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companiesLoading && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>}
+                    {!companiesLoading && companies.filter((c) => !companyQ || (c.name || "").toLowerCase().includes(companyQ.toLowerCase())).map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">{c.name}</TableCell>
+                        <TableCell className="text-xs">{c.industry || "—"}</TableCell>
+                        <TableCell className="text-right">{c.user_count}</TableCell>
+                        <TableCell className="text-right">{c.store_count}</TableCell>
+                        <TableCell className="text-right">{c.warehouse_count}</TableCell>
+                        <TableCell className="text-right">{Number(c.sales_total).toLocaleString()}</TableCell>
+                        <TableCell>{c.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="destructive">Suspended</Badge>}</TableCell>
+                        <TableCell className="text-right space-x-1">
+                          <Button variant="ghost" size="icon" title="View" onClick={() => openCompanyDetail(c.id)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditCompany(c); setCompanyPatch({ name: c.name, industry: c.industry || "", country: c.country || "", currency: c.currency || "" }); }}><Pencil className="h-4 w-4" /></Button>
+                          {c.is_active
+                            ? <Button variant="ghost" size="icon" title="Suspend" onClick={() => { setSuspendCompany(c); setSuspendReason(""); }} className="text-destructive"><PowerOff className="h-4 w-4" /></Button>
+                            : <Button variant="ghost" size="icon" title="Reactivate" onClick={async () => { try { await call("set_company_active", { companyId: c.id, active: true }); toast({ title: "Company reactivated" }); loadCompanies(); } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); } }}><Power className="h-4 w-4" /></Button>}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!companiesLoading && companies.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">No companies</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </TabsContent>
+
+          {/* -------- Users (existing) -------- */}
+          <TabsContent value="users">
         <Card className="p-4">
           <div className="flex items-center gap-2 mb-4">
             <Search className="h-4 w-4 text-muted-foreground" />
@@ -285,6 +438,12 @@ export default function SuperAdminPage() {
                       <Button variant="ghost" size="icon" title="Reset password" onClick={() => { setPwUser(u); setNewPassword(""); }}>
                         <KeyRound className="h-4 w-4" />
                       </Button>
+                      <Button variant="ghost" size="icon" title="Move to another company" onClick={() => { setMoveUser(u); setMoveCompanyId(u.company_id || ""); if (!companies.length) loadCompanies(); }}>
+                        <Building2 className="h-4 w-4" />
+                      </Button>
+                      {u.banned_until && new Date(u.banned_until).getTime() > Date.now()
+                        ? <Button variant="ghost" size="icon" title="Unban" onClick={async () => { try { await call("unban_user", { userId: u.id }); toast({ title: "User unbanned" }); load(); } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); } }}><Power className="h-4 w-4" /></Button>
+                        : <Button variant="ghost" size="icon" title="Ban" onClick={() => setBanUser(u)} className="text-destructive"><Ban className="h-4 w-4" /></Button>}
                       <Button variant="ghost" size="icon" title="Delete" onClick={() => setDeleting(u)} className="text-destructive hover:text-destructive">
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -309,6 +468,75 @@ export default function SuperAdminPage() {
             </div>
           )}
         </Card>
+          </TabsContent>
+
+          {/* -------- Audit -------- */}
+          <TabsContent value="audit" className="space-y-3">
+            <Card className="p-4">
+              <div className="flex flex-wrap items-end gap-2 mb-4">
+                <div className="min-w-[180px]">
+                  <Label className="text-xs">Company</Label>
+                  <Select value={auditFilters.companyId || "all"} onValueChange={(v) => setAuditFilters((f) => ({ ...f, companyId: v === "all" ? undefined : v }))}>
+                    <SelectTrigger><SelectValue placeholder="All companies" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All companies</SelectItem>
+                      {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-[160px]">
+                  <Label className="text-xs">Action contains</Label>
+                  <Input value={auditFilters.action || ""} onChange={(e) => setAuditFilters((f) => ({ ...f, action: e.target.value || undefined }))} placeholder="sale.create" />
+                </div>
+                <div className="min-w-[140px]">
+                  <Label className="text-xs">Severity</Label>
+                  <Select value={auditFilters.severity || "any"} onValueChange={(v) => setAuditFilters((f) => ({ ...f, severity: v === "any" ? undefined : v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any</SelectItem>
+                      <SelectItem value="info">info</SelectItem>
+                      <SelectItem value="warning">warning</SelectItem>
+                      <SelectItem value="critical">critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button variant="outline" size="sm" onClick={loadAudit} disabled={auditLoading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${auditLoading ? "animate-spin" : ""}`} /> Apply
+                </Button>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Company</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Target</TableHead>
+                      <TableHead>Detail</TableHead>
+                      <TableHead>Severity</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLoading && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>}
+                    {!auditLoading && audit.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No events</TableCell></TableRow>}
+                    {!auditLoading && audit.map((r: any) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString()}</TableCell>
+                        <TableCell className="text-xs">{r.company_name || <span className="text-muted-foreground">—</span>}</TableCell>
+                        <TableCell className="text-xs">{r.user_name || "System"} <span className="text-muted-foreground">({r.user_role || "—"})</span></TableCell>
+                        <TableCell className="text-xs font-mono">{r.action}</TableCell>
+                        <TableCell className="text-xs">{r.target || "—"}</TableCell>
+                        <TableCell className="text-xs max-w-[320px] truncate" title={r.detail || ""}>{r.detail || "—"}</TableCell>
+                        <TableCell><Badge variant={r.severity === "critical" ? "destructive" : r.severity === "warning" ? "outline" : "secondary"}>{r.severity}</Badge></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Create dialog */}
@@ -476,6 +704,184 @@ export default function SuperAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company detail */}
+      <Dialog open={companyDetailOpen} onOpenChange={(o) => { setCompanyDetailOpen(o); if (!o) setCompanyDetail(null); }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{companyDetail?.company?.name || "Company"}</DialogTitle>
+            <DialogDescription>
+              {companyDetail?.company?.industry || "—"} · {companyDetail?.company?.country || "—"} · {companyDetail?.company?.currency || "—"}
+              {companyDetail?.company && !companyDetail.company.is_active && <Badge variant="destructive" className="ml-2">Suspended</Badge>}
+            </DialogDescription>
+          </DialogHeader>
+          {companyDetail?.loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {companyDetail?.error && <p className="text-sm text-destructive">{companyDetail.error}</p>}
+          {companyDetail?.company && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><UsersIcon className="h-4 w-4" /> Users ({companyDetail.users?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Roles</TableHead><TableHead>Last sign in</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.users || []).map((u: any) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="text-sm">{u.name || "—"}</TableCell>
+                        <TableCell className="text-xs">{u.email || "—"}</TableCell>
+                        <TableCell className="text-xs">{(u.roles || []).map((r: any) => <Badge key={r.id} variant="secondary" className="mr-1">{r.name}</Badge>)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.users || []).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">No users</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Store className="h-4 w-4" /> Stores ({companyDetail.stores?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.stores || []).map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="text-sm">{s.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{[s.city, s.state].filter(Boolean).join(", ") || s.address || "—"}</TableCell>
+                        <TableCell>{s.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.stores || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No stores</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Warehouse className="h-4 w-4" /> Warehouses ({companyDetail.warehouses?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.warehouses || []).map((w: any) => (
+                      <TableRow key={w.id}>
+                        <TableCell className="text-sm">{w.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{[w.city, w.state].filter(Boolean).join(", ") || w.address || "—"}</TableCell>
+                        <TableCell>{w.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.warehouses || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No warehouses</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit company */}
+      <Dialog open={!!editCompany} onOpenChange={(o) => !o && setEditCompany(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {(["name","industry","country","currency","phone","email","website","address","city","state","tax_id","business_type"] as const).map((f) => (
+              <div key={f}><Label className="capitalize">{f.replace("_"," ")}</Label>
+                <Input value={companyPatch[f] ?? ""} onChange={(e) => setCompanyPatch((p) => ({ ...p, [f]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCompany(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              if (!editCompany) return;
+              setBusy(true);
+              try {
+                await call("update_company", { companyId: editCompany.id, patch: companyPatch });
+                toast({ title: "Company updated" });
+                setEditCompany(null);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend company */}
+      <AlertDialog open={!!suspendCompany} onOpenChange={(o) => !o && setSuspendCompany(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend {suspendCompany?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The company will be marked inactive. Data is preserved and can be reactivated later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input placeholder="Reason (optional)" value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              if (!suspendCompany) return;
+              try {
+                await call("set_company_active", { companyId: suspendCompany.id, active: false, reason: suspendReason });
+                toast({ title: "Company suspended" });
+                setSuspendCompany(null);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+            }}>Suspend</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Move user to company */}
+      <Dialog open={!!moveUser} onOpenChange={(o) => !o && setMoveUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move user</DialogTitle>
+            <DialogDescription>Reassign {moveUser?.name || moveUser?.email} to a different company.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Company</Label>
+            <Select value={moveCompanyId || "none"} onValueChange={(v) => setMoveCompanyId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— No company —</SelectItem>
+                {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveUser(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              if (!moveUser) return;
+              setBusy(true);
+              try {
+                await call("move_user_company", { userId: moveUser.id, companyId: moveCompanyId || null });
+                toast({ title: "User moved" });
+                setMoveUser(null);
+                load();
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Move</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ban user */}
+      <AlertDialog open={!!banUser} onOpenChange={(o) => !o && setBanUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ban {banUser?.name || banUser?.email}?</AlertDialogTitle>
+            <AlertDialogDescription>They will be signed out and blocked from signing in until you unban them.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              if (!banUser) return;
+              try {
+                await call("ban_user", { userId: banUser.id });
+                toast({ title: "User banned" });
+                setBanUser(null);
+                load();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+            }}>Ban</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
