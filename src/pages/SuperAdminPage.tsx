@@ -18,8 +18,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye } from "lucide-react";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 const PAGE_SIZE = 20;
