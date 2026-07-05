@@ -421,12 +421,15 @@ export type Database = {
           email: string | null
           id: string
           industry: string | null
+          is_active: boolean
           logo_url: string | null
           name: string
           owner_id: string
           phone: string | null
           rc_number: string | null
           state: string | null
+          suspended_at: string | null
+          suspended_reason: string | null
           tax_id: string | null
           tax_rate: number | null
           updated_at: string
@@ -442,12 +445,15 @@ export type Database = {
           email?: string | null
           id?: string
           industry?: string | null
+          is_active?: boolean
           logo_url?: string | null
           name: string
           owner_id: string
           phone?: string | null
           rc_number?: string | null
           state?: string | null
+          suspended_at?: string | null
+          suspended_reason?: string | null
           tax_id?: string | null
           tax_rate?: number | null
           updated_at?: string
@@ -463,12 +469,15 @@ export type Database = {
           email?: string | null
           id?: string
           industry?: string | null
+          is_active?: boolean
           logo_url?: string | null
           name?: string
           owner_id?: string
           phone?: string | null
           rc_number?: string | null
           state?: string | null
+          suspended_at?: string | null
+          suspended_reason?: string | null
           tax_id?: string | null
           tax_rate?: number | null
           updated_at?: string
