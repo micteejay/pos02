@@ -704,6 +704,184 @@ export default function SuperAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company detail */}
+      <Dialog open={companyDetailOpen} onOpenChange={(o) => { setCompanyDetailOpen(o); if (!o) setCompanyDetail(null); }}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{companyDetail?.company?.name || "Company"}</DialogTitle>
+            <DialogDescription>
+              {companyDetail?.company?.industry || "—"} · {companyDetail?.company?.country || "—"} · {companyDetail?.company?.currency || "—"}
+              {companyDetail?.company && !companyDetail.company.is_active && <Badge variant="destructive" className="ml-2">Suspended</Badge>}
+            </DialogDescription>
+          </DialogHeader>
+          {companyDetail?.loading && <p className="text-sm text-muted-foreground">Loading…</p>}
+          {companyDetail?.error && <p className="text-sm text-destructive">{companyDetail.error}</p>}
+          {companyDetail?.company && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><UsersIcon className="h-4 w-4" /> Users ({companyDetail.users?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Roles</TableHead><TableHead>Last sign in</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.users || []).map((u: any) => (
+                      <TableRow key={u.id}>
+                        <TableCell className="text-sm">{u.name || "—"}</TableCell>
+                        <TableCell className="text-xs">{u.email || "—"}</TableCell>
+                        <TableCell className="text-xs">{(u.roles || []).map((r: any) => <Badge key={r.id} variant="secondary" className="mr-1">{r.name}</Badge>)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.users || []).length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-4">No users</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Store className="h-4 w-4" /> Stores ({companyDetail.stores?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.stores || []).map((s: any) => (
+                      <TableRow key={s.id}>
+                        <TableCell className="text-sm">{s.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{[s.city, s.state].filter(Boolean).join(", ") || s.address || "—"}</TableCell>
+                        <TableCell>{s.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.stores || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No stores</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Warehouse className="h-4 w-4" /> Warehouses ({companyDetail.warehouses?.length || 0})</h3>
+                <Table>
+                  <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(companyDetail.warehouses || []).map((w: any) => (
+                      <TableRow key={w.id}>
+                        <TableCell className="text-sm">{w.name}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{[w.city, w.state].filter(Boolean).join(", ") || w.address || "—"}</TableCell>
+                        <TableCell>{w.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                      </TableRow>
+                    ))}
+                    {(companyDetail.warehouses || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No warehouses</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit company */}
+      <Dialog open={!!editCompany} onOpenChange={(o) => !o && setEditCompany(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Edit Company</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            {(["name","industry","country","currency","phone","email","website","address","city","state","tax_id","business_type"] as const).map((f) => (
+              <div key={f}><Label className="capitalize">{f.replace("_"," ")}</Label>
+                <Input value={companyPatch[f] ?? ""} onChange={(e) => setCompanyPatch((p) => ({ ...p, [f]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditCompany(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              if (!editCompany) return;
+              setBusy(true);
+              try {
+                await call("update_company", { companyId: editCompany.id, patch: companyPatch });
+                toast({ title: "Company updated" });
+                setEditCompany(null);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Suspend company */}
+      <AlertDialog open={!!suspendCompany} onOpenChange={(o) => !o && setSuspendCompany(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Suspend {suspendCompany?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The company will be marked inactive. Data is preserved and can be reactivated later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input placeholder="Reason (optional)" value={suspendReason} onChange={(e) => setSuspendReason(e.target.value)} />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              if (!suspendCompany) return;
+              try {
+                await call("set_company_active", { companyId: suspendCompany.id, active: false, reason: suspendReason });
+                toast({ title: "Company suspended" });
+                setSuspendCompany(null);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+            }}>Suspend</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Move user to company */}
+      <Dialog open={!!moveUser} onOpenChange={(o) => !o && setMoveUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move user</DialogTitle>
+            <DialogDescription>Reassign {moveUser?.name || moveUser?.email} to a different company.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Company</Label>
+            <Select value={moveCompanyId || "none"} onValueChange={(v) => setMoveCompanyId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— No company —</SelectItem>
+                {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveUser(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              if (!moveUser) return;
+              setBusy(true);
+              try {
+                await call("move_user_company", { userId: moveUser.id, companyId: moveCompanyId || null });
+                toast({ title: "User moved" });
+                setMoveUser(null);
+                load();
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Move</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ban user */}
+      <AlertDialog open={!!banUser} onOpenChange={(o) => !o && setBanUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ban {banUser?.name || banUser?.email}?</AlertDialogTitle>
+            <AlertDialogDescription>They will be signed out and blocked from signing in until you unban them.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={async () => {
+              if (!banUser) return;
+              try {
+                await call("ban_user", { userId: banUser.id });
+                toast({ title: "User banned" });
+                setBanUser(null);
+                load();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+            }}>Ban</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
