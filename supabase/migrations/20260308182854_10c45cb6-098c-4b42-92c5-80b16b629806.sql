@@ -1,7 +1,10 @@
-
 -- Enable extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Ensure uuid-ossp functions can be found by adding extensions to search path
+SELECT pg_catalog.set_config('search_path', 'public,extensions', false);
+
 
 -- ENUMS
 CREATE TYPE public.app_role AS ENUM ('super_admin', 'admin', 'manager', 'sales_rep', 'warehouse_staff', 'viewer');
@@ -1113,10 +1116,11 @@ CREATE INDEX idx_chat_doc_links_msg ON public.chat_document_links(message_id);
 CREATE INDEX idx_chat_doc_links_doc ON public.chat_document_links(document_id);
 
 -- STORAGE BUCKETS
-INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', FALSE);
-INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', TRUE);
-INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', TRUE);
-INSERT INTO storage.buckets (id, name, public) VALUES ('chat-attachments', 'chat-attachments', FALSE);
+INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', FALSE) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('avatars', 'avatars', TRUE) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('logos', 'logos', TRUE) ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('chat-attachments', 'chat-attachments', FALSE) ON CONFLICT (id) DO NOTHING;
+
 
 CREATE POLICY "auth_read" ON storage.objects FOR SELECT TO authenticated USING (TRUE);
 CREATE POLICY "auth_insert" ON storage.objects FOR INSERT TO authenticated WITH CHECK (TRUE);

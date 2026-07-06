@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
-import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase, PackageOpen, FolderOpen, AlertTriangle, RotateCcw } from "lucide-react";
+import { Building2, Upload, Check, ArrowRight, Globe, Phone, Mail, MapPin, Hash, Briefcase, PackageOpen, FolderOpen, AlertTriangle, RotateCcw, LogOut } from "lucide-react";
 import { previewBackupFile, importCompanyBackup, type BackupManifest, type BackupProgress } from "@/utils/company-backup";
 
 const currencyMap: Record<string, string> = {
@@ -13,7 +13,7 @@ const currencyMap: Record<string, string> = {
 };
 
 export default function CompanySetupPage() {
-  const { saveCompanyProfile, user } = useAuth();
+  const { saveCompanyProfile, user, logout } = useAuth();
   const { updateSettings } = useAppSettings();
   const navigate = useNavigate();
 
@@ -146,6 +146,14 @@ export default function CompanySetupPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      {/* Sign out button — top right */}
+      <button
+        onClick={logout}
+        className="fixed top-4 right-4 z-50 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground border border-border rounded-full px-3 py-1.5 bg-background/80 backdrop-blur-sm hover:bg-muted transition-all"
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        Sign out
+      </button>
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4">

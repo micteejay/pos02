@@ -41,6 +41,15 @@ interface AuthContextType {
   saveCompanyProfile: (profile: CompanyProfile) => void;
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number = 6000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out")), ms)
+    )
+  ]);
+}
+
 const AuthContext = createContext<AuthContextType>(null!);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -202,7 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       try {
         if (session?.user) {
-          await fetchUserProfile(session.user);
+          await withTimeout(fetchUserProfile(session.user), 6000);
         } else {
           setUser(null);
           setCompanyProfile(null);
@@ -221,13 +230,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (active) {
         if (error) {
-          await supabase.auth.signOut({ scope: "local" });
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch (_) {}
           setUser(null);
           setCompanyProfile(null);
           setLoading(false);
           return;
         }
         handleSessionChange(session);
+      }
+    }).catch(async (err) => {
+      console.error("[use-auth] getSession rejected:", err);
+      if (active) {
+        try {
+          await supabase.auth.signOut({ scope: "local" });
+        } catch (_) {}
+        setUser(null);
+        setCompanyProfile(null);
+        setLoading(false);
       }
     });
 
