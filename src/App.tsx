@@ -68,8 +68,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const PLATFORM_SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
+function isPlatformOwner(email?: string | null) {
+  return !!email && PLATFORM_SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+}
+
 function AuthRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasCompanyProfile } = useAuth();
+  const { isAuthenticated, hasCompanyProfile, user } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
   // Honor ?next=<same-origin path> so OAuth consent (and similar deep links)
@@ -78,6 +83,7 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
   if (isAuthenticated) {
     if (safeNext) return <Navigate to={safeNext} replace />;
+    if (isPlatformOwner(user?.email)) return <Navigate to="/super-admin" replace />;
     if (from && from.startsWith("/super-admin")) return <Navigate to={from} replace />;
     return <Navigate to={hasCompanyProfile ? (from || "/") : "/setup-company"} replace />;
   }
@@ -85,8 +91,9 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
 }
 
 function SetupRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, hasCompanyProfile } = useAuth();
+  const { isAuthenticated, hasCompanyProfile, user } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (isPlatformOwner(user?.email)) return <Navigate to="/super-admin" replace />;
   if (hasCompanyProfile) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
