@@ -20,7 +20,8 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye, Plus } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 const PAGE_SIZE = 20;
@@ -87,6 +88,26 @@ export default function SuperAdminPage() {
   const [moveCompanyId, setMoveCompanyId] = useState<string>("");
   const [banUser, setBanUser] = useState<SuperUser | null>(null);
 
+  // Create company / add store / add warehouse
+  const [createCompanyOpen, setCreateCompanyOpen] = useState(false);
+  const [newCompany, setNewCompany] = useState({ name: "", industry: "", country: "", currency: "" });
+  const [addStoreCompanyId, setAddStoreCompanyId] = useState<string | null>(null);
+  const [newStore, setNewStore] = useState({ name: "", type: "retail", address: "", phone: "", email: "" });
+  const [addWarehouseCompanyId, setAddWarehouseCompanyId] = useState<string | null>(null);
+  const [newWarehouse, setNewWarehouse] = useState({ name: "", location: "", capacity: "" });
+
+  // Multi-role + assignments
+  const [rbacUser, setRbacUser] = useState<SuperUser | null>(null);
+  const [rbacRoleIds, setRbacRoleIds] = useState<string[]>([]);
+  const [rbacStoreIds, setRbacStoreIds] = useState<string[]>([]);
+  const [rbacWarehouseIds, setRbacWarehouseIds] = useState<string[]>([]);
+  const [rbacCompanyOptions, setRbacCompanyOptions] = useState<{ stores: any[]; warehouses: any[] }>({ stores: [], warehouses: [] });
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkMoveCompanyId, setBulkMoveCompanyId] = useState<string>("");
+
   const [audit, setAudit] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditFilters, setAuditFilters] = useState<{ companyId?: string; action?: string; severity?: string }>({});
@@ -111,7 +132,7 @@ export default function SuperAdminPage() {
     }
   }, [call]);
 
-  useEffect(() => { if (serverCheck === "ok") load(); }, [serverCheck, load]);
+  useEffect(() => { if (serverCheck === "ok" && isAuthenticated) load(); }, [serverCheck, load, isAuthenticated]);
   useEffect(() => { setPage(1); }, [q, sortKey, sortDir]);
 
   // Loaders for new tabs
@@ -156,11 +177,11 @@ export default function SuperAdminPage() {
   }, [call, auditFilters]);
 
   useEffect(() => {
-    if (serverCheck !== "ok") return;
+    if (serverCheck !== "ok" || !isAuthenticated) return;
     if (tab === "overview") loadStats();
     if (tab === "companies") loadCompanies();
     if (tab === "audit") loadAudit();
-  }, [serverCheck, tab, loadStats, loadCompanies, loadAudit]);
+  }, [serverCheck, tab, loadStats, loadCompanies, loadAudit, isAuthenticated]);
 
   // Server-side authorization: verify with the edge function that the
   // caller's authenticated email is the platform owner. Client-side checks
@@ -202,6 +223,39 @@ export default function SuperAdminPage() {
   );
 
   // Authorization gates disabled. Directly rendering the Super Admin console dashboard.
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="p-6 w-full max-w-md space-y-4">
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-primary" />
+            <h1 className="text-lg font-semibold">Super Admin sign in</h1>
+          </div>
+          <p className="text-xs text-muted-foreground">Sign in with the platform owner email to access this console.</p>
+          <div className="space-y-2">
+            <Label>Email</Label>
+            <Input type="email" value={signInEmail} onChange={(e) => setSignInEmail(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input type="password" value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} />
+          </div>
+          <Button
+            className="w-full"
+            disabled={signingIn || !signInEmail || !signInPassword}
+            onClick={async () => {
+              setSigningIn(true);
+              const r = await login(signInEmail, signInPassword);
+              setSigningIn(false);
+              if (!r.ok) toast({ title: "Sign in failed", description: r.message, variant: "destructive" });
+            }}
+          >{signingIn ? "Signing in…" : "Sign in"}</Button>
+          <Button variant="link" className="w-full" onClick={() => navigate("/login")}>Back to login</Button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -263,7 +317,10 @@ export default function SuperAdminPage() {
               <div className="flex items-center gap-2 mb-4">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search companies…" value={companyQ} onChange={(e) => setCompanyQ(e.target.value)} className="max-w-md" />
-                <Button variant="outline" size="sm" onClick={loadCompanies} className="ml-auto" disabled={companiesLoading}>
+                <Button size="sm" className="ml-auto" onClick={() => { setNewCompany({ name: "", industry: "", country: "", currency: "" }); setCreateCompanyOpen(true); }}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Company
+                </Button>
+                <Button variant="outline" size="sm" onClick={loadCompanies} disabled={companiesLoading}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${companiesLoading ? "animate-spin" : ""}`} /> Refresh
                 </Button>
               </div>
@@ -322,10 +379,41 @@ export default function SuperAdminPage() {
             <span className="text-xs text-muted-foreground ml-auto">{filteredSorted.length} of {users.length}</span>
           </div>
 
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-muted/50 border">
+              <span className="text-xs">{selectedIds.size} selected</span>
+              <Button size="sm" variant="outline" onClick={() => { if (!companies.length) loadCompanies(); setBulkMoveCompanyId(""); setBulkMoveOpen(true); }}>
+                <Building2 className="h-4 w-4 mr-1" /> Move to company
+              </Button>
+              <Button size="sm" variant="outline" className="text-destructive" onClick={async () => {
+                try { await call("bulk_ban", { userIds: Array.from(selectedIds) }); toast({ title: "Users banned" }); setSelectedIds(new Set()); load(); }
+                catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              }}><Ban className="h-4 w-4 mr-1" /> Ban</Button>
+              <Button size="sm" variant="outline" onClick={async () => {
+                try { await call("bulk_unban", { userIds: Array.from(selectedIds) }); toast({ title: "Users unbanned" }); setSelectedIds(new Set()); load(); }
+                catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              }}><Power className="h-4 w-4 mr-1" /> Unban</Button>
+              <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8">
+                    <Checkbox
+                      checked={pageRows.length > 0 && pageRows.every((u) => selectedIds.has(u.id))}
+                      onCheckedChange={(v) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (v) pageRows.forEach((u) => next.add(u.id));
+                          else pageRows.forEach((u) => next.delete(u.id));
+                          return next;
+                        });
+                      }}
+                    />
+                  </TableHead>
                   <TableHead><SortHeader k="name" label="Name" /></TableHead>
                   <TableHead><SortHeader k="email" label="Email" /></TableHead>
                   <TableHead><SortHeader k="company_name" label="Company" /></TableHead>
@@ -336,13 +424,19 @@ export default function SuperAdminPage() {
               </TableHeader>
               <TableBody>
                 {loading && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Loading…</TableCell></TableRow>
                 )}
                 {!loading && pageRows.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No users found</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No users found</TableCell></TableRow>
                 )}
                 {!loading && pageRows.map((u) => (
                   <TableRow key={u.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(u.id)}
+                        onCheckedChange={(v) => setSelectedIds((prev) => { const next = new Set(prev); if (v) next.add(u.id); else next.delete(u.id); return next; })}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{u.name || "—"}</TableCell>
                     <TableCell className="text-sm">{u.email || "—"}</TableCell>
                     <TableCell className="text-sm">{u.company_name || <span className="text-muted-foreground">None</span>}</TableCell>
@@ -358,7 +452,21 @@ export default function SuperAdminPage() {
                       <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditing(u); setForm({ name: u.name || "", email: u.email || "", password: "" }); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" title="Assign role" onClick={() => { setRoleUser(u); setSelectedRoleId(u.roles?.[0]?.id || ""); }}>
+                      <Button variant="ghost" size="icon" title="Manage roles & assignments" onClick={async () => {
+                        setRbacUser(u);
+                        setRbacRoleIds((u.roles || []).map((r) => r.id));
+                        setRbacStoreIds([]); setRbacWarehouseIds([]);
+                        setRbacCompanyOptions({ stores: [], warehouses: [] });
+                        try {
+                          const [assign, det] = await Promise.all([
+                            call("user_assignments", { userId: u.id }),
+                            u.company_id ? call("company_detail", { companyId: u.company_id }) : Promise.resolve({ stores: [], warehouses: [] }),
+                          ]);
+                          setRbacStoreIds(assign.storeIds || []);
+                          setRbacWarehouseIds(assign.warehouseIds || []);
+                          setRbacCompanyOptions({ stores: det.stores || [], warehouses: det.warehouses || [] });
+                        } catch (e) { toast({ title: "Failed to load user scope", description: (e as Error).message, variant: "destructive" }); }
+                      }}>
                         <ShieldCheck className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" title="Reset password" onClick={() => { setPwUser(u); setNewPassword(""); }}>
@@ -663,15 +771,20 @@ export default function SuperAdminPage() {
                 </Table>
               </div>
               <div>
-                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Store className="h-4 w-4" /> Stores ({companyDetail.stores?.length || 0})</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-2"><Store className="h-4 w-4" /> Stores ({companyDetail.stores?.length || 0})</h3>
+                  <Button size="sm" variant="outline" onClick={() => { setNewStore({ name: "", type: "retail", address: "", phone: "", email: "" }); setAddStoreCompanyId(companyDetail.company.id); }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Store
+                  </Button>
+                </div>
                 <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {(companyDetail.stores || []).map((s: any) => (
                       <TableRow key={s.id}>
                         <TableCell className="text-sm">{s.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{[s.city, s.state].filter(Boolean).join(", ") || s.address || "—"}</TableCell>
-                        <TableCell>{s.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{s.address || "—"}</TableCell>
+                        <TableCell>{s.status === "active" ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">{s.status || "—"}</Badge>}</TableCell>
                       </TableRow>
                     ))}
                     {(companyDetail.stores || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No stores</TableCell></TableRow>}
@@ -679,15 +792,20 @@ export default function SuperAdminPage() {
                 </Table>
               </div>
               <div>
-                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><Warehouse className="h-4 w-4" /> Warehouses ({companyDetail.warehouses?.length || 0})</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-2"><Warehouse className="h-4 w-4" /> Warehouses ({companyDetail.warehouses?.length || 0})</h3>
+                  <Button size="sm" variant="outline" onClick={() => { setNewWarehouse({ name: "", location: "", capacity: "" }); setAddWarehouseCompanyId(companyDetail.company.id); }}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Warehouse
+                  </Button>
+                </div>
                 <Table>
                   <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {(companyDetail.warehouses || []).map((w: any) => (
                       <TableRow key={w.id}>
                         <TableCell className="text-sm">{w.name}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{[w.city, w.state].filter(Boolean).join(", ") || w.address || "—"}</TableCell>
-                        <TableCell>{w.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{w.location || "—"}</TableCell>
+                        <TableCell>{w.status === "active" ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">{w.status || "—"}</Badge>}</TableCell>
                       </TableRow>
                     ))}
                     {(companyDetail.warehouses || []).length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-4">No warehouses</TableCell></TableRow>}
@@ -808,6 +926,211 @@ export default function SuperAdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Create Company */}
+      <Dialog open={createCompanyOpen} onOpenChange={setCreateCompanyOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Company</DialogTitle>
+            <DialogDescription>Create a new tenant. You become the initial owner.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name *</Label><Input value={newCompany.name} onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })} /></div>
+            <div><Label>Industry</Label><Input value={newCompany.industry} onChange={(e) => setNewCompany({ ...newCompany, industry: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>Country</Label><Input value={newCompany.country} onChange={(e) => setNewCompany({ ...newCompany, country: e.target.value })} /></div>
+              <div><Label>Currency</Label><Input value={newCompany.currency} onChange={(e) => setNewCompany({ ...newCompany, currency: e.target.value })} placeholder="NGN" /></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateCompanyOpen(false)}>Cancel</Button>
+            <Button disabled={busy || !newCompany.name} onClick={async () => {
+              setBusy(true);
+              try {
+                await call("create_company", newCompany);
+                toast({ title: "Company created" });
+                setCreateCompanyOpen(false);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Store */}
+      <Dialog open={!!addStoreCompanyId} onOpenChange={(o) => !o && setAddStoreCompanyId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Store</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name *</Label><Input value={newStore.name} onChange={(e) => setNewStore({ ...newStore, name: e.target.value })} /></div>
+            <div><Label>Type</Label><Input value={newStore.type} onChange={(e) => setNewStore({ ...newStore, type: e.target.value })} placeholder="retail" /></div>
+            <div><Label>Address</Label><Input value={newStore.address} onChange={(e) => setNewStore({ ...newStore, address: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-2">
+              <div><Label>Phone</Label><Input value={newStore.phone} onChange={(e) => setNewStore({ ...newStore, phone: e.target.value })} /></div>
+              <div><Label>Email</Label><Input value={newStore.email} onChange={(e) => setNewStore({ ...newStore, email: e.target.value })} /></div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStoreCompanyId(null)}>Cancel</Button>
+            <Button disabled={busy || !newStore.name} onClick={async () => {
+              if (!addStoreCompanyId) return;
+              setBusy(true);
+              try {
+                await call("create_store", { companyId: addStoreCompanyId, ...newStore });
+                toast({ title: "Store created" });
+                const cid = addStoreCompanyId;
+                setAddStoreCompanyId(null);
+                setNewStore({ name: "", type: "retail", address: "", phone: "", email: "" });
+                openCompanyDetail(cid);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Warehouse */}
+      <Dialog open={!!addWarehouseCompanyId} onOpenChange={(o) => !o && setAddWarehouseCompanyId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add Warehouse</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Name *</Label><Input value={newWarehouse.name} onChange={(e) => setNewWarehouse({ ...newWarehouse, name: e.target.value })} /></div>
+            <div><Label>Location</Label><Input value={newWarehouse.location} onChange={(e) => setNewWarehouse({ ...newWarehouse, location: e.target.value })} /></div>
+            <div><Label>Capacity</Label><Input type="number" value={newWarehouse.capacity} onChange={(e) => setNewWarehouse({ ...newWarehouse, capacity: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddWarehouseCompanyId(null)}>Cancel</Button>
+            <Button disabled={busy || !newWarehouse.name} onClick={async () => {
+              if (!addWarehouseCompanyId) return;
+              setBusy(true);
+              try {
+                await call("create_warehouse", { companyId: addWarehouseCompanyId, ...newWarehouse });
+                toast({ title: "Warehouse created" });
+                const cid = addWarehouseCompanyId;
+                setAddWarehouseCompanyId(null);
+                setNewWarehouse({ name: "", location: "", capacity: "" });
+                openCompanyDetail(cid);
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* RBAC editor: multi-role + store/warehouse assignments */}
+      <Dialog open={!!rbacUser} onOpenChange={(o) => !o && setRbacUser(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Roles & Access — {rbacUser?.name || rbacUser?.email}</DialogTitle>
+            <DialogDescription>
+              Company: {rbacUser?.company_name || "None"}. Assign multiple roles and scope access to specific stores/warehouses.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div>
+              <Label className="mb-2 block">Roles</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {roles.map((r) => (
+                  <label key={r.id} className="flex items-center gap-2 text-sm border rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50">
+                    <Checkbox
+                      checked={rbacRoleIds.includes(r.id)}
+                      onCheckedChange={(v) => setRbacRoleIds((prev) => v ? [...prev, r.id] : prev.filter((x) => x !== r.id))}
+                    />
+                    <span>{r.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="mb-2 block flex items-center gap-2"><Store className="h-4 w-4" /> Store access</Label>
+              {rbacCompanyOptions.stores.length === 0 ? <p className="text-xs text-muted-foreground">No stores in this company.</p> : (
+                <div className="grid grid-cols-2 gap-2">
+                  {rbacCompanyOptions.stores.map((s: any) => (
+                    <label key={s.id} className="flex items-center gap-2 text-sm border rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50">
+                      <Checkbox
+                        checked={rbacStoreIds.includes(s.id)}
+                        onCheckedChange={(v) => setRbacStoreIds((prev) => v ? [...prev, s.id] : prev.filter((x) => x !== s.id))}
+                      />
+                      <span>{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <Label className="mb-2 block flex items-center gap-2"><Warehouse className="h-4 w-4" /> Warehouse access</Label>
+              {rbacCompanyOptions.warehouses.length === 0 ? <p className="text-xs text-muted-foreground">No warehouses in this company.</p> : (
+                <div className="grid grid-cols-2 gap-2">
+                  {rbacCompanyOptions.warehouses.map((w: any) => (
+                    <label key={w.id} className="flex items-center gap-2 text-sm border rounded-md px-2 py-1.5 cursor-pointer hover:bg-muted/50">
+                      <Checkbox
+                        checked={rbacWarehouseIds.includes(w.id)}
+                        onCheckedChange={(v) => setRbacWarehouseIds((prev) => v ? [...prev, w.id] : prev.filter((x) => x !== w.id))}
+                      />
+                      <span>{w.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRbacUser(null)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              if (!rbacUser) return;
+              setBusy(true);
+              try {
+                await Promise.all([
+                  call("assign_roles", { userId: rbacUser.id, roleIds: rbacRoleIds }),
+                  call("set_user_assignments", { userId: rbacUser.id, storeIds: rbacStoreIds, warehouseIds: rbacWarehouseIds }),
+                ]);
+                toast({ title: "Access updated" });
+                setRbacUser(null);
+                load();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk move to company */}
+      <Dialog open={bulkMoveOpen} onOpenChange={setBulkMoveOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Move {selectedIds.size} users</DialogTitle>
+            <DialogDescription>Reassign the selected users to a company.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Company</Label>
+            <Select value={bulkMoveCompanyId || "none"} onValueChange={(v) => setBulkMoveCompanyId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— No company —</SelectItem>
+                {companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkMoveOpen(false)}>Cancel</Button>
+            <Button disabled={busy} onClick={async () => {
+              setBusy(true);
+              try {
+                await call("bulk_move_company", { userIds: Array.from(selectedIds), companyId: bulkMoveCompanyId || null });
+                toast({ title: "Users moved" });
+                setBulkMoveOpen(false);
+                setSelectedIds(new Set());
+                load();
+                loadCompanies();
+              } catch (e) { toast({ title: "Failed", description: (e as Error).message, variant: "destructive" }); }
+              finally { setBusy(false); }
+            }}>Move</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

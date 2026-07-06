@@ -7,6 +7,12 @@ const corsHeaders = {
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
 
+function pick<T extends Record<string, unknown>>(obj: T, keys: string[]) {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (k in obj && obj[k] !== undefined && obj[k] !== "") out[k] = obj[k];
+  return out;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -123,6 +129,55 @@ Deno.serve(async (req) => {
       return json({ ok: true });
     }
 
+    // Multi-role assignment (replace set)
+    if (action === "assign_roles") {
+      const { userId, roleIds } = body;
+      if (!userId || !Array.isArray(roleIds)) return json({ error: "userId and roleIds[] required" }, 400);
+      await admin.from("user_roles").delete().eq("user_id", userId);
+      if (roleIds.length) {
+        const rows = roleIds.map((rid: string) => ({ user_id: userId, role_id: rid }));
+        const { error } = await admin.from("user_roles").insert(rows);
+        if (error) return json({ error: error.message }, 400);
+      }
+      return json({ ok: true });
+    }
+
+    // Store / warehouse assignments per user
+    if (action === "user_assignments") {
+      const { userId } = body;
+      if (!userId) return json({ error: "userId required" }, 400);
+      const [s, w] = await Promise.all([
+        admin.from("user_store_assignments").select("store_id").eq("user_id", userId),
+        admin.from("user_warehouse_assignments").select("warehouse_id").eq("user_id", userId),
+      ]);
+      return json({
+        storeIds: (s.data || []).map((r: any) => r.store_id),
+        warehouseIds: (w.data || []).map((r: any) => r.warehouse_id),
+      });
+    }
+
+    if (action === "set_user_assignments") {
+      const { userId, storeIds, warehouseIds } = body;
+      if (!userId) return json({ error: "userId required" }, 400);
+      if (Array.isArray(storeIds)) {
+        await admin.from("user_store_assignments").delete().eq("user_id", userId);
+        if (storeIds.length) {
+          const rows = storeIds.map((sid: string) => ({ user_id: userId, store_id: sid, assigned_by: callerId }));
+          const { error } = await admin.from("user_store_assignments").insert(rows);
+          if (error) return json({ error: error.message }, 400);
+        }
+      }
+      if (Array.isArray(warehouseIds)) {
+        await admin.from("user_warehouse_assignments").delete().eq("user_id", userId);
+        if (warehouseIds.length) {
+          const rows = warehouseIds.map((wid: string) => ({ user_id: userId, warehouse_id: wid, assigned_by: callerId }));
+          const { error } = await admin.from("user_warehouse_assignments").insert(rows);
+          if (error) return json({ error: error.message }, 400);
+        }
+      }
+      return json({ ok: true });
+    }
+
     if (action === "create") {
       const { email, password, name } = body;
       if (!email || !password || !name) return json({ error: "email, password, name required" }, 400);
@@ -134,6 +189,62 @@ Deno.serve(async (req) => {
       });
       if (error) return json({ error: error.message }, 400);
       return json({ user: data.user });
+    }
+
+    // Company / store / warehouse creation
+    if (action === "create_company") {
+      const { name, ownerId } = body as any;
+      if (!name) return json({ error: "name required" }, 400);
+      const patch = pick(body as any, ["name","industry","country","currency","phone","email","website","address","city","state","tax_id","business_type"]);
+      const insert: Record<string, unknown> = {
+        ...patch,
+        owner_id: ownerId || callerId,
+        is_active: true,
+      };
+      const { data, error } = await admin.from("company_profiles").insert(insert).select("*").single();
+      if (error) return json({ error: error.message }, 400);
+      return json({ company: data });
+    }
+
+    if (action === "create_store") {
+      const { companyId, name, type, address, phone, email } = body as any;
+      if (!companyId || !name) return json({ error: "companyId and name required" }, 400);
+      const insert = { company_id: companyId, name, type: type || "retail", address: address || null, phone: phone || null, email: email || null, status: "active" };
+      const { data, error } = await admin.from("stores").insert(insert).select("*").single();
+      if (error) return json({ error: error.message }, 400);
+      return json({ store: data });
+    }
+
+    if (action === "create_warehouse") {
+      const { companyId, name, location, capacity } = body as any;
+      if (!companyId || !name) return json({ error: "companyId and name required" }, 400);
+      const insert: Record<string, unknown> = { company_id: companyId, name, location: location || null, status: "active" };
+      if (capacity != null && capacity !== "") insert.capacity = Number(capacity);
+      const { data, error } = await admin.from("warehouses").insert(insert).select("*").single();
+      if (error) return json({ error: error.message }, 400);
+      return json({ warehouse: data });
+    }
+
+    // Bulk user actions
+    if (action === "bulk_ban" || action === "bulk_unban") {
+      const { userIds } = body as any;
+      if (!Array.isArray(userIds) || !userIds.length) return json({ error: "userIds[] required" }, 400);
+      const duration = action === "bulk_ban" ? "876000h" : "none";
+      const results: any[] = [];
+      for (const uid of userIds) {
+        if (uid === callerId) { results.push({ uid, skipped: "self" }); continue; }
+        const { error } = await admin.auth.admin.updateUserById(uid, { ban_duration: duration } as any);
+        results.push({ uid, ok: !error, error: error?.message });
+      }
+      return json({ results });
+    }
+
+    if (action === "bulk_move_company") {
+      const { userIds, companyId } = body as any;
+      if (!Array.isArray(userIds) || !userIds.length) return json({ error: "userIds[] required" }, 400);
+      const { error } = await admin.from("profiles").update({ company_id: companyId || null }).in("id", userIds);
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
     }
 
     if (action === "update") {
@@ -230,8 +341,8 @@ Deno.serve(async (req) => {
       const [comp, profs, stores, warehouses, ownerAuth] = await Promise.all([
         admin.from("company_profiles").select("*").eq("id", companyId).single(),
         admin.from("profiles").select("id, name, email, avatar, created_at").eq("company_id", companyId),
-        admin.from("stores").select("id, name, address, city, state, is_active, created_at").eq("company_id", companyId),
-        admin.from("warehouses").select("id, name, address, city, state, is_active, created_at").eq("company_id", companyId),
+        admin.from("stores").select("id, name, address, phone, email, type, status, created_at").eq("company_id", companyId),
+        admin.from("warehouses").select("id, name, location, capacity, status, created_at").eq("company_id", companyId),
         Promise.resolve(null),
       ]);
       if (comp.error) return json({ error: comp.error.message }, 400);
