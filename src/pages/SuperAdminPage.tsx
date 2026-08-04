@@ -20,7 +20,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye, Plus } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, LogIn, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye, Plus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
@@ -163,6 +163,23 @@ export default function SuperAdminPage() {
       setCompanyDetail(d);
     } catch (e) {
       setCompanyDetail({ error: (e as Error).message });
+    }
+  }, [call]);
+
+  // Sign in as a company account (platform owner only; enforced server-side).
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+  const impersonate = useCallback(async (opts: { companyId?: string; userId?: string; label: string }) => {
+    setImpersonating(opts.companyId || opts.userId || null);
+    try {
+      const d = await call("impersonate", { companyId: opts.companyId, userId: opts.userId });
+      const { error } = await supabase.auth.verifyOtp({ token_hash: d.token_hash, type: "magiclink" });
+      if (error) throw error;
+      toast({ title: `Signed in as ${d.email}`, description: opts.label });
+      window.location.href = "/";
+    } catch (e) {
+      toast({ title: "Could not sign in", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setImpersonating(null);
     }
   }, [call]);
 
@@ -351,6 +368,7 @@ export default function SuperAdminPage() {
                         <TableCell>{c.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="destructive">Suspended</Badge>}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" title="View" onClick={() => openCompanyDetail(c.id)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" title="Login as this company" disabled={impersonating === c.id} onClick={() => impersonate({ companyId: c.id, label: c.name })}><LogIn className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditCompany(c); setCompanyPatch({ name: c.name, industry: c.industry || "", country: c.country || "", currency: c.currency || "" }); }}><Pencil className="h-4 w-4" /></Button>
                           {c.is_active
                             ? <Button variant="ghost" size="icon" title="Suspend" onClick={() => { setSuspendCompany(c); setSuspendReason(""); }} className="text-destructive"><PowerOff className="h-4 w-4" /></Button>
@@ -449,6 +467,9 @@ export default function SuperAdminPage() {
                       {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" title="Login as this user" disabled={impersonating === u.id} onClick={() => impersonate({ userId: u.id, label: u.company_name || u.email || "" })}>
+                        <LogIn className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditing(u); setForm({ name: u.name || "", email: u.email || "", password: "" }); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
