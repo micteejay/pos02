@@ -20,7 +20,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye, Plus } from "lucide-react";
+import { Shield, UserPlus, Pencil, Trash2, KeyRound, RefreshCw, Search, LogOut, LogIn, ShieldCheck, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, Building2, Users as UsersIcon, Store, Warehouse, DollarSign, Ban, PowerOff, Power, ScrollText, Eye, Plus } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const SUPER_ADMIN_EMAILS = ["babajuwon0@gmail.com", "bsbsjuwon0@gmail.com"];
@@ -163,6 +163,23 @@ export default function SuperAdminPage() {
       setCompanyDetail(d);
     } catch (e) {
       setCompanyDetail({ error: (e as Error).message });
+    }
+  }, [call]);
+
+  // Sign in as a company account (platform owner only; enforced server-side).
+  const [impersonating, setImpersonating] = useState<string | null>(null);
+  const impersonate = useCallback(async (opts: { companyId?: string; userId?: string; label: string }) => {
+    setImpersonating(opts.companyId || opts.userId || null);
+    try {
+      const d = await call("impersonate", { companyId: opts.companyId, userId: opts.userId });
+      const { error } = await supabase.auth.verifyOtp({ token_hash: d.token_hash, type: "magiclink" });
+      if (error) throw error;
+      toast({ title: `Signed in as ${d.email}`, description: opts.label });
+      window.location.href = "/";
+    } catch (e) {
+      toast({ title: "Could not sign in", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setImpersonating(null);
     }
   }, [call]);
 
