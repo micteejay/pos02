@@ -114,10 +114,6 @@ Deno.serve(async (req) => {
       return json({ users });
     }
 
-    if (action === "list_roles") {
-      // placeholder anchor
-    }
-
     if (action === "impersonate") {
       const { companyId, userId } = body;
       let targetId: string | null = userId ?? null;
