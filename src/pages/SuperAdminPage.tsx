@@ -467,6 +467,9 @@ export default function SuperAdminPage() {
                       {u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : "Never"}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
+                      <Button variant="ghost" size="icon" title="Login as this user" disabled={impersonating === u.id} onClick={() => impersonate({ userId: u.id, label: u.company_name || u.email || "" })}>
+                        <LogIn className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditing(u); setForm({ name: u.name || "", email: u.email || "", password: "" }); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
