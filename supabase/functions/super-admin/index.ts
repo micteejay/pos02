@@ -115,6 +115,63 @@ Deno.serve(async (req) => {
     }
 
     if (action === "list_roles") {
+      // placeholder anchor
+    }
+
+    if (action === "impersonate") {
+      const { companyId, userId } = body;
+      let targetId: string | null = userId ?? null;
+      let companyName: string | null = null;
+
+      if (!targetId && companyId) {
+        const { data: comp, error: compErr } = await admin
+          .from("company_profiles")
+          .select("id, name, owner_id")
+          .eq("id", companyId)
+          .single();
+        if (compErr || !comp) return json({ error: compErr?.message || "Company not found" }, 400);
+        companyName = comp.name;
+        targetId = comp.owner_id;
+        if (!targetId) {
+          // Fall back to any profile belonging to that company
+          const { data: prof } = await admin
+            .from("profiles")
+            .select("id")
+            .eq("company_id", companyId)
+            .limit(1)
+            .maybeSingle();
+          targetId = prof?.id ?? null;
+        }
+      }
+      if (!targetId) return json({ error: "No account found to sign in as" }, 400);
+
+      const { data: targetAuth, error: tErr } = await admin.auth.admin.getUserById(targetId);
+      const email = targetAuth?.user?.email;
+      if (tErr || !email) return json({ error: tErr?.message || "Target account has no email" }, 400);
+
+      const { data: link, error: linkErr } = await admin.auth.admin.generateLink({
+        type: "magiclink",
+        email,
+      });
+      if (linkErr || !link?.properties?.hashed_token) {
+        return json({ error: linkErr?.message || "Could not create sign-in token" }, 400);
+      }
+
+      await admin.from("audit_log").insert({
+        user_id: callerId,
+        user_name: callerEmail,
+        user_role: "Platform Super Admin",
+        action: "superadmin.impersonate",
+        module: "Super Admin",
+        target: email,
+        detail: `Platform owner ${callerEmail} signed in as ${email}${companyName ? ` (${companyName})` : ""}`,
+        severity: "warning",
+      });
+
+      return json({ token_hash: link.properties.hashed_token, email, user_id: targetId });
+    }
+
+    if (action === "list_roles") {
       const { data, error } = await admin.from("roles").select("id, name, description").order("name");
       if (error) return json({ error: error.message }, 400);
       return json({ roles: data });
