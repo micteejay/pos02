@@ -368,6 +368,7 @@ export default function SuperAdminPage() {
                         <TableCell>{c.is_active ? <Badge variant="secondary">Active</Badge> : <Badge variant="destructive">Suspended</Badge>}</TableCell>
                         <TableCell className="text-right space-x-1">
                           <Button variant="ghost" size="icon" title="View" onClick={() => openCompanyDetail(c.id)}><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" title="Login as this company" disabled={impersonating === c.id} onClick={() => impersonate({ companyId: c.id, label: c.name })}><LogIn className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" title="Edit" onClick={() => { setEditCompany(c); setCompanyPatch({ name: c.name, industry: c.industry || "", country: c.country || "", currency: c.currency || "" }); }}><Pencil className="h-4 w-4" /></Button>
                           {c.is_active
                             ? <Button variant="ghost" size="icon" title="Suspend" onClick={() => { setSuspendCompany(c); setSuspendReason(""); }} className="text-destructive"><PowerOff className="h-4 w-4" /></Button>
