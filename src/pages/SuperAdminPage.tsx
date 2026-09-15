@@ -298,6 +298,9 @@ export default function SuperAdminPage() {
             <Button variant="outline" size="sm" onClick={load} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
+            <Button variant="outline" size="sm" onClick={openCompanyLogin}>
+              <LogIn className="h-4 w-4 mr-2" /> Login to Company
+            </Button>
             <Button size="sm" onClick={() => { setForm({ name: "", email: "", password: "" }); setCreateOpen(true); }}>
               <UserPlus className="h-4 w-4 mr-2" /> Add User
             </Button>
