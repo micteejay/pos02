@@ -1164,6 +1164,45 @@ export default function SuperAdminPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Login to a registered company */}
+      <Dialog open={companyLoginOpen} onOpenChange={setCompanyLoginOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Login to a company</DialogTitle>
+            <DialogDescription>Pick a registered company to sign in as its owner account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="h-4 w-4 absolute left-2 top-2.5 text-muted-foreground" />
+              <Input className="pl-8" placeholder="Search companies…" value={companyLoginQuery} onChange={(e) => setCompanyLoginQuery(e.target.value)} />
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1">
+              {companiesLoading && <p className="text-sm text-muted-foreground py-4 text-center">Loading companies…</p>}
+              {!companiesLoading && !companies.length && <p className="text-sm text-muted-foreground py-4 text-center">No companies registered yet.</p>}
+              {companies
+                .filter((c) => !companyLoginQuery.trim() || (c.name || "").toLowerCase().includes(companyLoginQuery.trim().toLowerCase()))
+                .map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-md border p-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {(c.country || "—")} · {c.user_count} users{c.is_active === false ? " · suspended" : ""}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline" disabled={impersonating === c.id}
+                      onClick={() => impersonate({ companyId: c.id, label: c.name })}>
+                      <LogIn className="h-4 w-4 mr-2" />{impersonating === c.id ? "Signing in…" : "Login"}
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompanyLoginOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
