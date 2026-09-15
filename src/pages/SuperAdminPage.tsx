@@ -183,6 +183,15 @@ export default function SuperAdminPage() {
     }
   }, [call]);
 
+  // Quick "log in to a company" picker
+  const [companyLoginOpen, setCompanyLoginOpen] = useState(false);
+  const [companyLoginQuery, setCompanyLoginQuery] = useState("");
+  const openCompanyLogin = useCallback(() => {
+    setCompanyLoginOpen(true);
+    setCompanyLoginQuery("");
+    if (!companies.length) loadCompanies();
+  }, [companies.length, loadCompanies]);
+
   const loadAudit = useCallback(async () => {
     setAuditLoading(true);
     try {
